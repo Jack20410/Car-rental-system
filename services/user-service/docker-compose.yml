@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  user_service:
+    build: .
+    container_name: user-service-app
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - MONGODB_URI=${MONGODB_URI} # Will be taken from .env file
+    networks:
+      - user_service_network
+
+networks:
+  user_service_network:
+    name: user_service_network
+    driver: bridge
+
+volumes:
+  user_service_data: 
