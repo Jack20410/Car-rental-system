@@ -10,7 +10,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3001
-      - MONGODB_URI=${MONGODB_URI} # Will be taken from .env file
+      - MONGODB_URI=${MONGODB_URI}
     networks:
       - user_service_network
 

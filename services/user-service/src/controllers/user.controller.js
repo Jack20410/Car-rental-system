@@ -1,7 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
-
 exports.register = async (req, res) => {
   try {
     const { name, email, password, phoneNumber, role } = req.body;
