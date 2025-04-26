@@ -6,6 +6,7 @@ import { AiOutlineSafety, AiOutlineCheck } from 'react-icons/ai';
 import { MdLocalOffer, MdCancel, MdGavel, MdSmokeFree, MdLocationOn, MdDirections, MdVerified, MdEmail } from 'react-icons/md';
 import { GiCardDiscard, GiTrashCan, GiFruitBowl, GiChemicalDrop } from 'react-icons/gi';
 import { FaCarSide } from 'react-icons/fa6';
+import { formatCurrency } from '../utils/formatCurrency';
 
 const CarDetails = () => {
   const { id } = useParams();
@@ -18,7 +19,7 @@ const CarDetails = () => {
     brand: 'Toyota',
     modelYear: 2023,
     licensePlate: 'ABC123',
-    rentalPricePerDay: 50,
+    rentalPricePerDay: 1200000, // Price in VND
     description: 'Experience comfort and reliability with our Toyota Camry. This well-maintained sedan offers excellent fuel efficiency, smooth handling, and plenty of space for both passengers and luggage. Perfect for both city driving and long trips.',
     images: [
       'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?ixlib=rb-4.0.3',
@@ -228,7 +229,7 @@ const CarDetails = () => {
             </div>
 
             {/* Specifications */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
+            {/* <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Specifications</h2>
               <div className="grid grid-cols-2 gap-4">
                 {Object.entries(car.specifications).map(([key, value]) => (
@@ -238,10 +239,10 @@ const CarDetails = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </div> */}
 
-{/* Location Section */}
-<div className="bg-white rounded-lg shadow-sm p-6 mt-8">
+            {/* Location Section */}
+            <div className="bg-white rounded-lg shadow-sm p-6 mt-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <MdLocationOn className="text-primary" />
                 Car Location
@@ -504,7 +505,7 @@ const CarDetails = () => {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                   <MdLocalOffer className="text-primary" />
-                  ${car.rentalPricePerDay}
+                  {formatCurrency(car.rentalPricePerDay)}
                 </h2>
                 <span className="text-gray-600">per day</span>
               </div>
@@ -535,7 +536,7 @@ const CarDetails = () => {
                 <div className="border-t border-gray-200 pt-4">
                   <div className="flex justify-between mb-2">
                     <span>Daily Rate</span>
-                    <span>${car.rentalPricePerDay}</span>
+                    <span>{formatCurrency(car.rentalPricePerDay)}</span>
                   </div>
                   <div className="flex justify-between mb-2">
                     <span>Number of Days</span>
@@ -543,11 +544,11 @@ const CarDetails = () => {
                   </div>
                   <div className="flex justify-between mb-2">
                     <span>Insurance</span>
-                    <span>$15</span>
+                    <span>{formatCurrency(150000)}</span>
                   </div>
                   <div className="flex justify-between font-bold text-lg border-t border-gray-200 pt-2">
                     <span>Total</span>
-                    <span>${car.rentalPricePerDay * 3 + 15}</span>
+                    <span>{formatCurrency(car.rentalPricePerDay * 3 + 150000)}</span>
                   </div>
                 </div>
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CarCard from '../components/CarCard';
 import SearchBar from '../components/SearchBar';
+import { formatCurrency } from '../utils/formatCurrency';
 
 const Cars = () => {
   const [searchParams] = useSearchParams();
@@ -23,7 +24,7 @@ const Cars = () => {
       brand: 'Toyota',
       modelYear: 2023,
       licensePlate: 'ABC123',
-      rentalPricePerDay: 50,
+      rentalPricePerDay: 1200000,
       description: 'Comfortable and fuel-efficient sedan',
       images: ['https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?ixlib=rb-4.0.3'],
       seats: 5,
@@ -32,7 +33,7 @@ const Cars = () => {
       status: 'Available',
       location: {
         address: '123 Main St',
-        city: 'New York'
+        city: 'Ho Chi Minh City'
       }
     },
     {
@@ -41,7 +42,7 @@ const Cars = () => {
       brand: 'Tesla',
       modelYear: 2023,
       licensePlate: 'XYZ789',
-      rentalPricePerDay: 80,
+      rentalPricePerDay: 2500000,
       description: 'Electric luxury sedan with autopilot',
       images: ['https://images.unsplash.com/photo-1536700503339-1e4b06520771?ixlib=rb-4.0.3'],
       seats: 5,
@@ -50,7 +51,7 @@ const Cars = () => {
       status: 'Available',
       location: {
         address: '456 Tech Ave',
-        city: 'San Francisco'
+        city: 'Ha Noi'
       }
     },
     {
@@ -59,7 +60,7 @@ const Cars = () => {
       brand: 'BMW',
       modelYear: 2022,
       licensePlate: 'DEF456',
-      rentalPricePerDay: 100,
+      rentalPricePerDay: 3000000,
       description: 'Luxury SUV with premium features',
       images: ['https://images.unsplash.com/photo-1555215695-3004980ad54e?ixlib=rb-4.0.3'],
       seats: 7,
@@ -68,7 +69,7 @@ const Cars = () => {
       status: 'Available',
       location: {
         address: '789 Luxury Blvd',
-        city: 'Miami'
+        city: 'Da Nang'
       }
     },
     {
@@ -77,7 +78,7 @@ const Cars = () => {
       brand: 'Honda',
       modelYear: 2023,
       licensePlate: 'GHI789',
-      rentalPricePerDay: 45,
+      rentalPricePerDay: 800000,
       description: 'Reliable and economical compact car',
       images: ['https://images.unsplash.com/photo-1590362891991-f776e747a588?ixlib=rb-4.0.3'],
       seats: 5,
@@ -86,7 +87,7 @@ const Cars = () => {
       status: 'Available',
       location: {
         address: '321 Economy Rd',
-        city: 'Chicago'
+        city: 'Nha Trang'
       }
     }
   ];
@@ -175,10 +176,10 @@ const Cars = () => {
                   onChange={(e) => handleFilterChange('priceRange', e.target.value)}
                 >
                   <option value="">Any Price</option>
-                  <option value="0-50">Under $50</option>
-                  <option value="50-100">$50 - $100</option>
-                  <option value="100-200">$100 - $200</option>
-                  <option value="200-500">$200+</option>
+                  <option value="0-1000000">Under {formatCurrency(1000000)}</option>
+                  <option value="1000000-2000000">{formatCurrency(1000000)} - {formatCurrency(2000000)}</option>
+                  <option value="2000000-3000000">{formatCurrency(2000000)} - {formatCurrency(3000000)}</option>
+                  <option value="3000000-5000000">{formatCurrency(3000000)}+</option>
                 </select>
               </div>
 
