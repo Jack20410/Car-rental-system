@@ -30,12 +30,20 @@ const vehicleSchema = new mongoose.Schema({
   description: {
     type: String
   },
+  features: {
+    type: [String]
+  },
   images: [{
     type: String,  // Will store the file path or URL
     required: true
   }],
   seats: {
     type: Number,
+    required: true
+  },
+  carType: {
+    type: String,
+    enum: ['Sedan', 'SUV', 'Convertible', 'Coupe', 'Hatchback', 'Other'],
     required: true
   },
   transmission: {

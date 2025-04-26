@@ -29,6 +29,9 @@ const validateCreateVehicle = [
   body('seats')
     .notEmpty().withMessage('Number of seats is required')
     .isInt({ min: 1, max: 50 }).withMessage('Invalid number of seats'),
+  body('carType')
+    .notEmpty().withMessage('Car type is required')
+    .isIn(['Sedan', 'SUV', 'Convertible', 'Coupe', 'Hatchback', 'Other']).withMessage('Invalid car type'),
   
   body('transmission')
     .trim()
