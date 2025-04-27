@@ -8,7 +8,8 @@ login,
 getUsersByRole,
 deleteUser,
 deleteUsers,
-updateUser
+updateUser,
+getCurrentUser
 } = require('../controllers/user.controller');
 const { validateRegistration, validateLogin } = require('../middleware/userValidation');
 const { verifyToken } = require('../middleware/auth');
@@ -23,6 +24,9 @@ router.post('/login', validateLogin, login);
 // Protected routes
 // GET /users - Get all users
 router.get('/', verifyToken, getAllUsers);
+
+// GET /users/profile - Get current user profile
+router.get('/profile', verifyToken, getCurrentUser);
 
 // GET /users/:id - Get user by ID
 router.get('/:id', verifyToken, getUserById);

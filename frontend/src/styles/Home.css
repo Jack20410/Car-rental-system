@@ -1,0 +1,43 @@
+/* Hide scrollbars while maintaining functionality */
+.hide-scrollbar {
+  /* For Firefox */
+  scrollbar-width: none;
+}
+
+/* For WebKit browsers (Chrome, Safari, etc.) */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Performance optimizations */
+.location-card {
+  will-change: transform;
+  transform: translateZ(0); /* Force hardware acceleration */
+  backface-visibility: hidden; /* Prevent flickering in some browsers */
+}
+
+.location-card img {
+  will-change: transform;
+  transition: transform 0.3s ease-out;
+}
+
+/* Reduce animation complexity on mobile */
+@media (max-width: 640px) {
+  .location-card img:hover {
+    transform: none !important;
+  }
+}
+
+/* Optimize transitions */
+.transition {
+  transition-property: transform, box-shadow, border-color;
+  transition-duration: 300ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Optimize modal animations */
+.fixed {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+} 

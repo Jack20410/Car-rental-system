@@ -24,7 +24,8 @@ exports.register = async (req, res) => {
       email,
       password: hashedPassword,
       phoneNumber,
-      role: role || 'customer' // Default to customer if role is not provided
+      role: role || 'customer', // Default to customer if role is not provided
+      avatar: '/uploads/avatar/user.png' // Set default avatar
     });
 
     await user.save();
@@ -96,6 +97,38 @@ exports.getUserById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching user',
+      error: error.message
+    });
+  }
+};
+
+// Get current user profile
+exports.getCurrentUser = async (req, res) => {
+  try {
+    // The user ID is extracted from the JWT token in the auth middleware
+    const userId = req.user.userId;
+    
+    // Find the user by ID but exclude password field
+    const user = await User.findById(userId, '-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Current user profile retrieved successfully',
+      data: user
+    });
+
+  } catch (error) {
+    console.error('Error fetching current user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching current user profile',
       error: error.message
     });
   }
@@ -269,6 +302,11 @@ exports.updateUser = async (req, res) => {
 
     // Prevent role modification through this endpoint for security
     delete updates.role;
+
+    // If no avatar is provided, don't update it
+    if (!updates.avatar) {
+      delete updates.avatar;
+    }
 
     // Find user and update
     const updatedUser = await User.findByIdAndUpdate(

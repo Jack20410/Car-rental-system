@@ -20,10 +20,14 @@ car-rental-system/
 │   ├── support-service/
 │   ├── admin-service/        # Admin + reporting
 │   └── api-gateway/
+├── frontend/               # React frontend application
+├── uploads/                # Shared upload directory for images
+│   ├── avatar/             # User profile images
+│   └── vehicles/           # Vehicle images
 ├── libs/
-│   ├── common/               # Shared utilities
-│   ├── models/               # Shared data models
-│   └── events/               # Event definitions
+│   ├── common/             # Shared utilities
+│   ├── models/             # Shared data models
+│   └── events/             # Event definitions
 ├── docker-compose.yml
 ├── package.json
 └── .gitignore
@@ -78,7 +82,7 @@ car-rental-system/
 
 3. Start the services:
    ```bash
-   docker-compose  (chưa xài được chạy bằng npm run dev)
+   docker compose up -d
    ```
 
 ## Development
@@ -88,4 +92,11 @@ Each service can be developed and run independently. Navigate to the specific se
 ## API Documentation
 
 API documentation for each service can be found in their respective directories under the `services` folder.
+
+## Project Structure Notes
+
+- The `frontend` directory contains the React frontend application
+- The `uploads` directory is shared between services for storing user and vehicle images
+- API configuration is located in the frontend's utils directory
+- The root package.json contains a dev script that starts all services concurrently
 

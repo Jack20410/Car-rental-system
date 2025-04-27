@@ -15,6 +15,7 @@ const Cars = () => {
     features: []
   });
   const [sortBy, setSortBy] = useState('recommended');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   // Sample car data based on the vehicle model schema
   const sampleCars = [
@@ -151,6 +152,14 @@ const Cars = () => {
     }));
   };
 
+  // Count active filters
+  const activeFilterCount = Object.entries(filters).reduce((count, [key, value]) => {
+    if (key === 'features') {
+      return count + value.length;
+    }
+    return value ? count + 1 : count;
+  }, 0);
+
   return (
     <div className="bg-gray-50 min-h-screen">
       {/* Search Section */}
@@ -160,122 +169,180 @@ const Cars = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <div className="flex flex-col lg:flex-row gap-8">
+      <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+        {/* Mobile Filter Toggle Button */}
+        <div className="lg:hidden mb-4">
+          <button
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow-sm text-primary font-medium hover:bg-gray-50 transition-colors"
+          >
+            <span className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </span>
+            <svg 
+              className={`h-5 w-5 transform transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} 
+              xmlns="http://www.w3.org/2000/svg" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Filter Panel */}
-          <div className="lg:w-1/4">
-            <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
-              <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+          <div className={`lg:w-1/4 ${isFilterOpen ? 'block' : 'hidden'} lg:block transition-all duration-300 ease-in-out`}>
+            <div className="bg-white rounded-lg shadow-sm p-5 sticky top-20">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+                {activeFilterCount > 0 && (
+                  <button
+                    onClick={() => setFilters({
+                      priceRange: '',
+                      carType: '',
+                      transmission: '',
+                      fuelType: '',
+                      seats: '',
+                      features: []
+                    })}
+                    className="text-sm text-primary hover:text-secondary"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
               
-              {/* Price Range Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-                  value={filters.priceRange}
-                  onChange={(e) => handleFilterChange('priceRange', e.target.value)}
-                >
-                  <option value="">Any Price</option>
-                  <option value="0-1000000">Under {formatCurrency(1000000)}</option>
-                  <option value="1000000-2000000">{formatCurrency(1000000)} - {formatCurrency(2000000)}</option>
-                  <option value="2000000-3000000">{formatCurrency(2000000)} - {formatCurrency(3000000)}</option>
-                  <option value="3000000-5000000">{formatCurrency(3000000)}+</option>
-                </select>
-              </div>
+              {/* Filter groups */}
+              <div className="space-y-5">
+                {/* Price Range Filter */}
+                <div className="pb-4 border-b border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary text-sm"
+                    value={filters.priceRange}
+                    onChange={(e) => handleFilterChange('priceRange', e.target.value)}
+                  >
+                    <option value="">Any Price</option>
+                    <option value="0-1000000">Under {formatCurrency(1000000)}</option>
+                    <option value="1000000-2000000">{formatCurrency(1000000)} - {formatCurrency(2000000)}</option>
+                    <option value="2000000-3000000">{formatCurrency(2000000)} - {formatCurrency(3000000)}</option>
+                    <option value="3000000-5000000">{formatCurrency(3000000)}+</option>
+                  </select>
+                </div>
 
-              {/* Car Type Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Car Type</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-                  value={filters.carType}
-                  onChange={(e) => handleFilterChange('carType', e.target.value)}
-                >
-                  <option value="">All Types</option>
-                  <option value="sedan">Sedan</option>
-                  <option value="suv">SUV</option>
-                  <option value="luxury">Luxury</option>
-                  <option value="sports">Sports</option>
-                </select>
-              </div>
+                {/* Car Type Filter */}
+                <div className="pb-4 border-b border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Car Type</label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary text-sm"
+                    value={filters.carType}
+                    onChange={(e) => handleFilterChange('carType', e.target.value)}
+                  >
+                    <option value="">All Types</option>
+                    <option value="sedan">Sedan</option>
+                    <option value="suv">SUV</option>
+                    <option value="luxury">Luxury</option>
+                    <option value="sports">Sports</option>
+                  </select>
+                </div>
 
-              {/* Transmission Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Transmission</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-                  value={filters.transmission}
-                  onChange={(e) => handleFilterChange('transmission', e.target.value)}
-                >
-                  <option value="">Any Transmission</option>
-                  <option value="Automatic">Automatic</option>
-                  <option value="Manual">Manual</option>
-                </select>
-              </div>
+                {/* Transmission Filter */}
+                <div className="pb-4 border-b border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Transmission</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['Automatic', 'Manual'].map((type) => (
+                      <label key={type} className={`flex items-center justify-center px-3 py-2 rounded-md cursor-pointer border ${filters.transmission === type ? 'border-primary bg-blue-50 text-primary' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                        <input
+                          type="radio"
+                          name="transmission"
+                          value={type}
+                          checked={filters.transmission === type}
+                          onChange={(e) => handleFilterChange('transmission', e.target.value)}
+                          className="sr-only"
+                        />
+                        <span className="text-sm">{type}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-              {/* Fuel Type Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Fuel Type</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-                  value={filters.fuelType}
-                  onChange={(e) => handleFilterChange('fuelType', e.target.value)}
-                >
-                  <option value="">Any Fuel Type</option>
-                  <option value="Gasoline">Gasoline</option>
-                  <option value="Diesel">Diesel</option>
-                  <option value="Electric">Electric</option>
-                  <option value="Hybrid">Hybrid</option>
-                </select>
-              </div>
+                {/* Fuel Type Filter */}
+                <div className="pb-4 border-b border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fuel Type</label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary text-sm"
+                    value={filters.fuelType}
+                    onChange={(e) => handleFilterChange('fuelType', e.target.value)}
+                  >
+                    <option value="">Any Fuel Type</option>
+                    <option value="Gasoline">Gasoline</option>
+                    <option value="Diesel">Diesel</option>
+                    <option value="Electric">Electric</option>
+                    <option value="Hybrid">Hybrid</option>
+                  </select>
+                </div>
 
-              {/* Seats Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Seats</label>
-                <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
-                  value={filters.seats}
-                  onChange={(e) => handleFilterChange('seats', e.target.value)}
-                >
-                  <option value="">Any Seats</option>
-                  <option value="2">2 Seats</option>
-                  <option value="4">4 Seats</option>
-                  <option value="5">5 Seats</option>
-                  <option value="7">7+ Seats</option>
-                </select>
-              </div>
+                {/* Seats Filter */}
+                <div className="pb-4 border-b border-gray-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Seats</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {['2', '4', '5', '7+'].map((seats) => (
+                      <label 
+                        key={seats} 
+                        className={`flex items-center justify-center px-3 py-2 rounded-md cursor-pointer border text-center ${filters.seats === seats.replace('+', '') ? 'border-primary bg-blue-50 text-primary' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        <input
+                          type="radio"
+                          name="seats"
+                          value={seats.replace('+', '')}
+                          checked={filters.seats === seats.replace('+', '')}
+                          onChange={(e) => handleFilterChange('seats', e.target.value)}
+                          className="sr-only"
+                        />
+                        <span className="text-sm">{seats}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-              {/* Features Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Features</label>
-                <div className="space-y-2">
-                  {['GPS', 'Bluetooth', 'Backup Camera', 'Sunroof'].map((feature) => (
-                    <label key={feature} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                        checked={filters.features.includes(feature)}
-                        onChange={() => handleFeatureToggle(feature)}
-                      />
-                      <span className="ml-2 text-sm text-gray-600">{feature}</span>
-                    </label>
-                  ))}
+                {/* Features Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Features</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['GPS', 'Bluetooth', 'Backup Camera', 'Sunroof'].map((feature) => (
+                      <label 
+                        key={feature} 
+                        className={`flex items-center px-3 py-2 rounded-md cursor-pointer border ${filters.features.includes(feature) ? 'border-primary bg-blue-50 text-primary' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded mr-2"
+                          checked={filters.features.includes(feature)}
+                          onChange={() => handleFeatureToggle(feature)}
+                        />
+                        <span className="text-sm">{feature}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
-
-              {/* Clear Filters Button */}
+              
+              {/* Apply Filters Button - Mobile Only */}
               <button
-                onClick={() => setFilters({
-                  priceRange: '',
-                  carType: '',
-                  transmission: '',
-                  fuelType: '',
-                  seats: '',
-                  features: []
-                })}
-                className="w-full px-4 py-2 text-sm font-medium text-primary hover:bg-primary hover:text-white border border-primary rounded-md transition-colors duration-150"
+                onClick={() => setIsFilterOpen(false)}
+                className="w-full mt-6 px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:bg-secondary transition-colors duration-150 lg:hidden"
               >
-                Clear All Filters
+                Apply Filters
               </button>
             </div>
           </div>
@@ -291,7 +358,7 @@ const Cars = () => {
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-700">Sort by:</span>
                   <select
-                    className="px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary"
+                    className="px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary text-sm"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                   >

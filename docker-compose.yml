@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # Frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "4000:4000"
+    environment:
+      - VITE_API_URL=http://api-gateway:3000
+      - VITE_VEHICLE_SERVICE_URL=http://localhost:3002
+    depends_on:
+      - api-gateway
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - ./uploads:/app/public/uploads
+    networks:
+      - car-rental-network
+
+  # API Gateway
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./api-gateway/.env
+    depends_on:
+      - user-service
+      - vehicle-service
+    volumes:
+      - ./api-gateway:/app
+    networks:
+      - car-rental-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # User Service
+  user-service:
+    build: ./services/user-service
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/user_service_db
+      - JWT_SECRET=ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt
+    volumes:
+      - ./services/user-service:/app
+      - /app/node_modules
+      - ./uploads:/app/uploads
+    networks:
+      - car-rental-network
+
+  # Vehicle Service
+  vehicle-service:
+    build: ./services/vehicle-service
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/vehicle_service_db
+    volumes:
+      - ./services/vehicle-service:/app
+      - /app/node_modules
+      - ./uploads:/uploads
+      # Ensure the avatar directory is explicitly mounted
+      - ./uploads/avatar:/uploads/avatar
+    networks:
+      - car-rental-network
+
+networks:
+  car-rental-network:
+    driver: bridge
+
+volumes:
+  mongodb_data: 

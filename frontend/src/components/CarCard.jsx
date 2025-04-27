@@ -13,6 +13,9 @@ const CarCard = ({ car }) => {
             src={car.images[0]}
             alt={`${car.brand} ${car.name}`}
             className="w-full h-48 object-cover"
+            loading="lazy"
+            width="384" 
+            height="192"
           />
           <div className="absolute top-4 right-4 bg-white px-2 py-1 rounded-full text-sm font-medium text-gray-700">
             {car.status}
@@ -58,4 +61,4 @@ const CarCard = ({ car }) => {
   );
 };
 
-export default CarCard; 
+export default React.memo(CarCard); 

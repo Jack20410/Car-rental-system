@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "concurrently \"cd frontend && npm run dev\" \"cd api-gateway && uvicorn main:app --reload --port 3000\" \"cd services/user-service && npm run dev\" \"cd services/vehicle-service && npm run dev\" \"cd services/rental-service && npm run dev\" \"cd services/payment-service && npm run dev\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
 }

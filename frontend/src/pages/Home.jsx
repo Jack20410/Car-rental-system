@@ -1,12 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import SearchBar from '../components/SearchBar';
 import CarCard from '../components/CarCard';
 import { TruckIcon, ShieldCheckIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom';
+import '../styles/Home.css'; // Updated import path for styles folder
 
 const Home = () => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const sliderRef = useRef(null);
+  const autoScrollRef = useRef(null);
+
   // Featured cars (using the same sample data for now)
-  const featuredCars = [
+  const featuredCars = useMemo(() => [
     {
       _id: '1',
       name: 'Camry',
@@ -61,15 +66,15 @@ const Home = () => {
         city: 'Miami'
       }
     }
-  ];
+  ], []);
 
   // Popular locations data
-  const popularLocations = [
+  const popularLocations = useMemo(() => [
     {
       id: 1,
       name: 'Ho Chi Minh City',
       carCount: '5000+ cars',
-      image: 'https://images.unsplash.com/photo-1583417319070-4a69db38a482?ixlib=rb-4.0.3',
+      image: 'https://nld.mediacdn.vn/291774122806476800/2024/8/16/tp-65-1723817004792851519414.jpg',
       description: 'Vietnam\'s largest city with diverse vehicle options'
     },
     {
@@ -85,8 +90,55 @@ const Home = () => {
       carCount: '500+ cars',
       image: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?ixlib=rb-4.0.3',
       description: 'Coastal city with modern rental fleet'
+    },
+    {
+      id: 4,
+      name: 'Nha Trang',
+      carCount: '350+ cars',
+      image: 'https://baokhanhhoa.vn/file/e7837c02857c8ca30185a8c39b582c03/012025/z6223362576777_15a21ef00a73b25851a3972d86795475_20250113104122.jpg',
+      description: 'Beach resort city with convenient rental options'
+    },
+    {
+      id: 5,
+      name: 'Quy Nhon',
+      carCount: '200+ cars',
+      image: 'https://benhvienquynhon.gov.vn/wp-content/uploads/2023/05/bai-tam-quy-nhon.jpg',
+      description: 'Emerging coastal destination with quality vehicles'
     }
-  ];
+  ], []);
+
+  const goToSlide = useCallback((index) => {
+    setCurrentSlide(index);
+    if (sliderRef.current) {
+      const slideWidth = sliderRef.current.querySelector('.location-card').offsetWidth;
+      const scrollPosition = index * (slideWidth + 24);
+      sliderRef.current.scrollTo({
+        left: scrollPosition,
+        behavior: 'smooth'
+      });
+    }
+  }, []);
+
+  // Auto slide functionality
+  useEffect(() => {
+    // Clear any existing interval when component re-renders
+    if (autoScrollRef.current) {
+      clearInterval(autoScrollRef.current);
+    }
+    
+    autoScrollRef.current = setInterval(() => {
+      if (sliderRef.current && popularLocations.length > 0) {
+        const nextSlide = (currentSlide + 1) % popularLocations.length;
+        goToSlide(nextSlide);
+      }
+    }, 3000);
+    
+    return () => {
+      if (autoScrollRef.current) {
+        clearInterval(autoScrollRef.current);
+      }
+    };
+  }, [currentSlide, popularLocations.length, goToSlide]);
 
   return (
     <div>
@@ -97,6 +149,8 @@ const Home = () => {
             src="https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?ixlib=rb-4.0.3"
             alt="Hero background"
             className="w-full h-full object-cover opacity-50"
+            loading="eager"
+            fetchPriority="high"
           />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 py-24 sm:px-6 lg:px-8">
@@ -117,31 +171,52 @@ const Home = () => {
             Choose from our most popular rental locations
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {popularLocations.map(location => (
-            <Link
-              key={location.id}
-              to={`/cars?location=${encodeURIComponent(location.name)}`}
-              className="group relative rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300"
-            >
-              <div className="aspect-w-16 aspect-h-9">
-                <img
-                  src={location.image}
-                  alt={location.name}
-                  className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent">
-                <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                  <h3 className="text-2xl font-bold mb-2">{location.name}</h3>
-                  <p className="text-sm opacity-90 mb-2">{location.description}</p>
-                  <p className="text-sm font-semibold bg-primary/80 inline-block px-3 py-1 rounded-full">
-                    {location.carCount}
-                  </p>
+        <div className="relative overflow-hidden">
+          <div 
+            ref={sliderRef}
+            className="flex overflow-x-auto pb-6 space-x-6 snap-x hide-scrollbar overscroll-x-none will-change-transform"
+          >
+            {popularLocations.map((location, index) => (
+              <Link
+                key={location.id}
+                to={`/cars?location=${encodeURIComponent(location.name)}`}
+                className={`location-card group relative rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex-shrink-0 w-full sm:w-80 md:w-96 snap-start ${index === currentSlide ? 'border-2 border-primary' : ''}`}
+              >
+                <div className="aspect-w-16 aspect-h-9">
+                  <img
+                    src={location.image}
+                    alt={location.name}
+                    className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                    width="384"
+                    height="256"
+                  />
                 </div>
-              </div>
-            </Link>
-          ))}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent">
+                  <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                    <h3 className="text-2xl font-bold mb-2">{location.name}</h3>
+                    <p className="text-sm opacity-90 mb-2">{location.description}</p>
+                    <p className="text-sm font-semibold bg-primary/80 inline-block px-3 py-1 rounded-full">
+                      {location.carCount}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+          {/* Slide indicators */}
+          <div className="flex justify-center mt-4 space-x-2">
+            {popularLocations.map((_, index) => (
+              <button
+                key={`indicator-${index}`}
+                onClick={() => goToSlide(index)}
+                className={`h-2 rounded-full transition-all ${
+                  currentSlide === index ? 'w-6 bg-primary' : 'w-2 bg-gray-300'
+                }`}
+                aria-label={`Go to slide ${index + 1}`}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
@@ -201,4 +276,4 @@ const Home = () => {
   );
 };
 
-export default Home; 
+export default React.memo(Home); 

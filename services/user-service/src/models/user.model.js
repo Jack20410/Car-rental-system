@@ -21,6 +21,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  avatar: {
+    type: String,
+    default: '/uploads/avatar/user.png'
+  },
   role: {
     type: String,
     required: true,
