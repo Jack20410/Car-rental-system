@@ -9,7 +9,7 @@ This system is built using a microservices architecture, with each service handl
 ## Architecture
 
 The system consists of the following microservices:
-
+```
 car-rental-system/
 ├── services/
 │   ├── user-service/     # Combined Auth + User
