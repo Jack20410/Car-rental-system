@@ -242,7 +242,35 @@ const ManageCars = () => {
       alert(`Error deleting car: ${error.message}`);
     }
   };
-
+  const handleChangeStatus = async (car, newStatus) => {
+    try {
+      const token = JSON.parse(sessionStorage.getItem('auth'))?.token;
+      if (!token) throw new Error('No authentication token found');
+  
+      // Example: Toggle between 'Available' and 'Retnted'
+      const newStatus = car.status === 'Available' ? 'Rented' : 'Available';
+  
+      const response = await fetch(`http://localhost:3000/vehicles/${car._id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+  
+      if (response.ok) {
+        fetchCars(); // Refresh list
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to change status');
+      }
+    } catch (error) {
+      alert(`Error changing status: ${error.message}`);
+    }
+  };
+  
+  
   return (
     <div className="container mx-auto px-4 pt-20">
       <div className="max-w-4xl mx-auto">
@@ -567,10 +595,10 @@ const ManageCars = () => {
                     <div className="flex justify-between items-center mb-2">
                       <h3 className="text-lg font-semibold text-gray-900">{car.name}</h3>
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        car.status === 'Available' ? 'bg-green-100 text-green-800' :
-                        car.status === 'Rented' ? 'bg-blue-100 text-blue-800' :
-                        car.status === 'Maintenance' ? 'bg-yellow-100 text-yellow-800' :
-                        car.status === 'Pending' ? 'bg-purple-100 text-purple-800' :
+                        car.status === 'Pending' ? 'bg-green-100 text-green-800' :
+                        car.status === 'Available' ? 'bg-blue-100 text-blue-800' :
+                        car.status === 'Unavailable'? 'bg-red-100 text-red-800' :
+                        car.status === 'Rented' ? 'bg-purple-100 text-purple-800' :
                         'bg-red-100 text-red-800'
                       }`}>
                         {car.status}
@@ -589,12 +617,23 @@ const ManageCars = () => {
                             ...car,
                             location: car.location || { city: '', address: '' },
                             features: car.features || [],
-                            images: [] // Không load lại ảnh cũ vào input file
+                            images: []
                           });
                         }}
                       >
                         Edit
                       </button>
+                      {/* Dropdown chọn status */}
+                      <select
+                        className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded hover:bg-yellow-200"
+                        value={car.status}
+                        onChange={e => handleChangeStatus(car, e.target.value)}
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="Available">Available</option>
+                        <option value="Rented">Rented</option>
+                        <option value="Unavailable">Unavailable</option>
+                      </select>
                       <button
                         className="bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200"
                         onClick={() => handleDeleteCar(car._id)}
