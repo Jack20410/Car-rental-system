@@ -1,0 +1,529 @@
+import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { formatCurrency } from '../utils/formatCurrency';
+
+const ManageCars = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [cars, setCars] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [providerRole, setProviderRole] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    brand: '',
+    modelYear: '',
+    rentalPricePerDay: '',
+    licensePlate: '',
+    description: '',
+    seats: '',
+    carType: 'Sedan',
+    transmission: 'Automatic',
+    fuelType: 'Gasoline',
+    location: {
+      city: '',
+      address: ''
+    },
+    features: [],
+    images: []
+  });
+
+  // Check auth directly from session storage as a fallback
+  useEffect(() => {
+    const auth = sessionStorage.getItem('auth');
+    if (auth) {
+      const parsedAuth = JSON.parse(auth);
+      if (parsedAuth.user && parsedAuth.user.role === 'car_provider') {
+        setProviderRole(true);
+      }
+    }
+  }, []);
+
+  // Protect the route
+  useEffect(() => {
+    // Get role from context or session storage
+    const isProvider = user?.role === 'car_provider' || providerRole;
+    
+    if (!isProvider) {
+      console.log('Not a car provider, redirecting', { user, providerRole });
+      navigate('/');
+    } else {
+      // Fetch the provider's cars
+      fetchCars();
+    }
+  }, [user, navigate, providerRole]);
+  
+  // Function to fetch cars
+  const fetchCars = async () => {
+    try {
+      setIsLoading(true);
+      const token = JSON.parse(sessionStorage.getItem('auth'))?.token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
+      // Fetch from the API gateway
+      const response = await fetch('http://localhost:3000/vehicles', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCars(data.data?.vehicles || []);
+      } else {
+        throw new Error('Failed to fetch cars');
+      }
+    } catch (error) {
+      console.error('Error fetching cars:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Handle nested location fields
+    if (name.startsWith('location.')) {
+      const locationField = name.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        location: {
+          ...prev.location,
+          [locationField]: value
+        }
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  const handleFeaturesChange = (e) => {
+    const { value, checked } = e.target;
+    setFormData(prev => {
+      if (checked) {
+        return {
+          ...prev,
+          features: [...prev.features, value]
+        };
+      } else {
+        return {
+          ...prev,
+          features: prev.features.filter(feature => feature !== value)
+        };
+      }
+    });
+  };
+
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    setFormData(prev => ({
+      ...prev,
+      images: files
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const formDataToSend = new FormData();
+      
+      // Add all non-nested fields
+      Object.keys(formData).forEach(key => {
+        if (key === 'images') {
+          formData.images.forEach(image => {
+            formDataToSend.append('images', image);
+          });
+        } else if (key === 'location') {
+          // Add location fields separately
+          formDataToSend.append('location[city]', formData.location.city);
+          formDataToSend.append('location[address]', formData.location.address);
+        } else if (key === 'features') {
+          // Add features as an array
+          formData.features.forEach(feature => {
+            formDataToSend.append('features[]', feature);
+          });
+        } else {
+          formDataToSend.append(key, formData[key]);
+        }
+      });
+      
+      const token = JSON.parse(sessionStorage.getItem('auth'))?.token;
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Call API gateway to create a vehicle
+      const response = await fetch('http://localhost:3000/vehicles', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formDataToSend
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setCars(prev => [...prev, result.data]);
+        setShowForm(false);
+        setFormData({
+          name: '',
+          brand: '',
+          modelYear: '',
+          rentalPricePerDay: '',
+          licensePlate: '',
+          description: '',
+          seats: '',
+          carType: 'Sedan',
+          transmission: 'Automatic',
+          fuelType: 'Gasoline',
+          location: {
+            city: '',
+            address: ''
+          },
+          features: [],
+          images: []
+        });
+        // Refresh car list
+        fetchCars();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create car');
+      }
+    } catch (error) {
+      console.error('Error creating car:', error);
+      alert(`Error creating car: ${error.message}`);
+    }
+  };
+
+  return (
+    <div className="container mx-auto px-4 pt-20">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Manage Rental Cars</h1>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="bg-primary text-white px-4 py-2 rounded-md hover:bg-secondary transition-colors"
+          >
+            {showForm ? 'Cancel' : 'Add New Car'}
+          </button>
+        </div>
+
+        {showForm && (
+          <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="name">
+                  Vehicle Name
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  placeholder="e.g. Toyota Camry 2021"
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="brand">
+                  Brand
+                </label>
+                <input
+                  type="text"
+                  id="brand"
+                  name="brand"
+                  value={formData.brand}
+                  onChange={handleInputChange}
+                  placeholder="e.g. Toyota"
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="modelYear">
+                  Model Year
+                </label>
+                <input
+                  type="number"
+                  id="modelYear"
+                  name="modelYear"
+                  value={formData.modelYear}
+                  onChange={handleInputChange}
+                  placeholder="e.g. 2021"
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="licensePlate">
+                  License Plate
+                </label>
+                <input
+                  type="text"
+                  id="licensePlate"
+                  name="licensePlate"
+                  value={formData.licensePlate}
+                  onChange={handleInputChange}
+                  placeholder="e.g. ABC-1234"
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="rentalPricePerDay">
+                  Price per Day
+                </label>
+                <input
+                  type="number"
+                  id="rentalPricePerDay"
+                  name="rentalPricePerDay"
+                  value={formData.rentalPricePerDay}
+                  onChange={handleInputChange}
+                  placeholder="e.g. 1.000.000"
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="seats">
+                  Number of Seats
+                </label>
+                <input
+                  type="number"
+                  id="seats"
+                  name="seats"
+                  value={formData.seats}
+                  onChange={handleInputChange}
+                  placeholder="e.g. 5"
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="carType">
+                  Car Type
+                </label>
+                <select
+                  id="carType"
+                  name="carType"
+                  value={formData.carType}
+                  onChange={handleInputChange}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                >
+                  <option value="Sedan">Sedan</option>
+                  <option value="SUV">SUV</option>
+                  <option value="Convertible">Convertible</option>
+                  <option value="Coupe">Coupe</option>
+                  <option value="Hatchback">Hatchback</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="transmission">
+                  Transmission
+                </label>
+                <select
+                  id="transmission"
+                  name="transmission"
+                  value={formData.transmission}
+                  onChange={handleInputChange}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                >
+                  <option value="Automatic">Automatic</option>
+                  <option value="Manual">Manual</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="fuelType">
+                  Fuel Type
+                </label>
+                <select
+                  id="fuelType"
+                  name="fuelType"
+                  value={formData.fuelType}
+                  onChange={handleInputChange}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                >
+                  <option value="Gasoline">Gasoline</option>
+                  <option value="Diesel">Diesel</option>
+                  <option value="Electric">Electric</option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="location.city">
+                  City
+                </label>
+                <select
+                  id="location.city"
+                  name="location.city"
+                  value={formData.location.city}
+                  onChange={handleInputChange}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                >
+                  <option value="">Select a city</option>
+                  <option value="Ho Chi Minh city">Ho Chi Minh city</option>
+                  <option value="Ha Noi city">Ha Noi city</option>
+                  <option value="Da Nang city">Da Nang city</option>
+                  <option value="Nha Trang city">Nha Trang city</option>
+                  <option value="Quy Nhon city">Quy Nhon city</option>
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="location.address">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  id="location.address"
+                  name="location.address"
+                  value={formData.location.address}
+                  onChange={handleInputChange}
+                  placeholder="e.g. 123 Main St"
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-gray-700 text-sm font-bold mb-2">
+                  Features
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {['Apple Carplay', 'Android Auto', 'USB Type-C Port', 'Heated Seats', 'Sunroof', '360 Camera', 'Leather Seats'].map(feature => (
+                    <div key={feature} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id={`feature-${feature}`}
+                        name="features"
+                        value={feature}
+                        checked={formData.features.includes(feature)}
+                        onChange={handleFeaturesChange}
+                        className="mr-2"
+                      />
+                      <label htmlFor={`feature-${feature}`}>{feature}</label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="description">
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  rows="4"
+                  required
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="images">
+                  Car Images
+                </label>
+                <input
+                  type="file"
+                  id="images"
+                  name="images"
+                  onChange={handleImageChange}
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  multiple
+                  accept="image/*"
+                  required
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="submit"
+                className="bg-primary text-white px-6 py-2 rounded-md hover:bg-secondary transition-colors"
+              >
+                Create Car
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="bg-white shadow-md rounded-lg p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Your Cars</h2>
+          {isLoading ? (
+            <p>Loading...</p>
+          ) : cars.length === 0 ? (
+            <p>No cars added yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {cars.map(car => (
+                <div key={car._id} className="border rounded-lg overflow-hidden bg-white shadow">
+                  <div className="h-48 overflow-hidden">
+                    {car.images && car.images.length > 0 ? (
+                      <img
+                        src={`http://localhost:3002${car.images[0]}`}
+                        alt={`${car.brand} ${car.name}`}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                        <span className="text-gray-500">No image</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">{car.name}</h3>
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                        car.status === 'Available' ? 'bg-green-100 text-green-800' :
+                        car.status === 'Rented' ? 'bg-blue-100 text-blue-800' :
+                        car.status === 'Maintenance' ? 'bg-yellow-100 text-yellow-800' :
+                        car.status === 'Pending' ? 'bg-purple-100 text-purple-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {car.status}
+                      </span>
+                    </div>
+                    <p className="text-gray-600 mb-2">{car.brand} • {car.modelYear}</p>
+                    <p className="text-gray-700 font-semibold mb-2">{formatCurrency(car.rentalPricePerDay)} per day</p>
+                    <p className="text-gray-600 text-sm mb-3">{car.licensePlate}</p>
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        className="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300"
+                        onClick={() => {/* Edit functionality */}}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200"
+                        onClick={() => {/* Delete functionality */}}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ManageCars; 

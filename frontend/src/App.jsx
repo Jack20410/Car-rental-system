@@ -10,6 +10,7 @@ import Cars from './pages/Cars';
 import CarDetails from './pages/CarDetails';
 import Profile from './pages/Profile';
 import Rentals from './pages/Rentals';
+import ManageCars from './pages/ManageCars';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
               <Route element={<ProtectedRoute />}>
                 <Route path="profile" element={<Profile />} />
                 <Route path="rentals" element={<Rentals />} />
+                <Route path="manage-cars" element={<ManageCars />} />
               </Route>
             </Route>
           </Routes>

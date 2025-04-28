@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useEffect, useState } from 'react';
 
 /**
  * A wrapper component for protected routes.
@@ -7,6 +8,16 @@ import { useAuth } from '../context/AuthContext';
  */
 const ProtectedRoute = () => {
   const { isAuthenticated, loading } = useAuth();
+  const [sessionAuth, setSessionAuth] = useState(false);
+  
+  // Directly check session storage as a fallback
+  useEffect(() => {
+    const auth = sessionStorage.getItem('auth');
+    if (auth) {
+      const parsedAuth = JSON.parse(auth);
+      setSessionAuth(!!parsedAuth.token);
+    }
+  }, []);
 
   // If still loading, show nothing or a loader
   if (loading) {
@@ -17,8 +28,8 @@ const ProtectedRoute = () => {
     );
   }
 
-  // If not authenticated, redirect to login
-  if (!isAuthenticated) {
+  // If not authenticated via context or session storage, redirect to login
+  if (!isAuthenticated && !sessionAuth) {
     return <Navigate to="/login" replace />;
   }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -6,11 +6,27 @@ const Navbar = () => {
   const { user, logout } = useAuth();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [providerRole, setProviderRole] = useState(false);
   const navigate = useNavigate();
   
   // Direct URL to the vehicle service for static files
   const DEFAULT_AVATAR = `http://localhost:3001/avatar/user.png`;
 
+  // Check session storage directly for debugging
+  useEffect(() => {
+    const auth = sessionStorage.getItem('auth');
+    if (auth) {
+      try {
+        const parsedAuth = JSON.parse(auth);
+        if (parsedAuth.user && parsedAuth.user.role === 'car_provider') {
+          setProviderRole(true);
+        }
+      } catch (error) {
+        console.error("Error parsing session storage:", error);
+      }
+    }
+  }, [user]);
+  
   const handleLogout = () => {
     logout();
     setIsProfileOpen(false);
@@ -75,6 +91,14 @@ const Navbar = () => {
                   My Rentals
                 </Link>
               )}
+              {(user?.role === 'car_provider' || providerRole) && (
+                <Link
+                  to="/manage-cars"
+                  className="bg-primary text-white inline-flex items-center px-3 py-1 rounded-md text-sm font-medium hover:bg-secondary"
+                >
+                  Manage Cars
+                </Link>
+              )}
             </div>
           </div>
           
@@ -132,13 +156,22 @@ const Navbar = () => {
                     >
                       My Rentals
                     </Link>
-                    {user.role === 'admin' && (
+                    {(user.role === 'admin' || user?.role === 'admin') && (
                       <Link
                         to="/admin"
                         onClick={() => setIsProfileOpen(false)}
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
                         Admin Dashboard
+                      </Link>
+                    )}
+                    {(user.role === 'car_provider' || providerRole) && (
+                      <Link
+                        to="/manage-cars"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Manage Rental Cars
                       </Link>
                     )}
                     <button
@@ -196,6 +229,15 @@ const Navbar = () => {
               My Rentals
             </Link>
           )}
+          {(user?.role === 'car_provider' || providerRole) && (
+            <Link
+              to="/manage-cars"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block pl-3 pr-4 py-2 border-l-4 border-transparent text-base font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 hover:border-gray-300"
+            >
+              Manage Cars
+            </Link>
+          )}
         </div>
         
         {/* Mobile menu auth buttons */}
@@ -246,13 +288,22 @@ const Navbar = () => {
               >
                 My Rentals
               </Link>
-              {user.role === 'admin' && (
+              {(user.role === 'admin' || user?.role === 'admin') && (
                 <Link
                   to="/admin"
                   onClick={() => setMobileMenuOpen(false)}
                   className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
                 >
                   Admin Dashboard
+                </Link>
+              )}
+              {(user.role === 'car_provider' || providerRole) && (
+                <Link
+                  to="/manage-cars"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                >
+                  Manage Rental Cars
                 </Link>
               )}
               <button

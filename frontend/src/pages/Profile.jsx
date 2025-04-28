@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { endpoints } from '../utils/api';
@@ -19,6 +19,20 @@ const Profile = () => {
     avatar: user?.avatar || DEFAULT_AVATAR,
   });
   const [previewAvatar, setPreviewAvatar] = useState(user?.avatar || DEFAULT_AVATAR);
+  const [sessionUser, setSessionUser] = useState(null);
+
+  useEffect(() => {
+    // Debug: check session storage
+    try {
+      const auth = sessionStorage.getItem('auth');
+      if (auth) {
+        const parsedAuth = JSON.parse(auth);
+        setSessionUser(parsedAuth.user);
+      }
+    } catch (error) {
+      console.error("Error parsing session storage:", error);
+    }
+  }, []);
 
   if (!user) {
     navigate('/login');
@@ -269,6 +283,33 @@ const Profile = () => {
               </dl>
             </div>
           )}
+        </div>
+        
+        {/* Debugging section */}
+        <div className="mt-8 bg-white shadow overflow-hidden sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">Debug Information</h3>
+          </div>
+          <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
+            <h4 className="text-md font-semibold mb-3">User from Context</h4>
+            <div className="bg-gray-50 p-3 rounded mb-4">
+              <p className="mb-1"><span className="font-medium">Name:</span> {user?.name}</p>
+              <p className="mb-1"><span className="font-medium">Email:</span> {user?.email}</p>
+              <p className="mb-1"><span className="font-medium">Role:</span> {user?.role}</p>
+            </div>
+            
+            <h4 className="text-md font-semibold mb-3">User from Session Storage</h4>
+            <div className="bg-gray-50 p-3 rounded">
+              <p className="mb-1"><span className="font-medium">User Present:</span> {sessionUser ? 'Yes' : 'No'}</p>
+              {sessionUser && (
+                <>
+                  <p className="mb-1"><span className="font-medium">Name:</span> {sessionUser?.name}</p>
+                  <p className="mb-1"><span className="font-medium">Email:</span> {sessionUser?.email}</p>
+                  <p className="mb-1"><span className="font-medium">Role:</span> {sessionUser?.role}</p>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

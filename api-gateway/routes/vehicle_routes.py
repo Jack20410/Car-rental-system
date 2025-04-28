@@ -25,4 +25,4 @@ async def vehicle_service_routes(request: Request, path: str):
         Response from the vehicle service
     """
     logger.info(f"Routing vehicle request to: {path}")
-    return await proxy_request(request, f"{VEHICLE_SERVICE_URL}/api/vehicles/{path}")
+    return await proxy_request(request, f"{VEHICLE_SERVICE_URL}/vehicles/{path}")
