@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   # Frontend
   frontend:
@@ -69,6 +68,23 @@ services:
       - ./uploads:/uploads
       # Ensure the avatar directory is explicitly mounted
       - ./uploads/avatar:/uploads/avatar
+    networks:
+      - car-rental-network
+
+  # Rental Service
+  rental-service:
+    build: ./services/rental-service
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/rental_service_db
+      - VEHICLE_SERVICE_URL=http://vehicle-service:3002
+      - JWT_SECRET=ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt
+    volumes:
+      - ./services/rental-service:/app
+      - /app/node_modules
+      - ./uploads:/uploads
     networks:
       - car-rental-network
 

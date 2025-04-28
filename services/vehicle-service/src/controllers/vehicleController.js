@@ -132,6 +132,54 @@ const updateVehicle = async (req, res) => {
   }
 };
 
+const updateVehicleStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    // Find vehicle and check ownership
+    const vehicle = await Vehicle.findById(id);
+    
+    if (!vehicle) {
+      return res.status(404).json({
+        message: 'Vehicle not found'
+      });
+    }
+
+    // Check if the user is the owner of the vehicle
+    if (vehicle.car_providerId.toString() !== req.user.userId) {
+      return res.status(403).json({
+        message: 'Not authorized to update this vehicle'
+      });
+    }
+
+    // Validate status
+    const validStatuses = ['Available', 'Rented', 'Maintenance', 'Unavailable'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+      });
+    }
+
+    // Update only the status field
+    const updatedVehicle = await Vehicle.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    );
+
+    res.status(200).json({
+      message: 'Vehicle status updated successfully',
+      data: updatedVehicle
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error updating vehicle status',
+      error: error.message
+    });
+  }
+};
+
 const getAllVehicles = async (req, res) => {
   try {
     const {
@@ -199,9 +247,40 @@ const getAllVehicles = async (req, res) => {
   }
 };
 
+const getVehicleById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const vehicle = await Vehicle.findById(id);
+    
+    if (!vehicle) {
+      return res.status(404).json({
+        message: 'Vehicle not found'
+      });
+    }
+
+    res.status(200).json({
+      message: 'Vehicle retrieved successfully',
+      data: vehicle
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        message: 'Invalid vehicle ID format'
+      });
+    }
+    res.status(500).json({
+      message: 'Error retrieving vehicle',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createVehicle,
   deleteVehicle,
   updateVehicle,
-  getAllVehicles
+  updateVehicleStatus,
+  getAllVehicles,
+  getVehicleById
 }; 

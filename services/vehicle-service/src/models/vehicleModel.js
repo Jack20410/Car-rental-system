@@ -58,7 +58,7 @@ const vehicleSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Pending', 'Approved', 'Rejected', 'Available', 'Rented', 'Unavailable'],
+    enum: ['Pending', 'Available', 'Rented', 'Unavailable'],
     default: 'Pending'
   },
   location: {
