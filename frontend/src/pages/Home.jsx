@@ -65,6 +65,60 @@ const Home = () => {
         address: '789 Luxury Blvd',
         city: 'Miami'
       }
+    },
+    {
+      _id: '8',
+      name: 'A4',
+      brand: 'Audi',
+      modelYear: 2023,
+      licensePlate: 'STU111',
+      rentalPricePerDay: 2700000,
+      description: 'Premium sedan with sleek design',
+      images: ['https://images.unsplash.com/photo-1698413935252-04ed6377296d?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzZ8fHN1diUyMGNhcnxlbnwwfHwwfHx8MA%3D%3D'],
+      seats: 5,
+      transmission: 'Automatic',
+      fuelType: 'Gasoline',
+      status: 'Available',
+      location: {
+        address: '222 Prestige St',
+        city: 'Ha Noi'
+      }
+    },
+    {
+      _id: '9',
+      name: 'Sportage',
+      brand: 'Kia',
+      modelYear: 2022,
+      licensePlate: 'VWX222',
+      rentalPricePerDay: 1100000,
+      description: 'Modern SUV with advanced features',
+      images: ['https://images.unsplash.com/photo-1698413935252-04ed6377296d?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzZ8fHN1diUyMGNhcnxlbnwwfHwwfHx8MA%3D%3D'],
+      seats: 5,
+      transmission: 'Automatic',
+      fuelType: 'Gasoline',
+      status: 'Available',
+      location: {
+        address: '333 Adventure Blvd',
+        city: 'Hue'
+      }
+    },
+    {
+      _id: '10',
+      name: 'Outlander',
+      brand: 'Mitsubishi',
+      modelYear: 2021,
+      licensePlate: 'YZA333',
+      rentalPricePerDay: 1200000,
+      description: 'Versatile SUV perfect for families',
+      images: ['https://images.unsplash.com/photo-1698413935252-04ed6377296d?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzZ8fHN1diUyMGNhcnxlbnwwfHwwfHx8MA%3D%3D'],
+      seats: 7,
+      transmission: 'Automatic',
+      fuelType: 'Gasoline',
+      status: 'Available',
+      location: {
+        address: '444 Family Way',
+        city: 'Vung Tau'
+      }
     }
   ], []);
 

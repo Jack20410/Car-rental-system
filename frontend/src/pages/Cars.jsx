@@ -90,8 +90,117 @@ const Cars = () => {
         address: '321 Economy Rd',
         city: 'Nha Trang'
       }
+    },
+    {
+      _id: '5',
+      name: 'Corolla Cross',
+      brand: 'Toyota',
+      modelYear: 2023,
+      licensePlate: 'JKL321',
+      rentalPricePerDay: 1000000,
+      description: 'Compact SUV with spacious interior',
+      images: ['https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'],
+      seats: 5,
+      transmission: 'Automatic',
+      fuelType: 'Gasoline',
+      status: 'Available',
+      location: {
+        address: '654 Family St',
+        city: 'Ho Chi Minh City'
+      }
+    },
+    {
+      _id: '6',
+      name: 'CX-5',
+      brand: 'Mazda',
+      modelYear: 2022,
+      licensePlate: 'MNO654',
+      rentalPricePerDay: 1300000,
+      description: 'Stylish and smooth compact SUV',
+      images: ['https://images.unsplash.com/photo-1615063029891-497bebd4f03c?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8c3V2JTIwY2FyfGVufDB8fDB8fHww'],
+      seats: 5,
+      transmission: 'Automatic',
+      fuelType: 'Gasoline',
+      status: 'Available',
+      location: {
+        address: '987 Comfort Ave',
+        city: 'Da Nang'
+      }
+    },
+    {
+      _id: '7',
+      name: 'F-150',
+      brand: 'Ford',
+      modelYear: 2021,
+      licensePlate: 'PQR987',
+      rentalPricePerDay: 1800000,
+      description: 'Powerful pickup truck for all terrains',
+      images: ['https://images.unsplash.com/photo-1612563893490-d86ed296e5e6?q=80&w=2669&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'],
+      seats: 5,
+      transmission: 'Automatic',
+      fuelType: 'Diesel',
+      status: 'Available',
+      location: {
+        address: '111 Rugged Rd',
+        city: 'Can Tho'
+      }
+    },
+    {
+      _id: '8',
+      name: 'A4',
+      brand: 'Audi',
+      modelYear: 2023,
+      licensePlate: 'STU111',
+      rentalPricePerDay: 2700000,
+      description: 'Premium sedan with sleek design',
+      images: ['https://images.unsplash.com/photo-1698413935252-04ed6377296d?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzZ8fHN1diUyMGNhcnxlbnwwfHwwfHx8MA%3D%3D'],
+      seats: 5,
+      transmission: 'Automatic',
+      fuelType: 'Gasoline',
+      status: 'Available',
+      location: {
+        address: '222 Prestige St',
+        city: 'Ha Noi'
+      }
+    },
+    {
+      _id: '9',
+      name: 'Sportage',
+      brand: 'Kia',
+      modelYear: 2022,
+      licensePlate: 'VWX222',
+      rentalPricePerDay: 1100000,
+      description: 'Modern SUV with advanced features',
+      images: ['https://images.unsplash.com/photo-1698413935252-04ed6377296d?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzZ8fHN1diUyMGNhcnxlbnwwfHwwfHx8MA%3D%3D'],
+      seats: 5,
+      transmission: 'Automatic',
+      fuelType: 'Gasoline',
+      status: 'Available',
+      location: {
+        address: '333 Adventure Blvd',
+        city: 'Hue'
+      }
+    },
+    {
+      _id: '10',
+      name: 'Outlander',
+      brand: 'Mitsubishi',
+      modelYear: 2021,
+      licensePlate: 'YZA333',
+      rentalPricePerDay: 1200000,
+      description: 'Versatile SUV perfect for families',
+      images: ['https://images.unsplash.com/photo-1698413935252-04ed6377296d?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzZ8fHN1diUyMGNhcnxlbnwwfHwwfHx8MA%3D%3D'],
+      seats: 7,
+      transmission: 'Automatic',
+      fuelType: 'Gasoline',
+      status: 'Available',
+      location: {
+        address: '444 Family Way',
+        city: 'Vung Tau'
+      }
     }
   ];
+  
 
   // Filter cars based on search parameters and filters
   const filteredCars = sampleCars.filter(car => {
@@ -135,6 +244,17 @@ const Cars = () => {
         return 0;
     }
   });
+
+  // Thêm các dòng sau để khai báo biến phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 9;
+  const totalPages = Math.ceil(sortedCars.length / pageSize);
+  const paginatedCars = sortedCars.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  // Reset về trang 1 khi filter/sort thay đổi
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sortBy, searchParams]);
 
   const handleFilterChange = (name, value) => {
     setFilters(prev => ({
@@ -373,15 +493,44 @@ const Cars = () => {
 
             {/* Cars Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {sortedCars.map(car => (
+              {paginatedCars.map(car => (
                 <CarCard key={car._id} car={car} />
               ))}
             </div>
 
-            {sortedCars.length === 0 && (
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex justify-center mt-8 space-x-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded border bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                >
+                  Trang trước
+                </button>
+                {[...Array(totalPages)].map((_, idx) => (
+                  <button
+                    key={idx + 1}
+                    onClick={() => setCurrentPage(idx + 1)}
+                    className={`px-3 py-1 rounded border ${currentPage === idx + 1 ? 'bg-primary text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}
+                  >
+                    {idx + 1}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded border bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                >
+                  Trang sau
+                </button>
+              </div>
+            )}
+
+            {paginatedCars.length === 0 && (
               <div className="text-center py-12 bg-white rounded-lg shadow-sm">
-                <h3 className="text-xl font-medium text-gray-900">No cars found</h3>
-                <p className="mt-2 text-gray-600">Try adjusting your filters</p>
+                <h3 className="text-xl font-medium text-gray-900">Không tìm thấy xe nào</h3>
+                <p className="mt-2 text-gray-600">Hãy thử thay đổi bộ lọc</p>
               </div>
             )}
           </div>
@@ -391,4 +540,4 @@ const Cars = () => {
   );
 };
 
-export default Cars; 
+export default Cars;
