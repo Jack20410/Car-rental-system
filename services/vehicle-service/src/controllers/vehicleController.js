@@ -80,10 +80,22 @@ const deleteVehicle = async (req, res) => {
 const updateVehicle = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
+    // Kiểm tra nếu licensePlate mới đã tồn tại ở xe khác
+    if (req.body.licensePlate) {
+      const existing = await Vehicle.findOne({
+        licensePlate: req.body.licensePlate,
+        _id: { $ne: id }
+      });
+      if (existing) {
+        return res.status(400).json({
+          message: 'License plate already exists'
+        });
+      }
+    }
+
     // Handle uploaded files if any
     const imagePaths = req.files ? req.files.map(file => `/uploads/vehicles/${file.filename}`) : [];
-    
     const updateData = {
       ...req.body,
       ...(imagePaths.length > 0 && { images: imagePaths })
@@ -91,7 +103,7 @@ const updateVehicle = async (req, res) => {
 
     // Find vehicle and check ownership
     const vehicle = await Vehicle.findById(id);
-    
+
     if (!vehicle) {
       return res.status(404).json({
         message: 'Vehicle not found'
@@ -283,4 +295,4 @@ module.exports = {
   updateVehicleStatus,
   getAllVehicles,
   getVehicleById
-}; 
+};

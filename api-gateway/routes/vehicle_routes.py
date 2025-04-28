@@ -12,7 +12,7 @@ VEHICLE_SERVICE_URL = os.getenv("VEHICLE_SERVICE_URL", "http://vehicle-service:3
 router = APIRouter(tags=["Vehicles"])
 
 # Vehicle Routes
-@router.api_route("/vehicles/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+@router.api_route("/vehicles/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def vehicle_service_routes(request: Request, path: str):
     """
     Proxy all vehicle-related requests to the vehicle service.

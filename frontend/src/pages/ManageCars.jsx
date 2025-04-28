@@ -28,6 +28,7 @@ const ManageCars = () => {
     features: [],
     images: []
   });
+  const [editingCar, setEditingCar] = useState(null);
 
   // Check auth directly from session storage as a fallback
   useEffect(() => {
@@ -163,14 +164,26 @@ const ManageCars = () => {
         throw new Error('No authentication token found');
       }
 
-      // Call API gateway to create a vehicle
-      const response = await fetch('http://localhost:3000/vehicles', {
+      let response;
+    if (editingCar) {
+      // Nếu đang edit, gọi PATCH
+      response = await fetch(`http://localhost:3000/vehicles/${editingCar._id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formDataToSend
+      });
+    } else {
+      // Nếu tạo mới, gọi POST
+      response = await fetch('http://localhost:3000/vehicles', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         },
         body: formDataToSend
       });
+    }
 
       if (response.ok) {
         const result = await response.json();
@@ -206,11 +219,35 @@ const ManageCars = () => {
     }
   };
 
+   const handleDeleteCar = async (carId) => {
+    if (!window.confirm('Are you sure you want to delete this car?')) return;
+    try {
+      const token = JSON.parse(sessionStorage.getItem('auth'))?.token;
+      if (!token) throw new Error('No authentication token found');
+  
+      const response = await fetch(`http://localhost:3000/vehicles/${carId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+  
+      if (response.ok) {
+        setCars(prev => prev.filter(car => car._id !== carId));
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete car');
+      }
+    } catch (error) {
+      alert(`Error deleting car: ${error.message}`);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 pt-20">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Manage Rental Cars</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Car Information</h1>
           <button
             onClick={() => setShowForm(!showForm)}
             className="bg-primary text-white px-4 py-2 rounded-md hover:bg-secondary transition-colors"
@@ -439,6 +476,19 @@ const ManageCars = () => {
                 <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="images">
                   Car Images
                 </label>
+                {/* Hiển thị ảnh cũ khi edit */}
+                {editingCar && editingCar.images && editingCar.images.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {editingCar.images.map((img, idx) => (
+                      <img
+                        key={idx}
+                        src={`http://localhost:3002${img}`}
+                        alt={`Car image ${idx + 1}`}
+                        className="w-24 h-16 object-cover border rounded"
+                      />
+                    ))}
+                  </div>
+                )}
                 <input
                   type="file"
                   id="images"
@@ -447,7 +497,8 @@ const ManageCars = () => {
                   className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                   multiple
                   accept="image/*"
-                  required
+                  // Chỉ required khi tạo mới, không required khi edit
+                  required={!editingCar}
                 />
               </div>
             </div>
@@ -456,8 +507,35 @@ const ManageCars = () => {
                 type="submit"
                 className="bg-primary text-white px-6 py-2 rounded-md hover:bg-secondary transition-colors"
               >
-                Create Car
+                {editingCar ? 'Update Car' : 'Create Car'}
               </button>
+              {editingCar && (
+                <button
+                  type="button"
+                  className="ml-2 bg-gray-300 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-400 transition-colors"
+                  onClick={() => {
+                    setEditingCar(null);
+                    setShowForm(false);
+                    setFormData({
+                      name: '',
+                      brand: '',
+                      modelYear: '',
+                      rentalPricePerDay: '',
+                      licensePlate: '',
+                      description: '',
+                      seats: '',
+                      carType: 'Sedan',
+                      transmission: 'Automatic',
+                      fuelType: 'Gasoline',
+                      location: { city: '', address: '' },
+                      features: [],
+                      images: []
+                    });
+                  }}
+                >
+                  Cancel Edit
+                </button>
+              )}
             </div>
           </form>
         )}
@@ -504,13 +582,22 @@ const ManageCars = () => {
                     <div className="flex justify-end space-x-2">
                       <button
                         className="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300"
-                        onClick={() => {/* Edit functionality */}}
+                        onClick={() => {
+                          setEditingCar(car);
+                          setShowForm(true);
+                          setFormData({
+                            ...car,
+                            location: car.location || { city: '', address: '' },
+                            features: car.features || [],
+                            images: [] // Không load lại ảnh cũ vào input file
+                          });
+                        }}
                       >
                         Edit
                       </button>
                       <button
                         className="bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200"
-                        onClick={() => {/* Delete functionality */}}
+                        onClick={() => handleDeleteCar(car._id)}
                       >
                         Delete
                       </button>
@@ -524,6 +611,16 @@ const ManageCars = () => {
       </div>
     </div>
   );
+
+ 
+
+
 };
 
-export default ManageCars; 
+
+
+
+
+
+export default ManageCars;
+
