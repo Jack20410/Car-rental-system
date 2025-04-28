@@ -13,7 +13,6 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-      - ./uploads:/app/public/uploads
     networks:
       - car-rental-network
 
@@ -50,7 +49,8 @@ services:
     volumes:
       - ./services/user-service:/app
       - /app/node_modules
-      - ./uploads:/app/uploads
+      - ./uploads:/uploads
+      - ./uploads/avatars:/uploads/avatars
     networks:
       - car-rental-network
 
@@ -66,8 +66,7 @@ services:
       - ./services/vehicle-service:/app
       - /app/node_modules
       - ./uploads:/uploads
-      # Ensure the avatar directory is explicitly mounted
-      - ./uploads/avatar:/uploads/avatar
+      - ./uploads/vehicles:/uploads/vehicles
     networks:
       - car-rental-network
 
@@ -93,4 +92,5 @@ networks:
     driver: bridge
 
 volumes:
-  mongodb_data: 
+  uploads_data:
+    driver: local 

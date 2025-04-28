@@ -34,4 +34,4 @@ exports.requireCustomer = (req, res, next) => {
     });
   }
   next();
-}; 
+};

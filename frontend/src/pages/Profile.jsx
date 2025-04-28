@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { endpoints } from '../utils/api';
 
+const DEFAULT_AVATAR = 'http://localhost:3001/avatar/user.png';
+
 const Profile = () => {
   const { user, getAuthState } = useAuth();
   const navigate = useNavigate();
@@ -14,9 +16,9 @@ const Profile = () => {
     email: user?.email || '',
     phone: user?.phoneNumber || '',
     address: user?.address || '',
-    avatar: user?.avatar || '/uploads/avatar/user.png',
+    avatar: user?.avatar || DEFAULT_AVATAR,
   });
-  const [previewAvatar, setPreviewAvatar] = useState(user?.avatar || '/uploads/avatar/user.png');
+  const [previewAvatar, setPreviewAvatar] = useState(user?.avatar || DEFAULT_AVATAR);
 
   if (!user) {
     navigate('/login');
@@ -124,7 +126,7 @@ const Profile = () => {
                       className="h-24 w-24 rounded-full object-cover border-2 border-gray-200"
                       onError={(e) => {
                         e.target.onerror = null;
-                        e.target.src = '/uploads/avatar/user.png';
+                        e.target.src = DEFAULT_AVATAR;
                       }}
                     />
                     <label 
@@ -220,12 +222,12 @@ const Profile = () => {
             <div className="border-t border-gray-200">
               <div className="flex justify-center py-5">
                 <img 
-                  src={user.avatar || '/uploads/avatar/user.png'} 
+                  src={user.avatar || DEFAULT_AVATAR} 
                   alt="Profile Avatar" 
                   className="h-32 w-32 rounded-full object-cover border-2 border-gray-200"
                   onError={(e) => {
                     e.target.onerror = null;
-                    e.target.src = '/uploads/avatar/user.png';
+                    e.target.src = DEFAULT_AVATAR;
                   }}
                 />
               </div>

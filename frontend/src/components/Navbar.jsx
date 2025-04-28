@@ -9,8 +9,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   
   // Direct URL to the vehicle service for static files
-  const VEHICLE_SERVICE_URL = import.meta.env.VITE_VEHICLE_SERVICE_URL || 'http://localhost:3002';
-  const DEFAULT_AVATAR = `${VEHICLE_SERVICE_URL}/avatar/user.png`;
+  const DEFAULT_AVATAR = `http://localhost:3001/avatar/user.png`;
 
   const handleLogout = () => {
     logout();
