@@ -1,126 +1,60 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import SearchBar from '../components/SearchBar';
 import CarCard from '../components/CarCard';
-import { TruckIcon, ShieldCheckIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom';
 import '../styles/Home.css'; // Updated import path for styles folder
 
 const Home = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [featuredCars, setFeaturedCars] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const sliderRef = useRef(null);
   const autoScrollRef = useRef(null);
 
-  // Featured cars (using the same sample data for now)
-  const featuredCars = useMemo(() => [
-    {
-      _id: '1',
-      name: 'Camry',
-      brand: 'Toyota',
-      modelYear: 2023,
-      licensePlate: 'ABC123',
-      rentalPricePerDay: 1000000,
-      description: 'Comfortable and fuel-efficient sedan',
-      images: ['https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?ixlib=rb-4.0.3'],
-      seats: 5,
-      transmission: 'Automatic',
-      fuelType: 'Gasoline',
-      status: 'Available',
-      location: {
-        address: '123 Main St',
-        city: 'New York'
+  // Fetch cars from API
+  useEffect(() => {
+    const fetchCars = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch('http://localhost:3000/vehicles');
+        if (!response.ok) {
+          throw new Error('Failed to fetch cars');
+        }
+        const result = await response.json();
+        
+        // Validate the response structure
+        if (!result.data?.vehicles || !Array.isArray(result.data.vehicles)) {
+          throw new Error('Invalid response format: vehicles array not found');
+        }
+        
+        // Extract and validate each vehicle
+        const vehicles = result.data.vehicles.filter(vehicle => {
+          // Ensure required properties exist
+          if (!vehicle || typeof vehicle !== 'object') return false;
+          if (!vehicle._id) return false;
+          return true;
+        });
+        
+        if (vehicles.length === 0) {
+          setError('No vehicles available');
+          return;
+        }
+        
+        // Get 6 random cars as featured cars
+        const randomCars = [...vehicles].sort(() => Math.random() - 0.5).slice(0, Math.min(6, vehicles.length));
+        console.log('Selected random cars:', randomCars);
+        setFeaturedCars(randomCars);
+      } catch (err) {
+        console.error('Error fetching cars:', err);
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
       }
-    },
-    {
-      _id: '2',
-      name: 'Model 3',
-      brand: 'Tesla',
-      modelYear: 2023,
-      licensePlate: 'XYZ789',
-      rentalPricePerDay: 1500000,
-      description: 'Electric luxury sedan with autopilot',
-      images: ['https://images.unsplash.com/photo-1536700503339-1e4b06520771?ixlib=rb-4.0.3'],
-      seats: 5,
-      transmission: 'Automatic',
-      fuelType: 'Electric',
-      status: 'Available',
-      location: {
-        address: '456 Tech Ave',
-        city: 'San Francisco'
-      }
-    },
-    {
-      _id: '3',
-      name: 'X5',
-      brand: 'BMW',
-      modelYear: 2022,
-      licensePlate: 'DEF456',
-      rentalPricePerDay: 1500000,
-      description: 'Luxury SUV with premium features',
-      images: ['https://images.unsplash.com/photo-1555215695-3004980ad54e?ixlib=rb-4.0.3'],
-      seats: 7,
-      transmission: 'Automatic',
-      fuelType: 'Hybrid',
-      status: 'Available',
-      location: {
-        address: '789 Luxury Blvd',
-        city: 'Miami'
-      }
-    },
-    {
-      _id: '8',
-      name: 'A4',
-      brand: 'Audi',
-      modelYear: 2023,
-      licensePlate: 'STU111',
-      rentalPricePerDay: 2700000,
-      description: 'Premium sedan with sleek design',
-      images: ['https://images.unsplash.com/photo-1698413935252-04ed6377296d?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzZ8fHN1diUyMGNhcnxlbnwwfHwwfHx8MA%3D%3D'],
-      seats: 5,
-      transmission: 'Automatic',
-      fuelType: 'Gasoline',
-      status: 'Available',
-      location: {
-        address: '222 Prestige St',
-        city: 'Ha Noi'
-      }
-    },
-    {
-      _id: '9',
-      name: 'Sportage',
-      brand: 'Kia',
-      modelYear: 2022,
-      licensePlate: 'VWX222',
-      rentalPricePerDay: 1100000,
-      description: 'Modern SUV with advanced features',
-      images: ['https://images.unsplash.com/photo-1698413935252-04ed6377296d?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzZ8fHN1diUyMGNhcnxlbnwwfHwwfHx8MA%3D%3D'],
-      seats: 5,
-      transmission: 'Automatic',
-      fuelType: 'Gasoline',
-      status: 'Available',
-      location: {
-        address: '333 Adventure Blvd',
-        city: 'Hue'
-      }
-    },
-    {
-      _id: '10',
-      name: 'Outlander',
-      brand: 'Mitsubishi',
-      modelYear: 2021,
-      licensePlate: 'YZA333',
-      rentalPricePerDay: 1200000,
-      description: 'Versatile SUV perfect for families',
-      images: ['https://images.unsplash.com/photo-1698413935252-04ed6377296d?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzZ8fHN1diUyMGNhcnxlbnwwfHwwfHx8MA%3D%3D'],
-      seats: 7,
-      transmission: 'Automatic',
-      fuelType: 'Gasoline',
-      status: 'Available',
-      location: {
-        address: '444 Family Way',
-        city: 'Vung Tau'
-      }
-    }
-  ], []);
+    };
+
+    fetchCars();
+  }, []);
 
   // Popular locations data
   const popularLocations = useMemo(() => [
@@ -282,11 +216,22 @@ const Home = () => {
             Discover our most popular rental vehicles
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {featuredCars.map(car => (
-            <CarCard key={car._id} car={car} />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        ) : error ? (
+          <div className="text-center text-red-600 py-8">
+            <p>{error}</p>
+            <p className="mt-2">Please try again later</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {featuredCars.map(car => (
+              <CarCard key={car._id} car={car} />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Why Choose Us Section */}

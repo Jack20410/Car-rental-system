@@ -21,15 +21,15 @@ router.post('/register', validateRegistration, register);
 // POST /users/login - Login user
 router.post('/login', validateLogin, login);
 
+// GET /users/:id - Get user by ID (Public route for provider details)
+router.get('/:id', getUserById);
+
 // Protected routes
 // GET /users - Get all users
 router.get('/', verifyToken, getAllUsers);
 
 // GET /users/profile - Get current user profile
 router.get('/profile', verifyToken, getCurrentUser);
-
-// GET /users/:id - Get user by ID
-router.get('/:id', verifyToken, getUserById);
 
 // GET /users/role/:role - Get users by role
 router.get('/role/:role', verifyToken, getUsersByRole);

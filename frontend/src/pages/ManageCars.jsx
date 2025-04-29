@@ -10,6 +10,7 @@ const ManageCars = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [providerRole, setProviderRole] = useState(false);
+  const [existingImages, setExistingImages] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     brand: '',
@@ -59,14 +60,16 @@ const ManageCars = () => {
   const fetchCars = async () => {
     try {
       setIsLoading(true);
-      const token = JSON.parse(sessionStorage.getItem('auth'))?.token;
+      const auth = JSON.parse(sessionStorage.getItem('auth'));
+      const token = auth?.token;
+      const userId = auth?.user?._id;
       
-      if (!token) {
-        throw new Error('No authentication token found');
+      if (!token || !userId) {
+        throw new Error('No authentication token or user ID found');
       }
       
-      // Fetch from the API gateway
-      const response = await fetch('http://localhost:3000/vehicles', {
+      // Fetch from the API gateway with user ID as query parameter
+      const response = await fetch(`http://localhost:3000/vehicles?car_providerId=${userId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -133,6 +136,15 @@ const ManageCars = () => {
     }));
   };
 
+  const handleMoveImage = (fromIndex, toIndex) => {
+    setExistingImages(prevImages => {
+      const newImages = [...prevImages];
+      const [movedImage] = newImages.splice(fromIndex, 1);
+      newImages.splice(toIndex, 0, movedImage);
+      return newImages;
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -144,6 +156,10 @@ const ManageCars = () => {
           formData.images.forEach(image => {
             formDataToSend.append('images', image);
           });
+          // Add existing images in their new order
+          if (editingCar) {
+            formDataToSend.append('existingImages', JSON.stringify(existingImages));
+          }
         } else if (key === 'location') {
           // Add location fields separately
           formDataToSend.append('location[city]', formData.location.city);
@@ -470,7 +486,7 @@ const ManageCars = () => {
                   Features
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {['Apple Carplay', 'Android Auto', 'USB Type-C Port', 'Heated Seats', 'Sunroof', '360 Camera', 'Leather Seats'].map(feature => (
+                  {['Apple Carplay', 'Android Auto', 'USB Type-C Port', 'Heated Seats', 'Sunroof', '360 Camera', 'Rear Camera', 'Leather Seats', 'Smart Key'].map(feature => (
                     <div key={feature} className="flex items-center">
                       <input
                         type="checkbox"
@@ -504,16 +520,37 @@ const ManageCars = () => {
                 <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="images">
                   Car Images
                 </label>
-                {/* Hiển thị ảnh cũ khi edit */}
+                {/* Display existing images with reorder controls */}
                 {editingCar && editingCar.images && editingCar.images.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {editingCar.images.map((img, idx) => (
-                      <img
-                        key={idx}
-                        src={`http://localhost:3002${img}`}
-                        alt={`Car image ${idx + 1}`}
-                        className="w-24 h-16 object-cover border rounded"
-                      />
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {existingImages.map((img, idx) => (
+                      <div key={idx} className="relative group">
+                        <img
+                          src={`http://localhost:3002${img}`}
+                          alt={`Car image ${idx + 1}`}
+                          className="w-24 h-16 object-cover border rounded"
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 flex items-center justify-center space-x-2 transition-opacity">
+                          {idx > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleMoveImage(idx, idx - 1)}
+                              className="p-1 bg-white rounded-full hover:bg-gray-100"
+                            >
+                              ←
+                            </button>
+                          )}
+                          {idx < existingImages.length - 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleMoveImage(idx, idx + 1)}
+                              className="p-1 bg-white rounded-full hover:bg-gray-100"
+                            >
+                              →
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -525,7 +562,6 @@ const ManageCars = () => {
                   className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                   multiple
                   accept="image/*"
-                  // Chỉ required khi tạo mới, không required khi edit
                   required={!editingCar}
                 />
               </div>
@@ -613,6 +649,7 @@ const ManageCars = () => {
                         onClick={() => {
                           setEditingCar(car);
                           setShowForm(true);
+                          setExistingImages(car.images || []);
                           setFormData({
                             ...car,
                             location: car.location || { city: '', address: '' },

@@ -29,6 +29,7 @@ const Navbar = () => {
   
   const handleLogout = () => {
     logout();
+    setProviderRole(false);
     setIsProfileOpen(false);
     setMobileMenuOpen(false);
     navigate('/');

@@ -81,7 +81,7 @@ const updateVehicle = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Kiểm tra nếu licensePlate mới đã tồn tại ở xe khác
+    // Check if licensePlate exists on another vehicle
     if (req.body.licensePlate) {
       const existing = await Vehicle.findOne({
         licensePlate: req.body.licensePlate,
@@ -96,9 +96,22 @@ const updateVehicle = async (req, res) => {
 
     // Handle uploaded files if any
     const imagePaths = req.files ? req.files.map(file => `/uploads/vehicles/${file.filename}`) : [];
+    
+    // Handle existing images reordering
+    let finalImages = [];
+    if (req.body.existingImages) {
+      const existingImages = JSON.parse(req.body.existingImages);
+      finalImages = [...existingImages];
+    }
+    
+    // Add any new images to the end of the array
+    if (imagePaths.length > 0) {
+      finalImages = [...finalImages, ...imagePaths];
+    }
+
     const updateData = {
       ...req.body,
-      ...(imagePaths.length > 0 && { images: imagePaths })
+      ...(finalImages.length > 0 && { images: finalImages })
     };
 
     // Find vehicle and check ownership
@@ -120,6 +133,7 @@ const updateVehicle = async (req, res) => {
     // Prevent updating certain fields
     delete updateData.car_providerId; // Cannot change ownership
     delete updateData.status; // Status changes should be handled separately
+    delete updateData.existingImages; // Remove the existingImages field from the update data
 
     const updatedVehicle = await Vehicle.findByIdAndUpdate(
       id,
@@ -202,6 +216,7 @@ const getAllVehicles = async (req, res) => {
       maxPrice,
       seats,
       status,
+      car_providerId,
       sortBy = 'createdAt',
       order = 'desc',
       page = 1,
@@ -216,6 +231,7 @@ const getAllVehicles = async (req, res) => {
     if (fuelType) filter.fuelType = fuelType;
     if (seats) filter.seats = seats;
     if (status) filter.status = status;
+    if (car_providerId) filter.car_providerId = car_providerId;
     
     // Price range filter
     if (minPrice || maxPrice) {

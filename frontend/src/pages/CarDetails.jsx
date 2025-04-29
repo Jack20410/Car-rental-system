@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { FaCar, FaGasPump, FaCog, FaUsers, FaCalendarAlt, FaMapMarkerAlt, FaStar, FaStarHalf, FaRegStar, FaPhoneAlt, FaUserCheck } from 'react-icons/fa';
 import { BsSpeedometer2, BsGearFill, BsShieldCheck } from 'react-icons/bs';
@@ -11,130 +11,149 @@ import { formatCurrency } from '../utils/formatCurrency';
 const CarDetails = () => {
   const { id } = useParams();
   const [selectedImage, setSelectedImage] = useState(0);
+  const [car, setCar] = useState(null);
+  const [provider, setProvider] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // This would normally come from an API call using the id
-  const car = {
-    _id: id,
-    name: 'Camry',
-    brand: 'Toyota',
-    modelYear: 2023,
-    licensePlate: 'ABC123',
-    rentalPricePerDay: 1200000, // Price in VND
-    description: 'Experience comfort and reliability with our Toyota Camry. This well-maintained sedan offers excellent fuel efficiency, smooth handling, and plenty of space for both passengers and luggage. Perfect for both city driving and long trips.',
-    images: [
-      'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?ixlib=rb-4.0.3',
-      'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?ixlib=rb-4.0.3',
-      'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?ixlib=rb-4.0.3',
-    ],
-    seats: 5,
-    transmission: 'Automatic',
-    fuelType: 'Gasoline',
-    status: 'Available',
-    location: {
-      address: '123 Main Street',
-      city: 'Ho Chi Minh City',
-      district: 'District 1',
-      coordinates: {
-        lat: 10.762622,
-        lng: 106.660172
-      },
-      landmark: 'Near Ben Thanh Market',
-      pickupInstructions: 'Please contact our staff 15 minutes before arrival. Parking available at the front.',
-      businessHours: '8:00 AM - 8:00 PM'
-    },
-    features: [
-      'Bluetooth Connectivity',
-      'Backup Camera',
-      'Cruise Control',
-      'USB Charging',
-      'Apple CarPlay',
-      'Android Auto',
-      'Climate Control',
-      'Keyless Entry'
-    ],
-    specifications: {
-      engine: '2.5L 4-Cylinder',
-      power: '203 hp',
-      fuelEfficiency: '28 city / 39 highway',
-      trunk: '15.1 cubic feet',
-      airbags: '8',
-      abs: 'Yes',
-      stabilityControl: 'Yes'
-    },
-    rating: {
-      average: 4.7,
-      total: 128,
-      distribution: {
-        5: 85,
-        4: 28,
-        3: 10,
-        2: 3,
-        1: 2
+  useEffect(() => {
+    const fetchCarAndProviderDetails = async () => {
+      try {
+        setLoading(true);
+        // Fetch car details
+        const carResponse = await fetch(`http://localhost:3000/vehicles/${id}`);
+        if (!carResponse.ok) {
+          throw new Error('Failed to fetch car details');
+        }
+        const carData = await carResponse.json();
+        const data = carData.data;
+
+        // Check if we have a car_providerId
+        if (data && data.car_providerId) {
+          try {
+            // Fetch provider details
+            const providerResponse = await fetch(`http://localhost:3000/users/${data.car_providerId}`);
+            if (providerResponse.ok) {
+              const providerData = await providerResponse.json();
+              setProvider(providerData.data);
+            } else {
+              console.warn('Failed to fetch provider details, using default display');
+              setProvider(null);
+            }
+          } catch (err) {
+            console.warn('Error fetching provider:', err);
+            setProvider(null);
+          }
+        } else {
+          console.warn('No car_providerId found in vehicle data');
+          setProvider(null);
+        }
+        
+        // Transform the data to match our frontend structure
+        const transformedData = {
+          _id: data._id,
+          name: data.name,
+          brand: data.brand,
+          modelYear: data.modelYear,
+          licensePlate: data.licensePlate,
+          rentalPricePerDay: data.rentalPricePerDay,
+          description: data.description,
+          images: data.images.map(image => `http://localhost:3002${image}`),
+          seats: data.seats,
+          transmission: data.transmission,
+          fuelType: data.fuelType,
+          status: data.status,
+          features: data.features || [],
+          rating: {
+            average: 4.7,
+            total: 0,
+            distribution: {
+              5: 0,
+              4: 0,
+              3: 0,
+              2: 0,
+              1: 0
+            }
+          },
+          reviews: [],
+          owner: provider ? {
+            id: data.car_providerId,
+            name: provider.fullName || 'Car Provider',
+            avatar: provider.avatar ? `http://localhost:3001${provider.avatar}` : "https://randomuser.me/api/portraits/men/32.jpg",
+            joinedDate: provider.createdAt ? new Date(provider.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Unknown date',
+            contact: {
+              email: provider.email || "Contact information unavailable",
+              phone: provider.phoneNumber || "Contact information unavailable"
+            }
+          } : {
+            id: data.car_providerId || 'unknown',
+            name: "Car Provider",
+            avatar: "https://randomuser.me/api/portraits/men/32.jpg",
+            joinedDate: "Unknown date",
+            contact: {
+              email: "Contact information unavailable",
+              phone: "Contact information unavailable"
+            }
+          },
+          location: {
+            address: data.location?.address || '',
+            city: data.location?.city || '',
+            coordinates: {
+              lat: 10.762622,
+              lng: 106.660172
+            },
+            landmark: 'Near city center',
+            pickupInstructions: 'Please contact our staff 15 minutes before arrival.',
+            businessHours: '8:00 AM - 8:00 PM'
+          }
+        };
+        
+        setCar(transformedData);
+      } catch (err) {
+        console.error('Error:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
-    },
-    reviews: [
-      {
-        id: 1,
-        user: {
-          name: 'John Smith',
-          avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
-          isVerified: true
-        },
-        rating: 5,
-        date: '2024-02-15',
-        comment: 'Excellent car! Very clean and well-maintained. The pickup process was smooth, and the owner was very professional.',
-        tripDuration: '3 days'
-      },
-      {
-        id: 2,
-        user: {
-          name: 'Sarah Johnson',
-          avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
-          isVerified: true
-        },
-        rating: 4,
-        date: '2024-02-10',
-        comment: 'Great experience overall. The car was comfortable and fuel-efficient. Would rent again.',
-        tripDuration: '5 days'
-      },
-      {
-        id: 3,
-        user: {
-          name: 'Mike Brown',
-          avatar: 'https://randomuser.me/api/portraits/men/2.jpg',
-          isVerified: false
-        },
-        rating: 5,
-        date: '2024-02-05',
-        comment: 'Perfect car for our family trip. Everything was as described, and the owner was very helpful.',
-        tripDuration: '7 days'
-      }
-    ],
-    owner: {
-      id: "owner123",
-      name: "David Nguyen",
-      avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-      joinedDate: "January 2022",
-      responseRate: 98,
-      responseTime: "within 1 hour",
-      totalTrips: 245,
-      verificationStatus: {
-        email: true,
-        phone: true,
-        identity: true
-      },
-      languages: ["English", "Vietnamese"],
-      contact: {
-        email: "david.nguyen@example.com",
-        phone: "+84 123 456 789"
-      }
-    }
-  };
+    };
+
+    fetchCarAndProviderDetails();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Car Details</h2>
+          <p className="text-gray-600">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!car) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Car Not Found</h2>
+          <p className="text-gray-600">The car you're looking for doesn't exist or has been removed.</p>
+        </div>
+      </div>
+    );
+  }
 
   const renderStars = (rating) => {
     const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
+    const fullStars = Math.floor(rating || 0);
+    const hasHalfStar = (rating || 0) % 1 !== 0;
 
     for (let i = 1; i <= 5; i++) {
       if (i <= fullStars) {
@@ -264,7 +283,7 @@ const CarDetails = () => {
                         <p className="flex items-start gap-2 text-gray-700">
                         <FaMapMarkerAlt className="text-primary mt-1" />
                         <span>
-                            {car.location.address}, {car.location.district}, {car.location.city}
+                            {car.location.address}, {car.location.city}
                             <br />
                             <span className="text-gray-500 text-sm">{car.location.landmark}</span>
                         </span>
@@ -310,16 +329,6 @@ const CarDetails = () => {
                       <MdVerified className="text-primary" title="Verified Owner" />
                     </div>
                     <p className="text-sm text-gray-600">Member since {car.owner.joinedDate}</p>
-                    <div className="flex items-center gap-2 mt-2">
-                      {car.owner.languages.map((lang, index) => (
-                        <span
-                          key={lang}
-                          className="px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-700"
-                        >
-                          {lang}
-                        </span>
-                      ))}
-                    </div>
                   </div>
                 </div>
 
@@ -327,39 +336,29 @@ const CarDetails = () => {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-gray-700">
                     <BsSpeedometer2 className="text-primary" />
-                    <span>{car.owner.responseRate}% response rate</span>
+                    <span>98% response rate</span>
                   </div>
                   <div className="flex items-center gap-2 text-gray-700">
                     <FaCalendarAlt className="text-primary" />
-                    <span>Responds {car.owner.responseTime}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <FaCar className="text-primary" />
-                    <span>{car.owner.totalTrips} completed trips</span>
+                    <span>Responds within 1 hour</span>
                   </div>
                 </div>
 
                 {/* Verification & Contact */}
                 <div>
                   <div className="space-y-3 mb-4">
-                    <h4 className="font-medium text-gray-800">Verified Info</h4>
+                    <h4 className="font-medium text-gray-800">Contact Information</h4>
                     <div className="grid grid-cols-2 gap-2">
-                      {car.owner.verificationStatus.email && (
+                      {car.owner.contact.email && (
                         <div className="flex items-center gap-2 text-gray-700">
                           <MdEmail className="text-primary" />
-                          <span>Email</span>
+                          <span>{car.owner.contact.email}</span>
                         </div>
                       )}
-                      {car.owner.verificationStatus.phone && (
+                      {car.owner.contact.phone && (
                         <div className="flex items-center gap-2 text-gray-700">
                           <FaPhoneAlt className="text-primary" />
-                          <span>Phone</span>
-                        </div>
-                      )}
-                      {car.owner.verificationStatus.identity && (
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <BsShieldCheck className="text-primary" />
-                          <span>Identity</span>
+                          <span>{car.owner.contact.phone}</span>
                         </div>
                       )}
                     </div>

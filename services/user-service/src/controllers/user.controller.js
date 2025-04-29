@@ -77,7 +77,8 @@ exports.getAllUsers = async (req, res) => {
 exports.getUserById = async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findById(id, '-password');
+    // Only select specified public fields
+    const user = await User.findById(id).select('name email phoneNumber avatar createdAt role');
 
     if (!user) {
       return res.status(404).json({
@@ -86,10 +87,20 @@ exports.getUserById = async (req, res) => {
       });
     }
 
+    // Transform the response for public view
+    const publicUserData = {
+      _id: user._id,
+      fullName: user.name,
+      avatar: user.avatar,
+      email: user.role === 'car_provider' ? user.email : undefined,
+      phoneNumber: user.role === 'car_provider' ? user.phoneNumber : undefined,
+      createdAt: user.createdAt
+    };
+
     res.status(200).json({
       success: true,
       message: 'User retrieved successfully',
-      data: user
+      data: publicUserData
     });
 
   } catch (error) {
