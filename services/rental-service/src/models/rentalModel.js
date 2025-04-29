@@ -34,16 +34,10 @@ const rentalSchema = new mongoose.Schema({
     default: 'unpaid'
   },
   paymentId: {
-    type: String
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+    type: mongoose.Schema.Types.ObjectId,  // <-- sửa thành ObjectId
+    ref: 'Payment'
   }
-});
+}, { timestamps: true }); // <-- tự động createdAt, updatedAt
 
-module.exports = mongoose.model('Rental', rentalSchema); 
+
+module.exports = mongoose.model('Rental', rentalSchema);

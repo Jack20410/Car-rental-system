@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const vehicleSchema = new mongoose.Schema({
   car_providerId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'car_provider',
+    ref: 'User', // Phải là User, vì car-provider chỉ là một role, không phải là field trong User
     required: true
   },
   name: {
