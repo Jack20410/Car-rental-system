@@ -15,6 +15,13 @@ const CarDetails = () => {
   const [provider, setProvider] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pickupDate, setPickupDate] = useState('');
+  const [returnDate, setReturnDate] = useState('');
+  const [numberOfDays, setNumberOfDays] = useState(0);
+  const [isHourlyRent, setIsHourlyRent] = useState(false);
+  const [pickupTime, setPickupTime] = useState('');
+  const [returnTime, setReturnTime] = useState('');
+  const [numberOfHours, setNumberOfHours] = useState(0);
 
   useEffect(() => {
     const fetchCarAndProviderDetails = async () => {
@@ -167,6 +174,27 @@ const CarDetails = () => {
 
     return stars;
   };
+
+  const calculateDays = (start, end) => {
+    if (!start || !end) return 0;
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const diffTime = endDate - startDate;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+
+
+const calculateHours = (startDate, startTime, endDate, endTime) => {
+  if (!startDate || !endDate || !startTime || !endTime) return 0;
+  const start = new Date(`${startDate}T${startTime}`);
+  const end = new Date(`${endDate}T${endTime}`);
+  const diffTime = end - start;
+  const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
+  return diffHours > 0 ? diffHours : 0;
+};
+  
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
@@ -504,9 +532,27 @@ const CarDetails = () => {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                   <MdLocalOffer className="text-primary" />
-                  {formatCurrency(car.rentalPricePerDay)}
+                  {formatCurrency(isHourlyRent ? car.rentalPricePerDay / 24 : car.rentalPricePerDay)}
                 </h2>
-                <span className="text-gray-600">per day</span>
+                <span className="text-gray-600">per {isHourlyRent ? 'hour' : 'day'}</span>
+              </div>
+
+              {/* Toggle Rent Type */}
+              <div className="flex items-center justify-center mb-4">
+                <button
+                  type="button"
+                  onClick={() => setIsHourlyRent(false)}
+                  className={`px-4 py-2 rounded-l-lg ${!isHourlyRent ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`}
+                >
+                  Thuê theo ngày
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsHourlyRent(true)}
+                  className={`px-4 py-2 rounded-r-lg ${isHourlyRent ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`}
+                >
+                  Thuê theo giờ
+                </button>
               </div>
 
               <form className="space-y-4">
@@ -517,29 +563,92 @@ const CarDetails = () => {
                   </label>
                   <input
                     type="date"
+                    value={pickupDate}
+                    onChange={(e) => {
+                      setPickupDate(e.target.value);
+                      if (isHourlyRent) {
+                        setNumberOfHours(
+                          pickupTime && returnTime
+                            ? calculateHours(e.target.value, pickupTime, e.target.value, returnTime)
+                            : 0
+                        );
+                      } else {
+                        setNumberOfDays(calculateDays(e.target.value, returnDate));
+                      }
+                    }}
+                    min={new Date().toISOString().split('T')[0]}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                   />
+                  {isHourlyRent && (
+                    <div className="flex gap-2 mt-2">
+                      <input
+                        type="time"
+                        value={pickupTime}
+                        onChange={(e) => {
+                          setPickupTime(e.target.value);
+                          setNumberOfHours(
+                            pickupDate && e.target.value && returnTime
+                              ? calculateHours(pickupDate, e.target.value, pickupDate, returnTime)
+                              : 0
+                          );
+                        }}
+                        className="w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                        placeholder="Pickup Time"
+                      />
+                      <input
+                        type="time"
+                        value={returnTime}
+                        onChange={(e) => {
+                          setReturnTime(e.target.value);
+                          setNumberOfHours(
+                            pickupDate && pickupTime && e.target.value
+                              ? calculateHours(pickupDate, pickupTime, pickupDate, e.target.value)
+                              : 0
+                          );
+                        }}
+                        className="w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                        placeholder="Return Time"
+                      />
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
-                    <FaCalendarAlt className="text-primary" />
-                    Return Date
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                  />
-                </div>
+                {/* Chỉ hiển thị Return Date/Time nếu là thuê theo ngày */}
+                {!isHourlyRent && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                      <FaCalendarAlt className="text-primary" />
+                      Return Date
+                    </label>
+                    <input
+                      type="date"
+                      value={returnDate}
+                      onChange={(e) => {
+                        setReturnDate(e.target.value);
+                        setNumberOfDays(calculateDays(pickupDate, e.target.value));
+                      }}
+                      min={pickupDate || new Date().toISOString().split('T')[0]}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                    />
+                    <input
+                      type="time"
+                      value={returnTime}
+                      onChange={(e) => {
+                        setReturnTime(e.target.value);
+                      }}
+                      className="w-full mt-2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+                )}
 
                 <div className="border-t border-gray-200 pt-4">
                   <div className="flex justify-between mb-2">
-                    <span>Daily Rate</span>
-                    <span>{formatCurrency(car.rentalPricePerDay)}</span>
+                    <span>{isHourlyRent ? 'Hourly Rate' : 'Daily Rate'}</span>
+                    <span>{formatCurrency(isHourlyRent ? car.rentalPricePerDay / 24 : car.rentalPricePerDay)}</span>
                   </div>
                   <div className="flex justify-between mb-2">
-                    <span>Number of Days</span>
-                    <span>3</span>
+                    <span>{isHourlyRent ? 'Number of Hours' : 'Number of Days'}</span>
+                    <span>{isHourlyRent ? numberOfHours : numberOfDays}</span>
                   </div>
                   <div className="flex justify-between mb-2">
                     <span>Insurance</span>
@@ -547,7 +656,13 @@ const CarDetails = () => {
                   </div>
                   <div className="flex justify-between font-bold text-lg border-t border-gray-200 pt-2">
                     <span>Total</span>
-                    <span>{formatCurrency(car.rentalPricePerDay * 3 + 150000)}</span>
+                    <span>
+                      {formatCurrency(
+                        isHourlyRent
+                          ? ((car.rentalPricePerDay / 24) * numberOfHours) + 150000
+                          : (car.rentalPricePerDay * numberOfDays) + 150000
+                      )}
+                    </span>
                   </div>
                 </div>
 
@@ -577,4 +692,6 @@ const CarDetails = () => {
   );
 };
 
-export default CarDetails; 
+export default CarDetails;
+
+

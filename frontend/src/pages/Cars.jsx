@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CarCard from '../components/CarCard';
 import SearchBar from '../components/SearchBar';
@@ -17,219 +17,57 @@ const Cars = () => {
   const [sortBy, setSortBy] = useState('recommended');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  // Sample car data based on the vehicle model schema
-  const sampleCars = [
-    {
-      _id: '1',
-      name: 'Camry',
-      brand: 'Toyota',
-      modelYear: 2023,
-      licensePlate: 'ABC123',
-      rentalPricePerDay: 1200000,
-      description: 'Comfortable and fuel-efficient sedan',
-      images: ['https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?ixlib=rb-4.0.3'],
-      seats: 5,
-      transmission: 'Automatic',
-      fuelType: 'Gasoline',
-      status: 'Available',
-      location: {
-        address: '123 Main St',
-        city: 'Ho Chi Minh City'
-      }
-    },
-    {
-      _id: '2',
-      name: 'Model 3',
-      brand: 'Tesla',
-      modelYear: 2023,
-      licensePlate: 'XYZ789',
-      rentalPricePerDay: 2500000,
-      description: 'Electric luxury sedan with autopilot',
-      images: ['https://images.unsplash.com/photo-1536700503339-1e4b06520771?ixlib=rb-4.0.3'],
-      seats: 5,
-      transmission: 'Automatic',
-      fuelType: 'Electric',
-      status: 'Available',
-      location: {
-        address: '456 Tech Ave',
-        city: 'Ha Noi'
-      }
-    },
-    {
-      _id: '3',
-      name: 'X5',
-      brand: 'BMW',
-      modelYear: 2022,
-      licensePlate: 'DEF456',
-      rentalPricePerDay: 3000000,
-      description: 'Luxury SUV with premium features',
-      images: ['https://images.unsplash.com/photo-1555215695-3004980ad54e?ixlib=rb-4.0.3'],
-      seats: 7,
-      transmission: 'Automatic',
-      fuelType: 'Hybrid',
-      status: 'Available',
-      location: {
-        address: '789 Luxury Blvd',
-        city: 'Da Nang'
-      }
-    },
-    {
-      _id: '4',
-      name: 'Civic',
-      brand: 'Honda',
-      modelYear: 2023,
-      licensePlate: 'GHI789',
-      rentalPricePerDay: 800000,
-      description: 'Reliable and economical compact car',
-      images: ['https://images.unsplash.com/photo-1590362891991-f776e747a588?ixlib=rb-4.0.3'],
-      seats: 5,
-      transmission: 'Manual',
-      fuelType: 'Gasoline',
-      status: 'Available',
-      location: {
-        address: '321 Economy Rd',
-        city: 'Nha Trang'
-      }
-    },
-    {
-      _id: '5',
-      name: 'Corolla Cross',
-      brand: 'Toyota',
-      modelYear: 2023,
-      licensePlate: 'JKL321',
-      rentalPricePerDay: 1000000,
-      description: 'Compact SUV with spacious interior',
-      images: ['https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'],
-      seats: 5,
-      transmission: 'Automatic',
-      fuelType: 'Gasoline',
-      status: 'Available',
-      location: {
-        address: '654 Family St',
-        city: 'Ho Chi Minh City'
-      }
-    },
-    {
-      _id: '6',
-      name: 'CX-5',
-      brand: 'Mazda',
-      modelYear: 2022,
-      licensePlate: 'MNO654',
-      rentalPricePerDay: 1300000,
-      description: 'Stylish and smooth compact SUV',
-      images: ['https://images.unsplash.com/photo-1615063029891-497bebd4f03c?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8c3V2JTIwY2FyfGVufDB8fDB8fHww'],
-      seats: 5,
-      transmission: 'Automatic',
-      fuelType: 'Gasoline',
-      status: 'Available',
-      location: {
-        address: '987 Comfort Ave',
-        city: 'Da Nang'
-      }
-    },
-    {
-      _id: '7',
-      name: 'F-150',
-      brand: 'Ford',
-      modelYear: 2021,
-      licensePlate: 'PQR987',
-      rentalPricePerDay: 1800000,
-      description: 'Powerful pickup truck for all terrains',
-      images: ['https://images.unsplash.com/photo-1612563893490-d86ed296e5e6?q=80&w=2669&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'],
-      seats: 5,
-      transmission: 'Automatic',
-      fuelType: 'Diesel',
-      status: 'Available',
-      location: {
-        address: '111 Rugged Rd',
-        city: 'Can Tho'
-      }
-    },
-    {
-      _id: '8',
-      name: 'A4',
-      brand: 'Audi',
-      modelYear: 2023,
-      licensePlate: 'STU111',
-      rentalPricePerDay: 2700000,
-      description: 'Premium sedan with sleek design',
-      images: ['https://images.unsplash.com/photo-1698413935252-04ed6377296d?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzZ8fHN1diUyMGNhcnxlbnwwfHwwfHx8MA%3D%3D'],
-      seats: 5,
-      transmission: 'Automatic',
-      fuelType: 'Gasoline',
-      status: 'Available',
-      location: {
-        address: '222 Prestige St',
-        city: 'Ha Noi'
-      }
-    },
-    {
-      _id: '9',
-      name: 'Sportage',
-      brand: 'Kia',
-      modelYear: 2022,
-      licensePlate: 'VWX222',
-      rentalPricePerDay: 1100000,
-      description: 'Modern SUV with advanced features',
-      images: ['https://images.unsplash.com/photo-1698413935252-04ed6377296d?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzZ8fHN1diUyMGNhcnxlbnwwfHwwfHx8MA%3D%3D'],
-      seats: 5,
-      transmission: 'Automatic',
-      fuelType: 'Gasoline',
-      status: 'Available',
-      location: {
-        address: '333 Adventure Blvd',
-        city: 'Hue'
-      }
-    },
-    {
-      _id: '10',
-      name: 'Outlander',
-      brand: 'Mitsubishi',
-      modelYear: 2021,
-      licensePlate: 'YZA333',
-      rentalPricePerDay: 1200000,
-      description: 'Versatile SUV perfect for families',
-      images: ['https://images.unsplash.com/photo-1698413935252-04ed6377296d?w=700&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MzZ8fHN1diUyMGNhcnxlbnwwfHwwfHx8MA%3D%3D'],
-      seats: 7,
-      transmission: 'Automatic',
-      fuelType: 'Gasoline',
-      status: 'Available',
-      location: {
-        address: '444 Family Way',
-        city: 'Vung Tau'
-      }
-    }
-  ];
-  
+  // --- NEW: State for fetched cars, loading, and error ---
+  const [cars, setCars] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // --- NEW: Fetch vehicles from API ---
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    fetch('/api/vehicles') // Adjust the URL if your gateway uses a different prefix
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to fetch vehicles');
+        return res.json();
+      })
+      .then(data => {
+        // Lấy đúng mảng xe từ data.data.vehicles
+        const vehicles = Array.isArray(data)
+          ? data
+          : (data.vehicles || (data.data && data.data.vehicles) || []);
+        setCars(vehicles);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message || 'Error fetching vehicles');
+        setLoading(false);
+      });
+  }, []);
 
   // Filter cars based on search parameters and filters
-  const filteredCars = sampleCars.filter(car => {
+  const filteredCars = Array.isArray(cars) ? cars.filter(car => {
     const location = searchParams.get('location');
-    if (location && !car.location.city.toLowerCase().includes(location.toLowerCase())) {
+    if (location && !car.location?.city?.toLowerCase().includes(location.toLowerCase())) {
       return false;
     }
-    
     if (filters.priceRange) {
       const [min, max] = filters.priceRange.split('-').map(Number);
       if (car.rentalPricePerDay < min || car.rentalPricePerDay > max) {
         return false;
       }
     }
-
     if (filters.transmission && car.transmission !== filters.transmission) {
       return false;
     }
-
     if (filters.fuelType && car.fuelType !== filters.fuelType) {
       return false;
     }
-
     if (filters.seats && car.seats !== parseInt(filters.seats)) {
       return false;
     }
-
     return true;
-  });
+  }) : [];
 
   // Sort cars
   const sortedCars = [...filteredCars].sort((a, b) => {
