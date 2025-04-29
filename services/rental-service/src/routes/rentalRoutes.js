@@ -5,10 +5,14 @@ const {
   getUserRentals, 
   getRentalById, 
   updateRentalStatus, 
-  updatePaymentStatus 
+  updatePaymentStatus,
+  checkAvailability 
 } = require('../controllers/rentalController');
 const { verifyToken, requireCustomer } = require('../middleware/authMiddleware');
 const { validateCreateRental } = require('../middleware/rentalValidation');
+
+// GET - Check rental availability
+router.get('/availability', checkAvailability);
 
 // POST - Create a new rental (customer only)
 router.post(

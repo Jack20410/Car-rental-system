@@ -7,12 +7,10 @@ const SearchBar = () => {
   const [showDateModal, setShowDateModal] = useState(false);
   const [selectedDates, setSelectedDates] = useState({
     pickup: {
-      date: '',
-      time: '21:00'
+      date: ''
     },
     return: {
-      date: '',
-      time: '20:00'
+      date: ''
     }
   });
   
@@ -73,16 +71,16 @@ const SearchBar = () => {
   const formatDateDisplay = useCallback(() => {
     if (!selectedDates.pickup.date || !selectedDates.return.date) return 'Select dates';
     
-    const formatDate = (dateStr, timeStr) => {
+    const formatDate = (dateStr) => {
       const date = new Date(dateStr);
       const day = date.getDate();
       const month = date.getMonth() + 1;
       const year = date.getFullYear();
-      return `${timeStr}, ${day}/${month}/${year}`;
+      return `${day}/${month}/${year}`;
     };
     
-    const pickup = formatDate(selectedDates.pickup.date, selectedDates.pickup.time);
-    const returnDate = formatDate(selectedDates.return.date, selectedDates.return.time);
+    const pickup = formatDate(selectedDates.pickup.date);
+    const returnDate = formatDate(selectedDates.return.date);
     
     return `${pickup} - ${returnDate}`;
   }, [selectedDates]);
@@ -121,7 +119,16 @@ const SearchBar = () => {
     }
   }, [selectedDates]);
   
-  // Handle location input change with debounce
+  // Available cities
+  const cities = useMemo(() => [
+    'Ho Chi Minh',
+    'Ha Noi',
+    'Da Nang',
+    'Nha Trang',
+    'Quy Nhon'
+  ], []);
+
+  // Handle location change
   const handleLocationChange = useCallback((e) => {
     setLocation(e.target.value);
   }, []);
@@ -133,15 +140,79 @@ const SearchBar = () => {
       return;
     }
     
-    const queryParams = new URLSearchParams({
-      location,
-      pickupDate: selectedDates.pickup.date,
-      pickupTime: selectedDates.pickup.time,
-      returnDate: selectedDates.return.date,
-      returnTime: selectedDates.return.time
-    }).toString();
-    
-    navigate(`/cars?${queryParams}`);
+    // First check availability for the selected dates
+    fetch(`http://localhost:3000/rentals/availability?startDate=${selectedDates.pickup.date}&endDate=${selectedDates.return.date}`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        return response.json();
+      })
+      .then(availabilityResponse => {
+        console.log('Availability response:', availabilityResponse);
+        
+        if (!availabilityResponse.success) {
+          throw new Error(availabilityResponse.message || 'Error checking availability');
+        }
+
+        // Get the available vehicle IDs from the data array
+        const availableIds = new Set((availabilityResponse.data || []).map(item => item.vehicleId));
+
+        // Convert city name to lowercase and remove spaces for API
+        const formattedCity = location.toLowerCase().replace(/\s+/g, '');
+        return fetch(`http://localhost:3000/vehicles?city=${formattedCity}`)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Network response was not ok');
+            }
+            return response.json();
+          })
+          .then(vehiclesResponse => {
+            console.log('Vehicles response:', vehiclesResponse);
+
+            if (!vehiclesResponse.success) {
+              throw new Error(vehiclesResponse.message || 'Error fetching vehicles');
+            }
+
+            // Extract vehicles from the response
+            const vehicles = Array.isArray(vehiclesResponse.data) 
+              ? vehiclesResponse.data 
+              : vehiclesResponse.data?.vehicles || [];
+            
+            console.log('Extracted vehicles:', vehicles);
+
+            // Filter vehicles based on availability
+            const filteredVehicles = vehicles.filter(vehicle => vehicle !== null);
+            
+            console.log('Filtered vehicles:', filteredVehicles);
+            
+            // Store the filtered results in sessionStorage
+            const searchResults = {
+              vehicles: filteredVehicles,
+              searchCriteria: {
+                city: location,
+                startDate: selectedDates.pickup.date,
+                endDate: selectedDates.return.date
+              }
+            };
+            
+            console.log('Storing search results:', searchResults);
+            sessionStorage.setItem('searchResults', JSON.stringify(searchResults));
+
+            // Navigate to cars page with search parameters
+            const queryParams = new URLSearchParams({
+              city: location,
+              startDate: selectedDates.pickup.date,
+              endDate: selectedDates.return.date
+            }).toString();
+            
+            navigate(`/cars?${queryParams}`);
+          });
+      })
+      .catch(error => {
+        console.error('Error during search:', error);
+        alert('Error searching for vehicles. Please try again.');
+      });
   }, [location, selectedDates, navigate]);
   
   // Months array for display
@@ -170,14 +241,6 @@ const SearchBar = () => {
     return date > pickup && date < returnDate;
   }, [selectedDates]);
   
-  // Handle time change
-  const handleTimeChange = useCallback((type, time) => {
-    setSelectedDates(prev => ({
-      ...prev,
-      [type]: { ...prev[type], time }
-    }));
-  }, []);
-  
   // Toggle date modal
   const toggleDateModal = useCallback(() => {
     setShowDateModal(prev => !prev);
@@ -194,13 +257,18 @@ const SearchBar = () => {
             </svg>
             <div className="flex-1">
               <label className="block text-xs text-gray-600 font-medium mb-1">Location</label>
-              <input
-                type="text"
+              <select
                 value={location}
                 onChange={handleLocationChange}
-                placeholder="City or airport"
-                className="w-full outline-none text-gray-800"
-              />
+                className="w-full outline-none text-gray-800 bg-transparent"
+              >
+                <option value="">Select a city</option>
+                {cities.map(city => (
+                  <option key={city} value={city}>
+                    {city.charAt(0).toUpperCase() + city.slice(1)}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           
@@ -247,12 +315,9 @@ const SearchBar = () => {
             
             {/* Tabs */}
             <div className="p-4 border-b">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4">
                 <button className="text-center py-2 border-b-2 border-blue-600 text-blue-600 font-medium">
                   Rent by Day
-                </button>
-                <button className="text-center py-2 text-gray-500">
-                  Rent by Hour
                 </button>
               </div>
             </div>
@@ -357,59 +422,6 @@ const SearchBar = () => {
                       {day}
                     </div>
                   ))}
-                </div>
-              </div>
-            </div>
-            
-            {/* Time selection */}
-            <div className="p-4 border-t grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Pickup time */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Pickup Time
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedDates.pickup.time}
-                    onChange={(e) => handleTimeChange('pickup', e.target.value)}
-                    className="block w-full p-3 border border-gray-300 rounded-lg appearance-none pr-10 focus:outline-none focus:ring-2 focus:ring-blue-600 text-gray-800"
-                  >
-                    {Array.from({ length: 24 }, (_, i) => i).map(hour => (
-                      <option key={hour} value={`${String(hour).padStart(2, '0')}:00`}>
-                        {`${String(hour).padStart(2, '0')}:00`}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-                    </svg>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Return time */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Return Time
-                </label>
-                <div className="relative">
-                  <select
-                    value={selectedDates.return.time}
-                    onChange={(e) => handleTimeChange('return', e.target.value)}
-                    className="block w-full p-3 border border-gray-300 rounded-lg appearance-none pr-10 focus:outline-none focus:ring-2 focus:ring-blue-600 text-gray-800"
-                  >
-                    {Array.from({ length: 24 }, (_, i) => i).map(hour => (
-                      <option key={hour} value={`${String(hour).padStart(2, '0')}:00`}>
-                        {`${String(hour).padStart(2, '0')}:00`}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-                    </svg>
-                  </div>
                 </div>
               </div>
             </div>

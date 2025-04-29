@@ -12,6 +12,7 @@ from middleware import RequestLoggingMiddleware, AuthMiddleware, RateLimitMiddle
 from routes import (
     user_router,
     vehicle_router,
+    rental_router,
     health_router
 )
 
@@ -65,6 +66,7 @@ else:
 app.include_router(health_router)
 app.include_router(user_router)
 app.include_router(vehicle_router)
+app.include_router(rental_router)
 
 @app.on_event("shutdown")
 async def shutdown_event():

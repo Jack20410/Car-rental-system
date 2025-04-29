@@ -22,6 +22,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             "/auth/register",
             "/auth/forgot-password",
             "/vehicles",
+            "/rentals/availability",
             "/uploads",
             "/api/health",
             "/api/check-file",

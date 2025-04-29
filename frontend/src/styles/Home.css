@@ -2,6 +2,11 @@
 .hide-scrollbar {
   /* For Firefox */
   scrollbar-width: none;
+  /* Add smooth scrolling */
+  scroll-behavior: smooth;
+  /* Improve snap behavior */
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* For WebKit browsers (Chrome, Safari, etc.) */
@@ -14,6 +19,7 @@
   will-change: transform;
   transform: translateZ(0); /* Force hardware acceleration */
   backface-visibility: hidden; /* Prevent flickering in some browsers */
+  scroll-snap-align: start; /* Ensure proper snapping */
 }
 
 .location-card img {

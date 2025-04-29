@@ -296,4 +296,69 @@ exports.updatePaymentStatus = async (req, res) => {
       message: 'An error occurred while updating the payment status'
     });
   }
+};
+
+// Check rental availability for a date range
+exports.checkAvailability = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Convert dates to start of day and end of day
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);  // Set to start of day
+
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);  // Set to end of day
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date format. Use YYYY-MM-DD format.'
+      });
+    }
+
+    if (start >= end) {
+      return res.status(400).json({
+        success: false,
+        message: 'End date must be after start date'
+      });
+    }
+
+    // Find rentals that overlap with the given date range
+    const overlappingRentals = await Rental.find({
+      $and: [
+        { status: { $nin: ['cancelled'] } },
+        {
+          $or: [
+            // Rental starts during the requested period
+            {
+              startDate: { $gte: start, $lt: end }
+            },
+            // Rental ends during the requested period
+            {
+              endDate: { $gt: start, $lte: end }
+            },
+            // Rental spans the entire requested period
+            {
+              startDate: { $lte: start },
+              endDate: { $gte: end }
+            }
+          ]
+        }
+      ]
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Rental availability checked successfully',
+      data: overlappingRentals
+    });
+  } catch (error) {
+    console.error('Error checking rental availability:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while checking rental availability',
+      error: error.message
+    });
+  }
 }; 

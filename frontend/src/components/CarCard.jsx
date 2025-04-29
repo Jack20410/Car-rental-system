@@ -4,18 +4,15 @@ import { FaUsers, FaCog, FaGasPump } from 'react-icons/fa';
 import { formatCurrency } from '../utils/formatCurrency';
 
 const CarCard = ({ car }) => {
-  // Early return if car object is not provided
   if (!car) {
     return null;
   }
 
-  // Safely access nested properties with fallbacks
+  // Handle image URL - remove http://localhost:3002 prefix if it exists
   const imageUrl = car.images?.[0] || car.image || 'https://via.placeholder.com/384x192?text=No+Image';
-  const carName = car.name || 'Unnamed Vehicle';
-  const carBrand = car.brand || 'Unknown Brand';
-  const carLocation = car.location?.city || car.location?.address || 'Location not specified';
-  const price = car.rentalPricePerDay || car.price || 0;
-  const status = car.status || 'Unknown';
+  const displayImageUrl = imageUrl.startsWith('http://localhost:3002') 
+    ? imageUrl 
+    : `http://localhost:3002${imageUrl}`;
 
   return (
     <Link to={`/cars/${car._id}`} className="block">
@@ -23,15 +20,18 @@ const CarCard = ({ car }) => {
         {/* Car Image */}
         <div className="aspect-w-16 aspect-h-9 relative">
           <img
-            src={`http://localhost:3002${imageUrl}`}
-            alt={`${carBrand} ${carName}`}
+            src={displayImageUrl}
+            alt={`${car.brand} ${car.name}`}
             className="w-full h-48 object-cover"
             loading="lazy"
             width="384" 
             height="192"
+            onError={(e) => {
+              e.target.src = 'https://via.placeholder.com/384x192?text=No+Image';
+            }}
           />
           <div className="absolute top-4 right-4 bg-white px-2 py-1 rounded-full text-sm font-medium text-gray-700">
-            {status}
+            {car.status || 'Available'}
           </div>
         </div>
 
@@ -39,13 +39,16 @@ const CarCard = ({ car }) => {
         <div className="p-4">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">{carBrand} {carName}</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {car.brand} {car.name}
+              </h3>
               <p className="text-sm text-gray-600">{car.modelYear || 'Year not specified'}</p>
-              {/* Car Type */}
               <p className="text-xs text-gray-500 mt-1">{car.carType || 'Type not specified'}</p>
             </div>
             <div className="text-right">
-              <p className="text-lg font-bold text-primary">{formatCurrency(price)}</p>
+              <p className="text-lg font-bold text-primary">
+                {formatCurrency(car.rentalPricePerDay || car.price || 0)}
+              </p>
               <p className="text-xs text-gray-600">per day</p>
             </div>
           </div>
@@ -68,7 +71,7 @@ const CarCard = ({ car }) => {
 
           {/* Location */}
           <div className="mt-4 text-sm text-gray-600">
-            <p>{carLocation}</p>
+            <p>{car.location?.city || car.location || 'Location not specified'}</p>
           </div>
 
           {/* Features */}

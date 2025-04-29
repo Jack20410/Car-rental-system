@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import SearchBar from '../components/SearchBar';
 import CarCard from '../components/CarCard';
 import { Link } from 'react-router-dom';
-import '../styles/Home.css'; // Updated import path for styles folder
+import '../styles/Home.css';
 
 const Home = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -10,9 +10,85 @@ const Home = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const sliderRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
   const autoScrollRef = useRef(null);
+  const [popularLocations, setPopularLocations] = useState([
+    {
+      id: 1,
+      name: 'Ho Chi Minh City',
+      image: 'https://nld.mediacdn.vn/291774122806476800/2024/8/16/tp-65-1723817004792851519414.jpg',
+      description: 'Vietnam\'s largest city with diverse vehicle options',
+      carCount: 'Loading...'
+    },
+    {
+      id: 2,
+      name: 'Ha Noi',
+      image: 'https://images.contentstack.io/v3/assets/blt1306150c2c4003bc/bltd403157dcd0ef9a3/660caf8a6c4a3972dfe468d3/00-what-to-see-and-do-in-hanoi-getty-cropped.jpg?auto=webp&width=784',
+      description: 'The capital city with extensive car rental services',
+      carCount: 'Loading...'
+    },
+    {
+      id: 3,
+      name: 'Da Nang',
+      image: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?ixlib=rb-4.0.3',
+      description: 'Coastal city with modern rental fleet',
+      carCount: 'Loading...'
+    },
+    {
+      id: 4,
+      name: 'Nha Trang',
+      image: 'https://baokhanhhoa.vn/file/e7837c02857c8ca30185a8c39b582c03/012025/z6223362576777_15a21ef00a73b25851a3972d86795475_20250113104122.jpg',
+      description: 'Beach resort city with convenient rental options',
+      carCount: 'Loading...'
+    },
+    {
+      id: 5,
+      name: 'Quy Nhon',
+      image: 'https://benhvienquynhon.gov.vn/wp-content/uploads/2023/05/bai-tam-quy-nhon.jpg',
+      description: 'Emerging coastal destination with quality vehicles',
+      carCount: 'Loading...'
+    }
+  ]);
+  const touchTimeout = useRef(null);
 
-  // Fetch cars from API
+  // Fetch car counts for each location
+  useEffect(() => {
+    const fetchCarCounts = async () => {
+      try {
+        const updatedLocations = await Promise.all(
+          popularLocations.map(async (location) => {
+            try {
+              const response = await fetch(`http://localhost:3000/vehicles?city=${encodeURIComponent(location.name)}`);
+              if (!response.ok) {
+                throw new Error(`Failed to fetch cars for ${location.name}`);
+              }
+              const data = await response.json();
+              const carCount = data.data?.vehicles?.length || 0;
+              return {
+                ...location,
+                carCount: `${carCount} cars available`
+              };
+            } catch (error) {
+              console.error(`Error fetching cars for ${location.name}:`, error);
+              return {
+                ...location,
+                carCount: 'No data available'
+              };
+            }
+          })
+        );
+        setPopularLocations(updatedLocations);
+      } catch (error) {
+        console.error('Error fetching car counts:', error);
+      }
+    };
+
+    fetchCarCounts();
+  }, []);
+
+  // Fetch featured cars from API
   useEffect(() => {
     const fetchCars = async () => {
       try {
@@ -23,16 +99,25 @@ const Home = () => {
         }
         const result = await response.json();
         
-        // Validate the response structure
         if (!result.data?.vehicles || !Array.isArray(result.data.vehicles)) {
           throw new Error('Invalid response format: vehicles array not found');
         }
         
-        // Extract and validate each vehicle
+        // Filter out invalid vehicles and ensure required fields are present
         const vehicles = result.data.vehicles.filter(vehicle => {
-          // Ensure required properties exist
           if (!vehicle || typeof vehicle !== 'object') return false;
-          if (!vehicle._id) return false;
+          if (!vehicle._id || !vehicle.name) return false;
+          
+          // Ensure the vehicle has all required fields, use defaults if missing
+          vehicle.brand = vehicle.brand || 'Unknown Brand';
+          vehicle.name = vehicle.name || 'Unnamed Vehicle';
+          vehicle.rentalPricePerDay = vehicle.rentalPricePerDay || vehicle.price || 0;
+          vehicle.status = vehicle.status || 'Available';
+          vehicle.location = vehicle.location || { city: 'Location not specified' };
+          if (typeof vehicle.location === 'string') {
+            vehicle.location = { city: vehicle.location };
+          }
+          
           return true;
         });
         
@@ -41,9 +126,13 @@ const Home = () => {
           return;
         }
         
-        // Get 6 random cars as featured cars
-        const randomCars = [...vehicles].sort(() => Math.random() - 0.5).slice(0, Math.min(6, vehicles.length));
-        console.log('Selected random cars:', randomCars);
+        // Get random cars but ensure they have images
+        const carsWithImages = vehicles.filter(car => car.images?.length > 0 || car.image);
+        const randomCars = [...(carsWithImages.length > 0 ? carsWithImages : vehicles)]
+          .sort(() => Math.random() - 0.5)
+          .slice(0, Math.min(6, vehicles.length));
+
+        console.log('Featured cars:', randomCars);
         setFeaturedCars(randomCars);
       } catch (err) {
         console.error('Error fetching cars:', err);
@@ -56,47 +145,7 @@ const Home = () => {
     fetchCars();
   }, []);
 
-  // Popular locations data
-  const popularLocations = useMemo(() => [
-    {
-      id: 1,
-      name: 'Ho Chi Minh City',
-      carCount: '5000+ cars',
-      image: 'https://nld.mediacdn.vn/291774122806476800/2024/8/16/tp-65-1723817004792851519414.jpg',
-      description: 'Vietnam\'s largest city with diverse vehicle options'
-    },
-    {
-      id: 2,
-      name: 'Ha Noi',
-      carCount: '2500+ cars',
-      image: 'https://images.contentstack.io/v3/assets/blt1306150c2c4003bc/bltd403157dcd0ef9a3/660caf8a6c4a3972dfe468d3/00-what-to-see-and-do-in-hanoi-getty-cropped.jpg?auto=webp&width=784',
-      description: 'The capital city with extensive car rental services'
-    },
-    {
-      id: 3,
-      name: 'Da Nang',
-      carCount: '500+ cars',
-      image: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?ixlib=rb-4.0.3',
-      description: 'Coastal city with modern rental fleet'
-    },
-    {
-      id: 4,
-      name: 'Nha Trang',
-      carCount: '350+ cars',
-      image: 'https://baokhanhhoa.vn/file/e7837c02857c8ca30185a8c39b582c03/012025/z6223362576777_15a21ef00a73b25851a3972d86795475_20250113104122.jpg',
-      description: 'Beach resort city with convenient rental options'
-    },
-    {
-      id: 5,
-      name: 'Quy Nhon',
-      carCount: '200+ cars',
-      image: 'https://benhvienquynhon.gov.vn/wp-content/uploads/2023/05/bai-tam-quy-nhon.jpg',
-      description: 'Emerging coastal destination with quality vehicles'
-    }
-  ], []);
-
   const goToSlide = useCallback((index) => {
-    setCurrentSlide(index);
     if (sliderRef.current) {
       const slideWidth = sliderRef.current.querySelector('.location-card').offsetWidth;
       const scrollPosition = index * (slideWidth + 24);
@@ -104,29 +153,76 @@ const Home = () => {
         left: scrollPosition,
         behavior: 'smooth'
       });
+      setCurrentSlide(index);
     }
   }, []);
 
-  // Auto slide functionality
-  useEffect(() => {
-    // Clear any existing interval when component re-renders
-    if (autoScrollRef.current) {
-      clearInterval(autoScrollRef.current);
+  const goToNextSlide = useCallback(() => {
+    if (popularLocations.length > 0) {
+      const nextSlide = (currentSlide + 1) % popularLocations.length;
+      goToSlide(nextSlide);
     }
-    
-    autoScrollRef.current = setInterval(() => {
-      if (sliderRef.current && popularLocations.length > 0) {
-        const nextSlide = (currentSlide + 1) % popularLocations.length;
-        goToSlide(nextSlide);
-      }
-    }, 3000);
-    
-    return () => {
-      if (autoScrollRef.current) {
-        clearInterval(autoScrollRef.current);
+  }, [currentSlide, popularLocations.length, goToSlide]);
+
+  const goToPrevSlide = useCallback(() => {
+    if (popularLocations.length > 0) {
+      const prevSlide = (currentSlide - 1 + popularLocations.length) % popularLocations.length;
+      goToSlide(prevSlide);
+    }
+  }, [currentSlide, popularLocations.length, goToSlide]);
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowLeft') {
+        goToPrevSlide();
+      } else if (e.key === 'ArrowRight') {
+        goToNextSlide();
       }
     };
-  }, [currentSlide, popularLocations.length, goToSlide]);
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [goToNextSlide, goToPrevSlide]);
+
+  // Touch event handling
+  useEffect(() => {
+    const slider = sliderRef.current;
+    if (slider) {
+      const handleTouchStart = (e) => {
+        setIsDragging(true);
+        setStartX(e.touches[0].pageX - slider.offsetLeft);
+        setScrollLeft(slider.scrollLeft);
+      };
+
+      const handleTouchMove = (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const x = e.touches[0].pageX - slider.offsetLeft;
+        const walk = (x - startX) * 2;
+        slider.scrollLeft = scrollLeft - walk;
+      };
+
+      const handleTouchEnd = () => {
+        setIsDragging(false);
+        if (slider) {
+          const slideWidth = slider.querySelector('.location-card').offsetWidth + 24;
+          const newIndex = Math.round(slider.scrollLeft / slideWidth);
+          setCurrentSlide(newIndex % popularLocations.length);
+        }
+      };
+
+      slider.addEventListener('touchstart', handleTouchStart);
+      slider.addEventListener('touchmove', handleTouchMove);
+      slider.addEventListener('touchend', handleTouchEnd);
+
+      return () => {
+        slider.removeEventListener('touchstart', handleTouchStart);
+        slider.removeEventListener('touchmove', handleTouchMove);
+        slider.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
+  }, [isDragging, popularLocations.length]);
 
   return (
     <div>
@@ -159,16 +255,73 @@ const Home = () => {
             Choose from our most popular rental locations
           </p>
         </div>
-        <div className="relative overflow-hidden">
+        <div className="relative overflow-hidden group">
+          {/* Navigation Buttons */}
+          <div className="absolute inset-y-0 left-2 z-20 flex items-center justify-center">
+            <button
+              onClick={goToPrevSlide}
+              className="flex items-center justify-center w-12 h-12 bg-black/30 hover:bg-primary text-white rounded-full shadow-xl transition-all duration-300 backdrop-blur-sm hover:scale-110 group-hover:opacity-100 opacity-0"
+              aria-label="Previous slide"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          </div>
+          
+          <div className="absolute inset-y-0 right-2 z-20 flex items-center justify-center">
+            <button
+              onClick={goToNextSlide}
+              className="flex items-center justify-center w-12 h-12 bg-black/30 hover:bg-primary text-white rounded-full shadow-xl transition-all duration-300 backdrop-blur-sm hover:scale-110 group-hover:opacity-100 opacity-0"
+              aria-label="Next slide"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          
           <div 
             ref={sliderRef}
-            className="flex overflow-x-auto pb-6 space-x-6 snap-x hide-scrollbar overscroll-x-none will-change-transform"
+            className="flex overflow-x-auto pb-6 space-x-6 snap-x hide-scrollbar overscroll-x-none will-change-transform touch-pan-x px-14"
+            role="region"
+            aria-label="Popular locations carousel"
+            style={{ scrollBehavior: 'smooth' }}
           >
             {popularLocations.map((location, index) => (
               <Link
                 key={location.id}
-                to={`/cars?location=${encodeURIComponent(location.name)}`}
-                className={`location-card group relative rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex-shrink-0 w-full sm:w-80 md:w-96 snap-start ${index === currentSlide ? 'border-2 border-primary' : ''}`}
+                to={`/cars?city=${(location.name)}`}
+                className="location-card group relative rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex-shrink-0 w-full sm:w-80 md:w-96 snap-start"
+              >
+                <div className="aspect-w-16 aspect-h-9">
+                  <img
+                    src={location.image}
+                    alt={location.name}
+                    className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                    width="384"
+                    height="256"
+                  />
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent">
+                  <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                    <h3 className="text-2xl font-bold mb-2">{location.name}</h3>
+                    <p className="text-sm opacity-90 mb-2">{location.description}</p>
+                    <p className="text-sm font-semibold bg-primary/80 inline-block px-3 py-1 rounded-full">
+                      {location.carCount}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+            
+            {/* Clone first few items for infinite scroll effect */}
+            {popularLocations.slice(0, 2).map((location, index) => (
+              <Link
+                key={`clone-${location.id}`}
+                to={`/cars?city=${(location.name)}`}
+                className="location-card group relative rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex-shrink-0 w-full sm:w-80 md:w-96 snap-start"
               >
                 <div className="aspect-w-16 aspect-h-9">
                   <img
@@ -192,14 +345,15 @@ const Home = () => {
               </Link>
             ))}
           </div>
+          
           {/* Slide indicators */}
-          <div className="flex justify-center mt-4 space-x-2">
+          <div className="flex justify-center mt-4 space-x-3">
             {popularLocations.map((_, index) => (
               <button
                 key={`indicator-${index}`}
                 onClick={() => goToSlide(index)}
-                className={`h-2 rounded-full transition-all ${
-                  currentSlide === index ? 'w-6 bg-primary' : 'w-2 bg-gray-300'
+                className={`h-2.5 rounded-full transition-all duration-300 ${
+                  currentSlide === index ? 'w-8 bg-primary' : 'w-2.5 bg-gray-300 hover:bg-gray-400'
                 }`}
                 aria-label={`Go to slide ${index + 1}`}
               />
@@ -275,4 +429,4 @@ const Home = () => {
   );
 };
 
-export default React.memo(Home); 
+export default React.memo(Home);

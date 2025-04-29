@@ -16,92 +16,165 @@ const Cars = () => {
   });
   const [sortBy, setSortBy] = useState('recommended');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-
-  // --- NEW: State for fetched cars, loading, and error ---
   const [cars, setCars] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // --- NEW: Fetch vehicles from API ---
+  // Fetch cars based on search parameters
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    fetch('/api/vehicles') // Adjust the URL if your gateway uses a different prefix
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch vehicles');
-        return res.json();
-      })
-      .then(data => {
-        // Lấy đúng mảng xe từ data.data.vehicles
-        const vehicles = Array.isArray(data)
-          ? data
-          : (data.vehicles || (data.data && data.data.vehicles) || []);
-        setCars(vehicles);
-        setLoading(false);
-      })
-      .catch(err => {
-        setError(err.message || 'Error fetching vehicles');
-        setLoading(false);
-      });
-  }, []);
+    const fetchCars = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  // Filter cars based on search parameters and filters
-  const filteredCars = Array.isArray(cars) ? cars.filter(car => {
-    const location = searchParams.get('location');
-    if (location && !car.location?.city?.toLowerCase().includes(location.toLowerCase())) {
-      return false;
+        const city = searchParams.get('city');
+        
+        if (!city) {
+          setError('Please select a city to search for cars.');
+          setCars([]);
+          setLoading(false);
+          return;
+        }
+
+        // Construct the URL with the city parameter
+        const url = `http://localhost:3000/vehicles?city=${encodeURIComponent(city)}`;
+        console.log('Fetching cars from:', url);
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error('Failed to fetch cars');
+        }
+
+        const result = await response.json();
+        console.log('API Response:', result);
+
+        if (!result.success) {
+          throw new Error(result.message || 'Error fetching cars');
+        }
+
+        const vehicles = Array.isArray(result.data?.vehicles) 
+          ? result.data.vehicles 
+          : result.data || [];
+
+        if (vehicles.length === 0) {
+          setError('No cars available in this city');
+          setCars([]);
+        } else {
+          // Process and validate each vehicle
+          const validVehicles = vehicles.filter(vehicle => {
+            if (!vehicle || typeof vehicle !== 'object') return false;
+            if (!vehicle._id) return false;
+
+            // Ensure required fields have default values
+            vehicle.brand = vehicle.brand || 'Unknown Brand';
+            vehicle.name = vehicle.name || 'Unnamed Vehicle';
+            vehicle.rentalPricePerDay = vehicle.rentalPricePerDay || vehicle.price || 0;
+            vehicle.status = vehicle.status || 'Available';
+            
+            // Normalize location data
+            if (typeof vehicle.location === 'string') {
+              vehicle.location = { city: vehicle.location };
+            } else if (!vehicle.location || typeof vehicle.location !== 'object') {
+              vehicle.location = { city: city };
+            }
+
+            return true;
+          });
+
+          console.log('Valid vehicles for city:', validVehicles);
+          setCars(validVehicles);
+        }
+      } catch (err) {
+        console.error('Error fetching cars:', err);
+        setError(err.message);
+        setCars([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCars();
+  }, [searchParams]);
+
+  // Filter cars based on applied filters
+  const filteredCars = React.useMemo(() => {
+    if (!Array.isArray(cars)) {
+      return [];
     }
-    if (filters.priceRange) {
-      const [min, max] = filters.priceRange.split('-').map(Number);
-      if (car.rentalPricePerDay < min || car.rentalPricePerDay > max) {
+
+    return cars.filter(car => {
+      if (!car) return false;
+
+      // Price Range Filter
+      if (filters.priceRange) {
+        const [min, max] = filters.priceRange.split('-').map(Number);
+        const price = car.rentalPricePerDay || car.price || 0;
+        if (price < min || (max && price > max)) {
+          return false;
+        }
+      }
+
+      // Car Type Filter
+      if (filters.carType && car.carType !== filters.carType) {
         return false;
       }
-    }
-    if (filters.transmission && car.transmission !== filters.transmission) {
-      return false;
-    }
-    if (filters.fuelType && car.fuelType !== filters.fuelType) {
-      return false;
-    }
-    if (filters.seats && car.seats !== parseInt(filters.seats)) {
-      return false;
-    }
-    if (filters.carType && car.carType !== filters.carType) {
-      return false;
-    }
-    // --- Features filter logic ---
-    if (filters.features && filters.features.length > 0) {
-      // Ensure car.features is an array
-      const carFeatures = Array.isArray(car.features) ? car.features : [];
-      // Every selected feature must be present in car.features
-      if (!filters.features.every(f => carFeatures.includes(f))) {
+
+      // Transmission Filter
+      if (filters.transmission && car.transmission !== filters.transmission) {
         return false;
       }
-    }
-    return true;
-  }) : [];
 
-  // Sort cars
-  const sortedCars = [...filteredCars].sort((a, b) => {
-    switch (sortBy) {
-      case 'price-low':
-        return a.rentalPricePerDay - b.rentalPricePerDay;
-      case 'price-high':
-        return b.rentalPricePerDay - a.rentalPricePerDay;
-      case 'newest':
-        return b.modelYear - a.modelYear;
-      default:
-        return 0;
-    }
-  });
+      // Fuel Type Filter
+      if (filters.fuelType && car.fuelType !== filters.fuelType) {
+        return false;
+      }
 
-  // Thêm các dòng sau để khai báo biến phân trang
+      // Seats Filter
+      if (filters.seats) {
+        const seatCount = parseInt(car.seats) || 0;
+        const filterSeats = parseInt(filters.seats);
+        if (filters.seats === '7') {
+          if (seatCount < 7) return false;
+        } else if (seatCount !== filterSeats) {
+          return false;
+        }
+      }
+
+      // Features Filter
+      if (filters.features.length > 0) {
+        const carFeatures = Array.isArray(car.features) ? car.features : [];
+        if (!filters.features.every(f => carFeatures.includes(f))) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [cars, filters]);
+
+  // Sort filtered cars
+  const sortedCars = React.useMemo(() => {
+    return [...filteredCars].sort((a, b) => {
+      switch (sortBy) {
+        case 'price-low':
+          return (a.rentalPricePerDay || 0) - (b.rentalPricePerDay || 0);
+        case 'price-high':
+          return (b.rentalPricePerDay || 0) - (a.rentalPricePerDay || 0);
+        case 'newest':
+          return (b.modelYear || 0) - (a.modelYear || 0);
+        default:
+          return 0;
+      }
+    });
+  }, [filteredCars, sortBy]);
+
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 9;
   const totalPages = Math.ceil(sortedCars.length / pageSize);
   const paginatedCars = sortedCars.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  // Reset về trang 1 khi filter/sort thay đổi
+  // Reset to page 1 when filters or sort changes
   React.useEffect(() => {
     setCurrentPage(1);
   }, [filters, sortBy, searchParams]);
@@ -355,9 +428,24 @@ const Cars = () => {
 
             {/* Cars Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {paginatedCars.map(car => (
-                <CarCard key={car._id} car={{ ...car, features: Array.isArray(car.features) ? car.features : [] }} />
-              ))}
+              {loading ? (
+                <div className="col-span-full text-center py-12">
+                  <p className="text-gray-600">Loading cars...</p>
+                </div>
+              ) : error ? (
+                <div className="col-span-full text-center py-12">
+                  <p className="text-red-600">{error}</p>
+                </div>
+              ) : paginatedCars.length === 0 ? (
+                <div className="col-span-full text-center py-12 bg-white rounded-lg shadow-sm">
+                  <h3 className="text-xl font-medium text-gray-900">No cars found</h3>
+                  <p className="mt-2 text-gray-600">Try adjusting your filters</p>
+                </div>
+              ) : (
+                paginatedCars.map(car => (
+                  <CarCard key={car._id || car.id} car={car} />
+                ))
+              )}
             </div>
 
             {/* Pagination Controls */}
@@ -386,13 +474,6 @@ const Cars = () => {
                 >
                   Trang sau
                 </button>
-              </div>
-            )}
-
-            {paginatedCars.length === 0 && (
-              <div className="text-center py-12 bg-white rounded-lg shadow-sm">
-                <h3 className="text-xl font-medium text-gray-900">Không tìm thấy xe nào</h3>
-                <p className="mt-2 text-gray-600">Hãy thử thay đổi bộ lọc</p>
               </div>
             )}
           </div>

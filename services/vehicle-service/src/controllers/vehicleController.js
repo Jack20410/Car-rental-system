@@ -1,4 +1,5 @@
 const Vehicle = require('../models/vehicleModel');
+const axios = require('axios');
 
 const createVehicle = async (req, res) => {
   try {
@@ -217,6 +218,7 @@ const getAllVehicles = async (req, res) => {
       seats,
       status,
       car_providerId,
+      city,
       sortBy = 'createdAt',
       order = 'desc',
       page = 1,
@@ -232,6 +234,15 @@ const getAllVehicles = async (req, res) => {
     if (seats) filter.seats = seats;
     if (status) filter.status = status;
     if (car_providerId) filter.car_providerId = car_providerId;
+    if (city) {
+      // Remove spaces and special characters from the search term
+      const normalizedCity = city.replace(/[\s-]+/g, '').toLowerCase();
+      // Create a regex that matches the city name regardless of spaces
+      filter['location.city'] = {
+        $regex: normalizedCity.split('').join('\\s*'),
+        $options: 'i'
+      };
+    }
     
     // Price range filter
     if (minPrice || maxPrice) {
@@ -256,7 +267,8 @@ const getAllVehicles = async (req, res) => {
     // Get total count for pagination
     const total = await Vehicle.countDocuments(filter);
 
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       message: 'Vehicles retrieved successfully',
       data: {
         vehicles,
@@ -268,8 +280,10 @@ const getAllVehicles = async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({
-      message: 'Error retrieving vehicles',
+    console.error('Error retrieving vehicles:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while retrieving vehicles',
       error: error.message
     });
   }
