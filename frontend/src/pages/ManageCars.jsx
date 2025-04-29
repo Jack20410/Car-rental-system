@@ -30,6 +30,7 @@ const ManageCars = () => {
     images: []
   });
   const [editingCar, setEditingCar] = useState(null);
+  const [imageError, setImageError] = useState(''); // Add this state for error message
 
   // Check auth directly from session storage as a fallback
   useEffect(() => {
@@ -130,6 +131,11 @@ const ManageCars = () => {
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
+    if (files.length !== 3) {
+      setImageError('You must upload exactly 3 images.');
+    } else {
+      setImageError('');
+    }
     setFormData(prev => ({
       ...prev,
       images: files
@@ -147,6 +153,16 @@ const ManageCars = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // Validate image count
+    if (!editingCar && formData.images.length !== 3) {
+      setImageError('You must upload exactly 3 images.');
+      return;
+    }
+    if (editingCar && (existingImages.length + formData.images.length !== 3)) {
+      setImageError('Total images (existing + new) must be exactly 3.');
+      return;
+    }
+    setImageError('');
     try {
       const formDataToSend = new FormData();
       
@@ -518,7 +534,7 @@ const ManageCars = () => {
               </div>
               <div className="md:col-span-2">
                 <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="images">
-                  Car Images
+                  Car Images <span className="text-red-500">*</span>
                 </label>
                 {/* Display existing images with reorder controls */}
                 {editingCar && editingCar.images && editingCar.images.length > 0 && (
@@ -564,6 +580,10 @@ const ManageCars = () => {
                   accept="image/*"
                   required={!editingCar}
                 />
+                {imageError && (
+                  <p className="text-red-500 text-sm mt-2">{imageError}</p>
+                )}
+                <p className="text-gray-500 text-xs mt-1">Please upload exactly 3 images.</p>
               </div>
             </div>
             <div className="mt-6 flex justify-end">

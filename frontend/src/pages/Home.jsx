@@ -67,7 +67,7 @@ const Home = () => {
     },
     {
       id: 2,
-      name: 'Hanoi',
+      name: 'Ha Noi',
       carCount: '2500+ cars',
       image: 'https://images.contentstack.io/v3/assets/blt1306150c2c4003bc/bltd403157dcd0ef9a3/660caf8a6c4a3972dfe468d3/00-what-to-see-and-do-in-hanoi-getty-cropped.jpg?auto=webp&width=784',
       description: 'The capital city with extensive car rental services'

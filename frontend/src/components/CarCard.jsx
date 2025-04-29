@@ -41,6 +41,8 @@ const CarCard = ({ car }) => {
             <div>
               <h3 className="text-lg font-semibold text-gray-900">{carBrand} {carName}</h3>
               <p className="text-sm text-gray-600">{car.modelYear || 'Year not specified'}</p>
+              {/* Car Type */}
+              <p className="text-xs text-gray-500 mt-1">{car.carType || 'Type not specified'}</p>
             </div>
             <div className="text-right">
               <p className="text-lg font-bold text-primary">{formatCurrency(price)}</p>
@@ -68,10 +70,26 @@ const CarCard = ({ car }) => {
           <div className="mt-4 text-sm text-gray-600">
             <p>{carLocation}</p>
           </div>
+
+          {/* Features */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            {Array.isArray(car.features) && car.features.length > 0 ? (
+              car.features.map((feature, idx) => (
+                <span
+                  key={idx}
+                  className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded"
+                >
+                  {feature}
+                </span>
+              ))
+            ) : (
+              <span className="text-gray-400 text-xs">No features listed</span>
+            )}
+          </div>
         </div>
       </div>
     </Link>
   );
 };
 
-export default React.memo(CarCard); 
+export default React.memo(CarCard);

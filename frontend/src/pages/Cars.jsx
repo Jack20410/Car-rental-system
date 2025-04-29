@@ -66,6 +66,18 @@ const Cars = () => {
     if (filters.seats && car.seats !== parseInt(filters.seats)) {
       return false;
     }
+    if (filters.carType && car.carType !== filters.carType) {
+      return false;
+    }
+    // --- Features filter logic ---
+    if (filters.features && filters.features.length > 0) {
+      // Ensure car.features is an array
+      const carFeatures = Array.isArray(car.features) ? car.features : [];
+      // Every selected feature must be present in car.features
+      if (!filters.features.every(f => carFeatures.includes(f))) {
+        return false;
+      }
+    }
     return true;
   }) : [];
 
@@ -207,10 +219,12 @@ const Cars = () => {
                     onChange={(e) => handleFilterChange('carType', e.target.value)}
                   >
                     <option value="">All Types</option>
-                    <option value="sedan">Sedan</option>
-                    <option value="suv">SUV</option>
-                    <option value="luxury">Luxury</option>
-                    <option value="sports">Sports</option>
+                    <option value="Sedan">Sedan</option>
+                    <option value="SUV">SUV</option>
+                    <option value="Convertible">Convertible</option>
+                    <option value="Coupe">Coupe</option>
+                    <option value="Hatchback">Hatchback</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
 
@@ -277,7 +291,17 @@ const Cars = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Features</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {['GPS', 'Bluetooth', 'Backup Camera', 'Sunroof'].map((feature) => (
+                    {[
+                      'Apple Carplay',
+                      'Android Auto',
+                      'USB Type-C Port',
+                      'Heated Seats',
+                      'Sunroof',
+                      '360 Camera',
+                      'Rear Camera',
+                      'Leather Seats',
+                      'Smart Key'
+                    ].map((feature) => (
                       <label 
                         key={feature} 
                         className={`flex items-center px-3 py-2 rounded-md cursor-pointer border ${filters.features.includes(feature) ? 'border-primary bg-blue-50 text-primary' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
@@ -332,7 +356,7 @@ const Cars = () => {
             {/* Cars Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {paginatedCars.map(car => (
-                <CarCard key={car._id} car={car} />
+                <CarCard key={car._id} car={{ ...car, features: Array.isArray(car.features) ? car.features : [] }} />
               ))}
             </div>
 
