@@ -297,3 +297,59 @@ exports.updatePaymentStatus = async (req, res) => {
     });
   }
 }; 
+
+// Get booked vehicles within a date range
+exports.getBookedVehicles = async (req, res) => {
+  try {
+    const { pickupDate, returnDate } = req.query;
+
+    if (!pickupDate || !returnDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Pickup date and return date are required'
+      });
+    }
+
+    const start = new Date(pickupDate);
+    const end = new Date(returnDate);
+
+    // Find rentals that overlap with the given date range
+    const overlappingRentals = await Rental.find({
+      $and: [
+        { status: { $nin: ['cancelled'] } }, // Exclude cancelled rentals
+        {
+          $or: [
+            // Case 1: Rental period contains the requested period
+            {
+              startDate: { $lte: start },
+              endDate: { $gte: end }
+            },
+            // Case 2: Rental start date falls within the requested period
+            {
+              startDate: { $gte: start, $lte: end }
+            },
+            // Case 3: Rental end date falls within the requested period
+            {
+              endDate: { $gte: start, $lte: end }
+            }
+          ]
+        }
+      ]
+    });
+
+    // Extract unique vehicle IDs
+    const bookedVehicleIds = [...new Set(overlappingRentals.map(rental => rental.vehicleId))];
+
+    return res.status(200).json({
+      success: true,
+      message: 'Booked vehicles retrieved successfully',
+      data: bookedVehicleIds
+    });
+  } catch (error) {
+    console.error('Error retrieving booked vehicles:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while retrieving booked vehicles'
+    });
+  }
+}; 

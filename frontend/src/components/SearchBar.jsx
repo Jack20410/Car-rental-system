@@ -128,20 +128,27 @@ const SearchBar = () => {
   
   // Handle search submission
   const handleSearch = useCallback(() => {
-    if (!location || !selectedDates.pickup.date || !selectedDates.return.date) {
-      alert('Please fill in all fields');
+    if (!location) {
+      alert('Please enter a location');
       return;
     }
+
+    if (!selectedDates.pickup.date || !selectedDates.return.date) {
+      alert('Please select pickup and return dates');
+      return;
+    }
+
+    // Format dates with times for the API
+    const pickupDateTime = `${selectedDates.pickup.date}T${selectedDates.pickup.time}:00`;
+    const returnDateTime = `${selectedDates.return.date}T${selectedDates.return.time}:00`;
     
     const queryParams = new URLSearchParams({
       location,
-      pickupDate: selectedDates.pickup.date,
-      pickupTime: selectedDates.pickup.time,
-      returnDate: selectedDates.return.date,
-      returnTime: selectedDates.return.time
+      pickupDate: pickupDateTime,
+      returnDate: returnDateTime
     }).toString();
     
-    navigate(`/cars?${queryParams}`);
+    navigate(`/vehicles/search?${queryParams}`);
   }, [location, selectedDates, navigate]);
   
   // Months array for display
@@ -234,7 +241,7 @@ const SearchBar = () => {
           <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-auto">
             {/* Modal header */}
             <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-800">Rental Period</h2>
+              <h2 className="text-xl font-bold text-gray-800">Select Rental Period</h2>
               <button 
                 onClick={toggleDateModal}
                 className="text-gray-500 hover:text-gray-700"
@@ -245,15 +252,21 @@ const SearchBar = () => {
               </button>
             </div>
             
-            {/* Tabs */}
-            <div className="p-4 border-b">
+            {/* Selected dates display */}
+            <div className="p-4 border-b bg-gray-50">
               <div className="grid grid-cols-2 gap-4">
-                <button className="text-center py-2 border-b-2 border-blue-600 text-blue-600 font-medium">
-                  Rent by Day
-                </button>
-                <button className="text-center py-2 text-gray-500">
-                  Rent by Hour
-                </button>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Pickup Date</p>
+                  <p className="text-lg font-semibold text-gray-800">
+                    {selectedDates.pickup.date ? formatDateDisplay().split(' - ')[0] : 'Not selected'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Return Date</p>
+                  <p className="text-lg font-semibold text-gray-800">
+                    {selectedDates.return.date ? formatDateDisplay().split(' - ')[1] : 'Not selected'}
+                  </p>
+                </div>
               </div>
             </div>
             
@@ -270,7 +283,7 @@ const SearchBar = () => {
                   <h3 className="font-medium text-lg text-gray-800">
                     {months[currentView.month]} {currentView.year}
                   </h3>
-                  <div className="w-5"></div> {/* Empty space for alignment */}
+                  <div className="w-5"></div>
                 </div>
                 
                 {/* Weekday headers */}
@@ -304,7 +317,7 @@ const SearchBar = () => {
               {/* Next month */}
               <div>
                 <div className="flex justify-between items-center mb-4">
-                  <div className="w-5"></div> {/* Empty space for alignment */}
+                  <div className="w-5"></div>
                   <h3 className="font-medium text-lg text-gray-800">
                     {currentView.month === 11 
                       ? `${months[0]} ${currentView.year + 1}` 
@@ -415,12 +428,19 @@ const SearchBar = () => {
             </div>
             
             {/* Footer with buttons */}
-            <div className="p-4 border-t flex justify-end">
+            <div className="p-4 border-t flex justify-end gap-4">
               <button 
-                onClick={() => setShowDateModal(false)}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg transition"
+                onClick={toggleDateModal}
+                className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
               >
-                Continue
+                Cancel
+              </button>
+              <button 
+                onClick={toggleDateModal}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg transition"
+                disabled={!selectedDates.pickup.date || !selectedDates.return.date}
+              >
+                Apply
               </button>
             </div>
           </div>

@@ -167,7 +167,7 @@ const Home = () => {
             {popularLocations.map((location, index) => (
               <Link
                 key={location.id}
-                to={`/cars?location=${encodeURIComponent(location.name)}`}
+                to={`/vehicles/search?location=${encodeURIComponent(location.name)}`}
                 className={`location-card group relative rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 flex-shrink-0 w-full sm:w-80 md:w-96 snap-start ${index === currentSlide ? 'border-2 border-primary' : ''}`}
               >
                 <div className="aspect-w-16 aspect-h-9">

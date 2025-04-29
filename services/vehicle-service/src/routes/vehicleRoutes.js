@@ -5,6 +5,7 @@ const { createVehicle,
         updateVehicle, 
         updateVehicleStatus, 
         getAllVehicles, 
+        searchAvailableVehicles,
         getVehicleById } = require('../controllers/vehicleController');
 const { verifyToken, requireCarProvider } = require('../middleware/authMiddleware');
 const { validateCreateVehicle } = require('../middleware/vehicleValidation');
@@ -12,6 +13,9 @@ const upload = require('../config/multerConfig');
 
 // Get all vehicles - public route
 router.get('/vehicles', getAllVehicles);
+
+// Search available vehicles with filters - public route
+router.get('/vehicles/search', searchAvailableVehicles);
 
 // Get vehicle by ID - public route
 router.get('/vehicles/:id', getVehicleById);

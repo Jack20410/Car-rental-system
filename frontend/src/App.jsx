@@ -22,6 +22,7 @@ function App() {
             <Route path="/" element={<MainLayout />}>
               <Route index element={<Home />} />
               <Route path="cars" element={<Cars />} />
+              <Route path="vehicles/search" element={<Cars />} />
               <Route path="cars/:id" element={<CarDetails />} />
               <Route path="login" element={<Login />} />
               <Route path="register" element={<Register />} />

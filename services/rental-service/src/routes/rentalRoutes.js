@@ -5,10 +5,19 @@ const {
   getUserRentals, 
   getRentalById, 
   updateRentalStatus, 
-  updatePaymentStatus 
+  updatePaymentStatus,
+  getBookedVehicles
 } = require('../controllers/rentalController');
 const { verifyToken, requireCustomer } = require('../middleware/authMiddleware');
 const { validateCreateRental } = require('../middleware/rentalValidation');
+
+// GET - Get all rentals for the authenticated user
+router.get(
+  '/',
+  verifyToken,
+  requireCustomer,
+  getUserRentals
+);
 
 // POST - Create a new rental (customer only)
 router.post(
@@ -19,12 +28,10 @@ router.post(
   createRental
 );
 
-// GET - Get all rentals for the authenticated user
+// GET - Get list of booked vehicles within a date range
 router.get(
-  '/',
-  verifyToken,
-  requireCustomer,
-  getUserRentals
+  '/booked-vehicles',
+  getBookedVehicles
 );
 
 // GET - Get a specific rental by ID

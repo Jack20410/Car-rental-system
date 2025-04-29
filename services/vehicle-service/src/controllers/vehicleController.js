@@ -1,4 +1,5 @@
 const Vehicle = require('../models/vehicleModel');
+const axios = require('axios');
 
 const createVehicle = async (req, res) => {
   try {
@@ -206,7 +207,56 @@ const updateVehicleStatus = async (req, res) => {
   }
 };
 
+// Get all vehicles (simple version without availability check)
 const getAllVehicles = async (req, res) => {
+  try {
+    const {
+      sortBy = 'createdAt',
+      order = 'desc',
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    // Calculate skip value for pagination
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Build sort object
+    const sortOptions = {};
+    sortOptions[sortBy] = order === 'desc' ? -1 : 1;
+
+    // Execute query with sorting and pagination
+    const vehicles = await Vehicle.find()
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(Number(limit));
+
+    // Get total count for pagination
+    const total = await Vehicle.countDocuments();
+
+    res.status(200).json({
+      success: true,
+      message: 'Vehicles retrieved successfully',
+      data: {
+        vehicles,
+        pagination: {
+          total,
+          page: Number(page),
+          pages: Math.ceil(total / Number(limit))
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error retrieving vehicles:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving vehicles',
+      error: error.message
+    });
+  }
+};
+
+// Search available vehicles with filters
+const searchAvailableVehicles = async (req, res) => {
   try {
     const {
       brand,
@@ -215,8 +265,9 @@ const getAllVehicles = async (req, res) => {
       minPrice,
       maxPrice,
       seats,
-      status,
-      car_providerId,
+      location,
+      pickupDate,
+      returnDate,
       sortBy = 'createdAt',
       order = 'desc',
       page = 1,
@@ -230,14 +281,42 @@ const getAllVehicles = async (req, res) => {
     if (transmission) filter.transmission = transmission;
     if (fuelType) filter.fuelType = fuelType;
     if (seats) filter.seats = seats;
-    if (status) filter.status = status;
-    if (car_providerId) filter.car_providerId = car_providerId;
+    if (location) filter.location = new RegExp(location, 'i');
+    
+    // Status filter - only show Available or Pending vehicles
+    filter.status = { $in: ['Available', 'Pending'] };
     
     // Price range filter
     if (minPrice || maxPrice) {
       filter.rentalPricePerDay = {};
       if (minPrice) filter.rentalPricePerDay.$gte = Number(minPrice);
       if (maxPrice) filter.rentalPricePerDay.$lte = Number(maxPrice);
+    }
+
+    // If pickup and return dates are provided, check for vehicle availability
+    if (pickupDate && returnDate) {
+      try {
+        // Get booked vehicles from rental service
+        const rentalServiceResponse = await axios.get(
+          `${process.env.RENTAL_SERVICE_URL}/rentals/booked-vehicles`,
+          {
+            params: {
+              pickupDate,
+              returnDate
+            }
+          }
+        );
+
+        const bookedVehicleIds = rentalServiceResponse.data.data;
+        
+        // Exclude booked vehicles from the results
+        if (bookedVehicleIds && bookedVehicleIds.length > 0) {
+          filter._id = { $nin: bookedVehicleIds };
+        }
+      } catch (error) {
+        console.error('Error fetching booked vehicles:', error);
+        // Continue with the search even if rental service is unavailable
+      }
     }
 
     // Calculate skip value for pagination
@@ -310,5 +389,6 @@ module.exports = {
   updateVehicle,
   updateVehicleStatus,
   getAllVehicles,
+  searchAvailableVehicles,
   getVehicleById
 };
