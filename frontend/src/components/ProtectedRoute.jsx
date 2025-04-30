@@ -12,7 +12,7 @@ const ProtectedRoute = () => {
   
   // Directly check session storage as a fallback
   useEffect(() => {
-    const auth = sessionStorage.getItem('auth');
+    const auth = localStorage.getItem('auth');
     if (auth) {
       const parsedAuth = JSON.parse(auth);
       setSessionAuth(!!parsedAuth.token);

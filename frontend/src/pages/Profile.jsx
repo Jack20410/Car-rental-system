@@ -24,7 +24,7 @@ const Profile = () => {
   useEffect(() => {
     // Debug: check session storage
     try {
-      const auth = sessionStorage.getItem('auth');
+      const auth = localStorage.getItem('auth');
       if (auth) {
         const parsedAuth = JSON.parse(auth);
         setSessionUser(parsedAuth.user);

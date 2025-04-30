@@ -4,7 +4,7 @@ import api, { endpoints } from '../utils/api';
 const AuthContext = createContext(null);
 
 const getStoredAuth = () => {
-  const auth = sessionStorage.getItem('auth');
+  const auth = localStorage.getItem('auth');
   return auth ? JSON.parse(auth) : null;
 };
 
@@ -15,30 +15,62 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Check if user is logged in on mount
     const auth = getStoredAuth();
+    console.log('Auth state on mount:', { auth, hasToken: !!auth?.token });
+    
     if (auth?.token) {
-      fetchUserProfile();
+      console.log('Found token, fetching user profile...');
+      // Add a small delay to ensure the API is ready
+      setTimeout(() => {
+        fetchUserProfile();
+      }, 100);
     } else {
+      console.log('No token found in localStorage');
       setLoading(false);
     }
+
+    // Add event listener for storage changes
+    const handleStorageChange = (e) => {
+      if (e.key === 'auth') {
+        console.log('Auth storage changed:', e.newValue);
+        if (e.newValue) {
+          const newAuth = JSON.parse(e.newValue);
+          setUser(newAuth.user);
+        } else {
+          setUser(null);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const fetchUserProfile = async () => {
     try {
+      console.log('Starting profile fetch...');
       const response = await api.get(endpoints.user.profile);
       const userData = response.data.data;
+      console.log('Profile fetch successful:', userData);
       setUser(userData);
       // Update stored user data
       const auth = getStoredAuth();
       if (auth) {
-        sessionStorage.setItem('auth', JSON.stringify({
+        localStorage.setItem('auth', JSON.stringify({
           ...auth,
           user: userData
         }));
+        console.log('Updated auth in localStorage with new user data');
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      sessionStorage.removeItem('auth');
-      setUser(null);
+      // Only clear auth for specific error cases
+      if (error.response?.status === 401 && 
+          (error.response?.data?.message === 'Invalid token.' || 
+           error.response?.data?.message === 'Token expired')) {
+        console.log('Token invalid or expired - clearing auth state');
+        localStorage.removeItem('auth');
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -64,7 +96,7 @@ export const AuthProvider = ({ children }) => {
         user: userData,
         loginTime: new Date().toISOString()
       };
-      sessionStorage.setItem('auth', JSON.stringify(authData));
+      localStorage.setItem('auth', JSON.stringify(authData));
       setUser(userData);
       return userData;
     } catch (error) {
@@ -78,7 +110,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    sessionStorage.removeItem('auth');
+    localStorage.removeItem('auth');
     setUser(null);
   };
 

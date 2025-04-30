@@ -12,8 +12,17 @@ const api = axios.create({
 
 // Get auth token from session storage
 const getAuthToken = () => {
-  const auth = sessionStorage.getItem('auth');
-  return auth ? JSON.parse(auth).token : null;
+  try {
+    const auth = localStorage.getItem('auth');
+    if (!auth) return null;
+    
+    const parsedAuth = JSON.parse(auth);
+    console.log('Current auth token:', parsedAuth.token ? 'exists' : 'missing');
+    return parsedAuth.token;
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
 };
 
 // Request interceptor for adding auth token
@@ -22,6 +31,10 @@ api.interceptors.request.use(
     const token = getAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('Request URL:', config.url);
+      console.log('Request headers:', config.headers);
+    } else {
+      console.log('No auth token available for request');
     }
     return config;
   },
@@ -33,17 +46,29 @@ api.interceptors.request.use(
 
 // Response interceptor for handling errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('Successful response:', {
+      url: response.config.url,
+      status: response.status,
+      data: response.data
+    });
+    return response;
+  },
   async (error) => {
-    console.error('API Error:', error.message);
-    if (error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response data:', error.response.data);
-    }
+    console.error('API Error:', {
+      message: error.message,
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      data: error.response?.data
+    });
     
-    if (error.response?.status === 401) {
-      // Handle unauthorized access
-      sessionStorage.removeItem('auth');
+    // Only clear auth and redirect for specific 401 errors
+    if (error.response?.status === 401 && 
+        (error.response?.data?.message === 'Invalid token.' || 
+         error.response?.data?.message === 'Token expired')) {
+      console.log('Token invalid or expired, clearing auth state');
+      localStorage.removeItem('auth');
       window.location.href = '/login';
     }
     return Promise.reject(error);

@@ -14,7 +14,7 @@ const Navbar = () => {
 
   // Check session storage directly for debugging
   useEffect(() => {
-    const auth = sessionStorage.getItem('auth');
+    const auth = localStorage.getItem('auth');
     if (auth) {
       try {
         const parsedAuth = JSON.parse(auth);

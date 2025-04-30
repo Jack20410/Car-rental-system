@@ -9,6 +9,9 @@ const { createVehicle,
 const { verifyToken, requireCarProvider } = require('../middleware/authMiddleware');
 const { validateCreateVehicle } = require('../middleware/vehicleValidation');
 const upload = require('../config/multerConfig');
+const Vehicle = require('../models/vehicleModel');
+const fs = require('fs');
+const path = require('path');
 
 // Get all vehicles - public route
 router.get('/vehicles', getAllVehicles);
@@ -42,5 +45,43 @@ router.patch('/vehicles/:id/status',
 
 // Delete vehicle - requires car_provider role
 router.delete('/vehicles/:id', verifyToken, requireCarProvider, deleteVehicle);
+
+// Delete vehicle image - requires car_provider role
+router.delete('/vehicles/:id/images', verifyToken, requireCarProvider, async (req, res) => {
+  try {
+    const { imagePath } = req.body;
+    const vehicleId = req.params.id;
+    
+    // Get the vehicle
+    const vehicle = await Vehicle.findById(vehicleId);
+    if (!vehicle) {
+      return res.status(404).json({ message: 'Vehicle not found' });
+    }
+
+    // Check if image exists in vehicle's images
+    if (!vehicle.images.includes(imagePath)) {
+      return res.status(404).json({ message: 'Image not found' });
+    }
+
+    // Remove image from vehicle's images array
+    vehicle.images = vehicle.images.filter(img => img !== imagePath);
+    await vehicle.save();
+
+    // Delete physical file
+    const fullPath = path.join(__dirname, '../../../uploads/vehicles', path.basename(imagePath));
+    
+    fs.unlink(fullPath, (err) => {
+      if (err) {
+        console.error('Error deleting file:', err);
+        // Don't fail the request if file deletion fails
+      }
+    });
+
+    res.status(200).json({ message: 'Image deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    res.status(500).json({ message: 'Failed to delete image' });
+  }
+});
 
 module.exports = router; 

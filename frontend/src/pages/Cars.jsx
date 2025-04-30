@@ -29,15 +29,10 @@ const Cars = () => {
 
         const city = searchParams.get('city');
         
-        if (!city) {
-          setError('Please select a city to search for cars.');
-          setCars([]);
-          setLoading(false);
-          return;
-        }
-
-        // Construct the URL with the city parameter
-        const url = `http://localhost:3000/vehicles?city=${encodeURIComponent(city)}`;
+        // Construct the URL - if city is provided use it as parameter, otherwise fetch all cars
+        const url = city 
+          ? `http://localhost:3000/vehicles?city=${encodeURIComponent(city)}`
+          : 'http://localhost:3000/vehicles';
         console.log('Fetching cars from:', url);
 
         const response = await fetch(url);
@@ -57,7 +52,7 @@ const Cars = () => {
           : result.data || [];
 
         if (vehicles.length === 0) {
-          setError('No cars available in this city');
+          setError(city ? `No cars available in ${city}` : 'No cars available');
           setCars([]);
         } else {
           // Process and validate each vehicle
@@ -75,13 +70,13 @@ const Cars = () => {
             if (typeof vehicle.location === 'string') {
               vehicle.location = { city: vehicle.location };
             } else if (!vehicle.location || typeof vehicle.location !== 'object') {
-              vehicle.location = { city: city };
+              vehicle.location = { city: city || 'Location not specified' };
             }
 
             return true;
           });
 
-          console.log('Valid vehicles for city:', validVehicles);
+          console.log('Valid vehicles:', validVehicles);
           setCars(validVehicles);
         }
       } catch (err) {

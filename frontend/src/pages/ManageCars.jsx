@@ -34,7 +34,7 @@ const ManageCars = () => {
 
   // Check auth directly from session storage as a fallback
   useEffect(() => {
-    const auth = sessionStorage.getItem('auth');
+    const auth = localStorage.getItem('auth');
     if (auth) {
       const parsedAuth = JSON.parse(auth);
       if (parsedAuth.user && parsedAuth.user.role === 'car_provider') {
@@ -61,7 +61,7 @@ const ManageCars = () => {
   const fetchCars = async () => {
     try {
       setIsLoading(true);
-      const auth = JSON.parse(sessionStorage.getItem('auth'));
+      const auth = JSON.parse(localStorage.getItem('auth'));
       const token = auth?.token;
       const userId = auth?.user?._id;
       
@@ -131,11 +131,6 @@ const ManageCars = () => {
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
-    if (files.length !== 3) {
-      setImageError('You must upload exactly 3 images.');
-    } else {
-      setImageError('');
-    }
     setFormData(prev => ({
       ...prev,
       images: files
@@ -151,18 +146,37 @@ const ManageCars = () => {
     });
   };
 
+  const handleDeleteImage = async (indexToDelete) => {
+    try {
+      const imageToDelete = existingImages[indexToDelete];
+      const token = JSON.parse(localStorage.getItem('auth'))?.token;
+      
+      if (!token) throw new Error('No authentication token found');
+
+      // Call API to delete the image
+      const response = await fetch(`http://localhost:3000/vehicles/${editingCar._id}/images`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ imagePath: imageToDelete })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete image');
+      }
+
+      // Only remove from state if deletion was successful
+      setExistingImages(prevImages => prevImages.filter((_, index) => index !== indexToDelete));
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      alert('Failed to delete image. Please try again.');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Validate image count
-    if (!editingCar && formData.images.length !== 3) {
-      setImageError('You must upload exactly 3 images.');
-      return;
-    }
-    if (editingCar && (existingImages.length + formData.images.length !== 3)) {
-      setImageError('Total images (existing + new) must be exactly 3.');
-      return;
-    }
-    setImageError('');
     try {
       const formDataToSend = new FormData();
       
@@ -190,7 +204,7 @@ const ManageCars = () => {
         }
       });
       
-      const token = JSON.parse(sessionStorage.getItem('auth'))?.token;
+      const token = JSON.parse(localStorage.getItem('auth'))?.token;
       
       if (!token) {
         throw new Error('No authentication token found');
@@ -254,7 +268,7 @@ const ManageCars = () => {
    const handleDeleteCar = async (carId) => {
     if (!window.confirm('Are you sure you want to delete this car?')) return;
     try {
-      const token = JSON.parse(sessionStorage.getItem('auth'))?.token;
+      const token = JSON.parse(localStorage.getItem('auth'))?.token;
       if (!token) throw new Error('No authentication token found');
   
       const response = await fetch(`http://localhost:3000/vehicles/${carId}`, {
@@ -276,7 +290,7 @@ const ManageCars = () => {
   };
   const handleChangeStatus = async (car, newStatus) => {
     try {
-      const token = JSON.parse(sessionStorage.getItem('auth'))?.token;
+      const token = JSON.parse(localStorage.getItem('auth'))?.token;
       if (!token) throw new Error('No authentication token found');
   
       // Example: Toggle between 'Available' and 'Retnted'
@@ -502,18 +516,40 @@ const ManageCars = () => {
                   Features
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {['Apple Carplay', 'Android Auto', 'USB Type-C Port', 'Heated Seats', 'Sunroof', '360 Camera', 'Rear Camera', 'Leather Seats', 'Smart Key'].map(feature => (
-                    <div key={feature} className="flex items-center">
+                  {[
+                    { name: 'Entertainment', icon: '/icons/dvd-v2.png' },
+                    { name: 'Tire Pressure Monitoring System', icon: '/icons/tpms-v2.png' },
+                    { name: 'Spare Tire', icon: '/icons/spare_tire-v2.png' },
+                    { name: 'Navigation', icon: '/icons/map-v2.png' },
+                    { name: 'ETC', icon: '/icons/etc-v2.png' },
+                    { name: 'Head Up Display', icon: '/icons/head_up-v2.png' },
+                    { name: 'Impact Sensor', icon: '/icons/impact_sensor-v2.png' },
+                    { name: '360 Camera', icon: '/icons/360_camera-v2.png' },
+                    { name: 'Airbags', icon: '/icons/airbags-v2.png' },
+                    { name: 'Reverse Camera', icon: '/icons/reverse_camera-v2.png' },
+                    { name: 'USB Port', icon: '/icons/usb-v2.png' },
+                    { name: 'GPS', icon: '/icons/gps-v2.png' },
+                    { name: 'Bluetooth', icon: '/icons/bluetooth-v2.png' },
+                    { name: 'Sunroof', icon: '/icons/sunroof-v2.png' }
+                  ].map(feature => (
+                    <div key={feature.name} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded">
                       <input
                         type="checkbox"
-                        id={`feature-${feature}`}
+                        id={`feature-${feature.name}`}
                         name="features"
-                        value={feature}
-                        checked={formData.features.includes(feature)}
+                        value={feature.name}
+                        checked={formData.features.includes(feature.name)}
                         onChange={handleFeaturesChange}
                         className="mr-2"
                       />
-                      <label htmlFor={`feature-${feature}`}>{feature}</label>
+                      <img 
+                        src={feature.icon} 
+                        alt={feature.name}
+                        className="w-5 h-5 object-contain"
+                      />
+                      <label htmlFor={`feature-${feature.name}`} className="text-sm">
+                        {feature.name}
+                      </label>
                     </div>
                   ))}
                 </div>
@@ -565,6 +601,14 @@ const ManageCars = () => {
                               →
                             </button>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteImage(idx)}
+                            className="p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                            title="Delete image"
+                          >
+                            ×
+                          </button>
                         </div>
                       </div>
                     ))}

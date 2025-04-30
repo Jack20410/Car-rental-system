@@ -21,9 +21,6 @@ router.post('/register', validateRegistration, register);
 // POST /users/login - Login user
 router.post('/login', validateLogin, login);
 
-// GET /users/:id - Get user by ID (Public route for provider details)
-router.get('/:id', getUserById);
-
 // Protected routes
 // GET /users - Get all users
 router.get('/', verifyToken, getAllUsers);
@@ -34,11 +31,14 @@ router.get('/profile', verifyToken, getCurrentUser);
 // GET /users/role/:role - Get users by role
 router.get('/role/:role', verifyToken, getUsersByRole);
 
+// DELETE /users/all - Delete multiple users
+router.delete('/all', verifyToken, deleteUsers);
+
+// GET /users/:id - Get user by ID (Public route for provider details)
+router.get('/:id', getUserById);
+
 // DELETE /users/:id - Delete a single user
 router.delete('/:id', verifyToken, deleteUser);
-
-// DELETE /users - Delete multiple users
-router.delete('/all', verifyToken, deleteUsers);
 
 // PATCH /users/:id - Update user
 router.patch('/:id', verifyToken, updateUser);
