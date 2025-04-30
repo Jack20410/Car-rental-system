@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import api, { endpoints } from '../utils/api';
+import { Link } from 'react-router-dom';
+import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import { formatCurrency } from '../utils/formatCurrency';
 
 const Rentals = () => {
   const { user } = useAuth();
@@ -11,7 +13,7 @@ const Rentals = () => {
   useEffect(() => {
     const fetchRentals = async () => {
       try {
-        const response = await api.get(endpoints.rentals.list);
+        const response = await api.get('/rentals');
         setRentals(response.data.data || []);
       } catch (err) {
         setError('Failed to load your rental history. Please try again later.');
@@ -23,6 +25,28 @@ const Rentals = () => {
 
     fetchRentals();
   }, []);
+
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      confirmed: 'bg-blue-100 text-blue-800',
+      active: 'bg-green-100 text-green-800',
+      completed: 'bg-gray-100 text-gray-800',
+      cancelled: 'bg-red-100 text-red-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
 
   if (loading) {
     return (
@@ -73,9 +97,9 @@ const Rentals = () => {
               <h3 className="mt-2 text-sm font-medium text-gray-900">No rentals</h3>
               <p className="mt-1 text-sm text-gray-500">You haven't made any car rentals yet.</p>
               <div className="mt-6">
-                <a href="/cars" className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                <Link to="/cars" className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
                   Browse available cars
-                </a>
+                </Link>
               </div>
             </div>
           ) : (
@@ -83,56 +107,42 @@ const Rentals = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Car</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle ID</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Start Date</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">End Date</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Price</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {rentals.map((rental) => (
-                    <tr key={rental.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {rental.vehicle?.image && (
-                            <div className="flex-shrink-0 h-10 w-10 mr-3">
-                              <img className="h-10 w-10 rounded-full object-cover" src={rental.vehicle.image} alt={rental.vehicle.model} />
-                            </div>
-                          )}
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {rental.vehicle?.brand} {rental.vehicle?.model}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {rental.vehicle?.year}
-                            </div>
-                          </div>
-                        </div>
+                    <tr key={rental._id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {rental.vehicleId}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(rental.start_date).toLocaleDateString()}
+                        {formatDate(rental.startDate)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(rental.end_date).toLocaleDateString()}
+                        {formatDate(rental.endDate)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
-                          ${rental.status === 'active' ? 'bg-green-100 text-green-800' : 
-                          rental.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                          rental.status === 'completed' ? 'bg-blue-100 text-blue-800' : 
-                          'bg-red-100 text-red-800'}`}>
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(rental.status)}`}>
                           {rental.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        ${rental.total_price?.toFixed(2)}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          rental.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
+                          rental.paymentStatus === 'refunded' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {rental.paymentStatus}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <a href={`/rentals/${rental.id}`} className="text-primary hover:text-secondary">
-                          View Details
-                        </a>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatCurrency(rental.totalPrice)}
                       </td>
                     </tr>
                   ))}

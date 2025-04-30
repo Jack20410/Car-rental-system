@@ -5,11 +5,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 4000,
-    host: true,
-    open: false,
+    open: true,
     proxy: {
       '/api': {
         target: 'http://api-gateway:3000',
+        // target: 'http://localhost:3000', //for testing
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
@@ -27,8 +27,6 @@ export default defineConfig({
           });
           proxy.on('proxyReq', (proxyReq, req, _res) => {
             console.log('Sending Request:', req.method, req.url);
-            // Log headers for debugging
-            console.log('Request headers:', proxyReq.getHeaders());
           });
           proxy.on('proxyRes', (proxyRes, req, _res) => {
             console.log('Received Response:', proxyRes.statusCode, req.url);

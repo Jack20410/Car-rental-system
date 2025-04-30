@@ -1,6 +1,34 @@
 const Rental = require('../models/rentalModel');
 const axios = require('axios');
 
+// Helper function to calculate rental price
+const calculateRentalPrice = (start, end, vehicle) => {
+  // Check if rental is within the same day
+  const isSameDay = start.toDateString() === end.toDateString();
+  
+  if (isSameDay) {
+    // Calculate hours for same-day rental
+    const hourDiff = (end - start) / (1000 * 60 * 60);
+    
+    // If rental is under 6 hours, charge 50% of daily rate
+    if (hourDiff <= 6) {
+      return vehicle.rentalPricePerDay * 0.5;
+    }
+    // If rental is 6-12 hours, charge 75% of daily rate
+    else if (hourDiff <= 12) {
+      return vehicle.rentalPricePerDay * 0.75;
+    }
+    // If over 12 hours, charge full day rate
+    else {
+      return vehicle.rentalPricePerDay;
+    }
+  } else {
+    // Calculate number of days (rounded up)
+    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    return days * vehicle.rentalPricePerDay;
+  }
+};
+
 // Create a new rental
 exports.createRental = async (req, res) => {
   console.log('Received rental creation request:', {
@@ -31,8 +59,15 @@ exports.createRental = async (req, res) => {
       });
     }
 
-    // Calculate number of days
-    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    // Validate minimum rental duration (2 hours)
+    const minHours = 2;
+    const hourDiff = (end - start) / (1000 * 60 * 60);
+    if (hourDiff < minHours) {
+      return res.status(400).json({
+        success: false,
+        message: `Minimum rental duration is ${minHours} hours`
+      });
+    }
     
     // Get vehicle details from vehicle service
     let vehicleResponse;
@@ -77,8 +112,8 @@ exports.createRental = async (req, res) => {
       });
     }
 
-    // Calculate total price
-    const totalPrice = days * vehicle.rentalPricePerDay;
+    // Calculate total price using the new helper function
+    const totalPrice = calculateRentalPrice(start, end, vehicle);
 
     // Create rental record
     const rental = new Rental({

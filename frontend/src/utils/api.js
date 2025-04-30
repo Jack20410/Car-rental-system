@@ -2,7 +2,8 @@ import axios from 'axios';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: '/api',  // This will use the Vite proxy configuration
+  // baseURL: import.meta.env.VITE_API_URL || 'http://api-gateway:3000',  // Use API gateway URL
+  baseURL: 'http://localhost:3000', //for testing
   headers: {
     'Content-Type': 'application/json',
   },

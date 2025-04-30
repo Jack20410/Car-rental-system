@@ -11,7 +11,8 @@ import CarDetails from './pages/CarDetails';
 import Profile from './pages/Profile';
 import Rentals from './pages/Rentals';
 import ManageCars from './pages/ManageCars';
-import OwnerProfile from './pages/OwnerProfile';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
   return (
@@ -34,8 +35,19 @@ function App() {
                 <Route path="manage-cars" element={<ManageCars />} />
               </Route>
             </Route>
-            <Route path="/owner-profile/:id" element={<OwnerProfile />} />
           </Routes>
+          <ToastContainer
+            position="top-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            newestOnTop
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="light"
+          />
         </div>
       </AuthProvider>
     </Router>
