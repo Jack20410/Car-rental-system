@@ -8,6 +8,8 @@ import { GiCardDiscard, GiTrashCan, GiFruitBowl, GiChemicalDrop } from 'react-ic
 import { FaCarSide } from 'react-icons/fa6';
 import { formatCurrency } from '../utils/formatCurrency';
 import L from 'leaflet';
+import { useAuth } from '../context/AuthContext';
+
 
 const CarDetails = () => {
   const { id } = useParams();
@@ -27,6 +29,25 @@ const CarDetails = () => {
   const mapRef = useRef(null);
   const [mapInstance, setMapInstance] = useState(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+    // Thêm các state cho phần đánh giá
+const [reviewComment, setReviewComment] = useState('');
+const [reviewRating, setReviewRating] = useState(0);
+const [reviews, setReviews] = useState([]);
+const { user } = useAuth(); // Get user from AuthContext
+const [showReviews, setShowReviews] = useState(true);
+
+// Khởi tạo reviews từ localStorage hoặc car.reviews (nếu có)
+useEffect(() => {
+  if (car) {
+    const localKey = `car_reviews_${car._id}`;
+    const storedReviews = localStorage.getItem(localKey);
+    if (storedReviews) {
+      setReviews(JSON.parse(storedReviews));
+    } else if (car.reviews) {
+      setReviews(car.reviews);
+    }
+  }
+}, [car]);
 
   useEffect(() => {
     const fetchCarAndProviderDetails = async () => {
@@ -285,6 +306,68 @@ const CarDetails = () => {
     const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
     return diffHours > 0 ? diffHours : 0;
   };
+
+
+
+// Định nghĩa hàm handleReviewSubmit
+const handleReviewSubmit = (e) => {
+  e.preventDefault();
+  if (!reviewComment.trim() || reviewRating === 0) return;
+
+const newReview = {
+  id: Date.now(),
+  user: {
+    name: user?.name || "Anonymous",
+    avatar: user?.avatar
+      ? (user.avatar.startsWith('http')
+          ? user.avatar
+          : `http://localhost:3001${user.avatar.replace('/uploads', '')}`)
+      : "http://localhost:3001/avatar/user.png",
+    isVerified: true,
+  },
+  rating: reviewRating,
+  comment: reviewComment,
+  date: new Date().toLocaleDateString('en-US'),
+  tripDuration: "1 day",
+};
+
+  const updatedReviews = [newReview, ...reviews];
+  setReviews(updatedReviews);
+
+  // Lưu reviews vào localStorage theo car._id
+  if (car && car._id) {
+    const localKey = `car_reviews_${car._id}`;
+    localStorage.setItem(localKey, JSON.stringify(updatedReviews));
+  }
+
+  setReviewComment('');
+  setReviewRating(0);
+};
+
+const DEFAULT_AVATAR = "http://localhost:3001/avatar/user.png";
+function ReviewAvatar({ avatar, name, className }) {
+  return avatar ? (
+    <img
+      src={avatar}
+      alt={name}
+      className={`${className} rounded-full object-cover`}
+      onError={(e) => {
+        e.target.src = DEFAULT_AVATAR;
+        e.target.onerror = () => {
+          e.target.style.display = 'none';
+          e.target.parentElement.innerHTML = `<div class="${className} rounded-full bg-primary text-white flex items-center justify-center">${name?.charAt(0).toUpperCase() || 'U'}</div>`;
+        };
+      }}
+    />
+  ) : (
+    <div className={`${className} rounded-full bg-primary text-white flex items-center justify-center`}>
+      {name ? name.charAt(0).toUpperCase() : 'U'}
+    </div>
+  );
+}
+
+
+
   
   return (
     <div className="bg-gray-50 min-h-screen py-8">
@@ -534,44 +617,91 @@ const CarDetails = () => {
                 </div>
               </div>
 
-              {/* Reviews List */}
-              <div className="space-y-6">
-                {car.reviews.map((review) => (
-                  <div key={review.id} className="border-b border-gray-200 pb-6 last:border-0">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        <img
-                          src={review.user.avatar}
-                          alt={review.user.name}
-                          className="w-12 h-12 rounded-full"
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-medium text-gray-900">{review.user.name}</h3>
-                            {review.user.isVerified && (
-                              <MdVerified className="text-primary" title="Verified User" />
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <span>{review.date}</span>
-                            <span>•</span>
-                            <span>{review.tripDuration} rental</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-1">
-                        {renderStars(review.rating)}
-                      </div>
+              {/* Leave a Review Form */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Leave a Review</h3>
+                <form className="space-y-4" onSubmit={handleReviewSubmit}>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Your Rating</label>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setReviewRating(star)}
+                          className="focus:outline-none"
+                        >
+                          {reviewRating >= star ? (
+                            <FaStar className="text-yellow-400 text-2xl" />
+                          ) : (
+                            <FaRegStar className="text-yellow-400 text-2xl" />
+                          )}
+                        </button>
+                      ))}
                     </div>
-                    <p className="text-gray-700">{review.comment}</p>
                   </div>
-                ))}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Your Comment</label>
+                    <textarea
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                      rows={3}
+                      placeholder="Share your experience..."
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-secondary transition"
+                  >
+                    Submit Review
+                  </button>
+                </form>
               </div>
 
-              {/* Show More Button */}
+              {/* Reviews List */}
+              {showReviews && (
+                <div className="space-y-6">
+                  {reviews.map((review) => (
+                    <div key={review.id} className="border-b border-gray-200 pb-6 last:border-0">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-4">
+                          <img
+                            src={review.user.avatar}
+                            alt={review.user.name}
+                            className="w-12 h-12 rounded-full"
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-medium text-gray-900">{review.user.name}</h3>
+                              {review.user.isVerified && (
+                                <MdVerified className="text-primary" title="Verified User" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <span>{review.date}</span>
+                              <span>•</span>
+                              <span>{review.tripDuration} rental</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          {renderStars(review.rating)}
+                        </div>
+                      </div>
+                      <p className="text-gray-700">{review.comment}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Toggle Button */}
               <div className="text-center mt-6">
-                <button className="text-primary font-medium hover:text-secondary transition-colors">
-                  Show More Reviews
+                <button
+                  className="text-primary font-medium hover:text-secondary transition-colors"
+                  onClick={() => setShowReviews((prev) => !prev)}
+                >
+                  {showReviews ? "Hide Reviews" : "Show Reviews"}
                 </button>
               </div>
             </div>
