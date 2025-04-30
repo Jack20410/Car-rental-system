@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { FaCar, FaGasPump, FaCog, FaUsers, FaCalendarAlt, FaMapMarkerAlt, FaStar, FaStarHalf, FaRegStar, FaPhoneAlt, FaUserCheck } from 'react-icons/fa';
 import { BsSpeedometer2, BsGearFill, BsShieldCheck } from 'react-icons/bs';
 import { AiOutlineSafety, AiOutlineCheck } from 'react-icons/ai';
@@ -7,9 +7,11 @@ import { MdLocalOffer, MdCancel, MdGavel, MdSmokeFree, MdLocationOn, MdDirection
 import { GiCardDiscard, GiTrashCan, GiFruitBowl, GiChemicalDrop } from 'react-icons/gi';
 import { FaCarSide } from 'react-icons/fa6';
 import { formatCurrency } from '../utils/formatCurrency';
+import L from 'leaflet';
 
 const CarDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [selectedImage, setSelectedImage] = useState(0);
   const [car, setCar] = useState(null);
   const [provider, setProvider] = useState(null);
@@ -22,6 +24,9 @@ const CarDetails = () => {
   const [pickupTime, setPickupTime] = useState('');
   const [returnTime, setReturnTime] = useState('');
   const [numberOfHours, setNumberOfHours] = useState(0);
+  const mapRef = useRef(null);
+  const [mapInstance, setMapInstance] = useState(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
     const fetchCarAndProviderDetails = async () => {
@@ -86,7 +91,7 @@ const CarDetails = () => {
           owner: provider ? {
             id: data.car_providerId,
             name: provider.fullName || 'Car Provider',
-            avatar: provider.avatar ? `http://localhost:3001${provider.avatar}` : "https://randomuser.me/api/portraits/men/32.jpg",
+            avatar: provider.avatar ? `http://localhost:3001${provider.avatar.replace('/uploads', '')}` : "https://randomuser.me/api/portraits/men/32.jpg",
             joinedDate: provider.createdAt ? new Date(provider.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Unknown date',
             contact: {
               email: provider.email || "Contact information unavailable",
@@ -126,6 +131,94 @@ const CarDetails = () => {
 
     fetchCarAndProviderDetails();
   }, [id]);
+
+  // Function to get coordinates from city name using OpenStreetMap Nominatim
+  const getCoordinates = async (city) => {
+    try {
+      // Append "Viet Nam" to the search query for better accuracy
+      const searchQuery = `${city}, Viet Nam`;
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1&countrycodes=vn`
+      );
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        return {
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon),
+          boundingBox: data[0].boundingbox
+        };
+      }
+      throw new Error('Location not found');
+    } catch (error) {
+      console.error('Error getting coordinates:', error);
+      // Default coordinates for Vietnam (Hanoi)
+      return { 
+        lat: 21.028511, 
+        lng: 105.804817,
+        boundingBox: null
+      };
+    }
+  };
+
+  useEffect(() => {
+    if (car && !mapLoaded) {
+      const initializeMap = async () => {
+        try {
+          // Get coordinates from city name
+          const locationData = await getCoordinates(car.location.city);
+          
+          // Initialize the map if it hasn't been initialized yet
+          if (!mapInstance) {
+            const map = L.map(mapRef.current).setView([locationData.lat, locationData.lng], 17);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Add a marker for the car location
+            const marker = L.marker([locationData.lat, locationData.lng])
+              .addTo(map)
+              .bindPopup(
+                `${car.location.city}<br>`
+              );
+            
+            // Open popup by default
+            marker.openPopup();
+
+            // If we have a bounding box, fit the map to it
+            if (locationData.boundingBox) {
+              map.fitBounds([
+                [locationData.boundingBox[0], locationData.boundingBox[2]],
+                [locationData.boundingBox[1], locationData.boundingBox[3]]
+              ]);
+            }
+
+            setMapInstance(map);
+            setMapLoaded(true);
+          }
+        } catch (error) {
+          console.error('Error initializing map:', error);
+        }
+      };
+
+      initializeMap();
+    }
+
+    // Cleanup function to remove map when component unmounts
+    return () => {
+      if (mapInstance) {
+        mapInstance.remove();
+      }
+    };
+  }, [car, mapLoaded, mapInstance]);
+
+  const handleOwnerClick = () => {
+    if (provider?._id) {
+      navigate(`/owner-profile/${provider._id}`);
+    }
+  };
 
   if (loading) {
     return (
@@ -261,8 +354,8 @@ const CarDetails = () => {
 
             {/* Features */}
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Features</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">Features</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                 {car.features.map((featureName) => {
                   const featureMap = {
                     'Entertainment': '/icons/dvd-v2.png',
@@ -282,31 +375,18 @@ const CarDetails = () => {
                   };
                   
                   return (
-                    <div key={featureName} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded">
+                    <div key={featureName} className="flex items-center space-x-3 p-4 hover:bg-gray-50 rounded-lg border border-gray-100">
                       <img 
                         src={featureMap[featureName]} 
                         alt={featureName}
-                        className="w-5 h-5 object-contain"
+                        className="w-8 h-8 object-contain"
                       />
-                      <span className="text-sm text-gray-700">{featureName}</span>
+                      <span className="text-base text-gray-700">{featureName}</span>
                     </div>
                   );
                 })}
               </div>
             </div>
-
-            {/* Specifications */}
-            {/* <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Specifications</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {Object.entries(car.specifications).map(([key, value]) => (
-                  <div key={key} className="border-b border-gray-200 pb-2">
-                    <p className="text-sm text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                    <p className="font-semibold">{value}</p>
-                  </div>
-                ))}
-              </div>
-            </div> */}
 
             {/* Location Section */}
             <div className="bg-white rounded-lg shadow-sm p-6 mt-8">
@@ -315,45 +395,44 @@ const CarDetails = () => {
                 Car Location
               </h2>
               <div className="space-y-4">
-                {/* Map Placeholder */}
-                <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <MdDirections className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500">Map will be integrated here</p>
-                  </div>
-                </div>
+                {/* Leaflet Map */}
+                <div 
+                  ref={mapRef}
+                  className="w-full h-64 rounded-lg"
+                  style={{ background: '#f1f1f1', position: 'relative', zIndex: 0 }}
+                />
 
                 {/* Location Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
                     <h3 className="font-medium text-gray-800">Address Details</h3>
                     <div className="space-y-2">
-                        <p className="flex items-start gap-2 text-gray-700">
+                      <p className="flex items-start gap-2 text-gray-700">
                         <FaMapMarkerAlt className="text-primary mt-1" />
                         <span>
-                            {car.location.address}, {car.location.city}
-                            <br />
-                            <span className="text-gray-500 text-sm">{car.location.landmark}</span>
+                          {car.location.city}
+                          <br />
+                          <span className="text-gray-500 text-sm">{car.location.landmark}</span>
                         </span>
-                        </p>
+                      </p>
                     </div>
-                    </div>
+                  </div>
 
-                    <div className="space-y-3">
+                  <div className="space-y-3">
                     <h3 className="font-medium text-gray-800">Pickup Information</h3>
                     <div className="space-y-2">
-                        <p className="flex items-start gap-2 text-gray-700">
+                      <p className="flex items-start gap-2 text-gray-700">
                         <AiOutlineSafety className="text-primary mt-1" />
                         {car.location.pickupInstructions}
-                        </p>
-                        <p className="flex items-start gap-2 text-gray-700">
+                      </p>
+                      <p className="flex items-start gap-2 text-gray-700">
                         <FaCalendarAlt className="text-primary mt-1" />
                         Business Hours: {car.location.businessHours}
-                        </p>
+                      </p>
                     </div>
+                  </div>
                 </div>
-            </div>
-            </div>
+              </div>
             </div>
             
             {/* Car Owner Section */}
@@ -363,58 +442,54 @@ const CarDetails = () => {
                 Car Owner
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div 
+                onClick={handleOwnerClick}
+                className="grid grid-cols-1 md:grid-cols-2 gap-6 cursor-pointer hover:bg-gray-50 rounded-lg transition-colors p-4"
+              >
                 {/* Owner Profile */}
                 <div className="flex items-start gap-4">
                   <img
-                    src={car.owner.avatar}
-                    alt={car.owner.name}
-                    className="w-16 h-16 rounded-full"
+                    src={provider?.avatar ? `http://localhost:3001${provider.avatar.replace('/uploads', '')}` : "http://localhost:3001/avatar/user.png"}
+                    alt={provider?.fullName || 'Car Provider'}
+                    className="w-16 h-16 rounded-full object-cover"
                   />
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="font-medium text-gray-900">{car.owner.name}</h3>
+                      <h3 className="font-medium text-gray-900">{provider?.fullName || 'Car Provider'}</h3>
                       <MdVerified className="text-primary" title="Verified Owner" />
                     </div>
-                    <p className="text-sm text-gray-600">Member since {car.owner.joinedDate}</p>
-                  </div>
-                </div>
-
-                {/* Owner Stats */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <BsSpeedometer2 className="text-primary" />
-                    <span>98% response rate</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <FaCalendarAlt className="text-primary" />
-                    <span>Responds within 1 hour</span>
-                  </div>
-                </div>
-
-                {/* Verification & Contact */}
-                <div>
-                  <div className="space-y-3 mb-4">
-                    <h4 className="font-medium text-gray-800">Contact Information</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {car.owner.contact.email && (
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <MdEmail className="text-primary" />
-                          <span>{car.owner.contact.email}</span>
-                        </div>
-                      )}
-                      {car.owner.contact.phone && (
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <FaPhoneAlt className="text-primary" />
-                          <span>{car.owner.contact.phone}</span>
-                        </div>
-                      )}
+                    <p className="text-sm text-gray-600">
+                      Member since {provider?.createdAt ? new Date(provider.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Unknown date'}
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <BsSpeedometer2 className="text-primary" />
+                      <span className="text-sm text-gray-700">Responds within 1 hour</span>
                     </div>
                   </div>
-                  <button className="w-full bg-primary text-white py-2 rounded-lg hover:bg-secondary transition duration-150">
-                    Contact Owner
-                  </button>
                 </div>
+
+                {/* Statistics */}
+                <div className="flex flex-col justify-center">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <MdVerified className="text-primary text-xl" />
+                      <div>
+                        <span className="font-medium text-gray-900">95%</span>
+                        <span className="text-gray-600 ml-1">Approval Rate</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <FaStar className="text-primary text-xl" />
+                      <div>
+                        <span className="font-medium text-gray-900">4.8</span>
+                        <span className="text-gray-600 ml-1">Rating Average</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="text-center mt-4 text-sm text-primary">
+                Click to view owner's profile and all cars
               </div>
             </div>
             

@@ -1,93 +1,75 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaUsers, FaCog, FaGasPump } from 'react-icons/fa';
+import { FaCar, FaGasPump, FaCog, FaUsers, FaPlus } from 'react-icons/fa';
 import { formatCurrency } from '../utils/formatCurrency';
 
 const CarCard = ({ car }) => {
-  if (!car) {
-    return null;
-  }
-
-  // Handle image URL - remove http://localhost:3002 prefix if it exists
-  const imageUrl = car.images?.[0] || car.image || 'https://via.placeholder.com/384x192?text=No+Image';
-  const displayImageUrl = imageUrl.startsWith('http://localhost:3002') 
-    ? imageUrl 
-    : `http://localhost:3002${imageUrl}`;
+  const displayedFeatures = car.features?.slice(0, 4) || [];
+  const remainingFeaturesCount = car.features ? Math.max(0, car.features.length - 4) : 0;
 
   return (
     <Link to={`/cars/${car._id}`} className="block">
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-        {/* Car Image */}
-        <div className="aspect-w-16 aspect-h-9 relative">
+      <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+        <div className="relative h-48">
           <img
-            src={displayImageUrl}
-            alt={`${car.brand} ${car.name}`}
-            className="w-full h-48 object-cover"
-            loading="lazy"
-            width="384" 
-            height="192"
-            onError={(e) => {
-              e.target.src = 'https://via.placeholder.com/384x192?text=No+Image';
-            }}
+            src={car.images?.[0] ? `http://localhost:3002${car.images[0]}` : "placeholder-car-image.jpg"}
+            alt={car.name}
+            className="w-full h-full object-cover"
           />
-          <div className="absolute top-4 right-4 bg-white px-2 py-1 rounded-full text-sm font-medium text-gray-700">
-            {car.status || 'Available'}
-          </div>
+          <span className={`absolute top-2 right-2 text-xs px-2 py-1 rounded-full ${
+            car.status === 'Available' ? 'bg-green-100 text-green-800' : 
+            car.status === 'Rented' ? 'bg-blue-100 text-blue-800' : 
+            'bg-gray-100 text-gray-800'
+          }`}>
+            {car.status}
+          </span>
         </div>
-
-        {/* Car Details */}
         <div className="p-4">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                {car.brand} {car.name}
-              </h3>
-              <p className="text-sm text-gray-600">{car.modelYear || 'Year not specified'}</p>
-              <p className="text-xs text-gray-500 mt-1">{car.carType || 'Type not specified'}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-lg font-bold text-primary">
-                {formatCurrency(car.rentalPricePerDay || car.price || 0)}
-              </p>
-              <p className="text-xs text-gray-600">per day</p>
-            </div>
-          </div>
-
-          {/* Car Specifications */}
-          <div className="grid grid-cols-3 gap-4 mt-4 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-gray-900 mb-2">{car.name}</h3>
+          <div className="grid grid-cols-2 gap-2 mb-3 text-sm text-gray-600">
+            <div className="flex items-center gap-1">
               <FaUsers className="text-primary" />
-              <span>{car.seats || '?'} seats</span>
+              <span>{car.seats} seats</span>
             </div>
-            <div className="flex items-center gap-2">
-              <FaCog className="text-primary" />
-              <span>{car.transmission || 'N/A'}</span>
-            </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <FaGasPump className="text-primary" />
-              <span>{car.fuelType || 'N/A'}</span>
+              <span>{car.fuelType}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <FaCog className="text-primary" />
+              <span>{car.transmission}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <FaCar className="text-primary" />
+              <span>{car.modelYear}</span>
             </div>
           </div>
+          
+          {/* Features Section */}
+          {displayedFeatures.length > 0 && (
+            <div className="mb-3">
+              <div className="flex flex-wrap gap-1">
+                {displayedFeatures.map((feature, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded"
+                  >
+                    {feature}
+                  </span>
+                ))}
+                {remainingFeaturesCount > 0 && (
+                  <span className="inline-flex items-center bg-gray-50 text-gray-600 text-xs px-2 py-1 rounded">
+                    <FaPlus className="mr-1" />
+                    {remainingFeaturesCount}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
-          {/* Location */}
-          <div className="mt-4 text-sm text-gray-600">
-            <p>{car.location?.city || car.location || 'Location not specified'}</p>
-          </div>
-
-          {/* Features */}
-          <div className="flex flex-wrap gap-2 mt-3">
-            {Array.isArray(car.features) && car.features.length > 0 ? (
-              car.features.map((feature, idx) => (
-                <span
-                  key={idx}
-                  className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded"
-                >
-                  {feature}
-                </span>
-              ))
-            ) : (
-              <span className="text-gray-400 text-xs">No features listed</span>
-            )}
+          <div className="flex justify-end">
+            <span className="text-md text-primary font-bold">{formatCurrency(car.rentalPricePerDay)} </span>
+            <span className="text-sm text-gray-600">/ per day</span>
           </div>
         </div>
       </div>
@@ -95,4 +77,4 @@ const CarCard = ({ car }) => {
   );
 };
 
-export default React.memo(CarCard);
+export default CarCard;

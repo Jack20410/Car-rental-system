@@ -360,15 +360,20 @@ const Cars = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Features</label>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      'Apple Carplay',
-                      'Android Auto',
-                      'USB Type-C Port',
-                      'Heated Seats',
-                      'Sunroof',
+                      'Entertainment',
+                      'Tire Pressure Monitoring System',
+                      'Spare Tire',
+                      'Navigation',
+                      'ETC',
+                      'Head Up Display',
+                      'Impact Sensor',
                       '360 Camera',
-                      'Rear Camera',
-                      'Leather Seats',
-                      'Smart Key'
+                      'Airbags',
+                      'Reverse Camera',
+                      'USB Port',
+                      'GPS',
+                      'Bluetooth',
+                      'Sunroof'
                     ].map((feature) => (
                       <label 
                         key={feature} 
