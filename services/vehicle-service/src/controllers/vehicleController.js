@@ -318,11 +318,67 @@ const getVehicleById = async (req, res) => {
   }
 };
 
+// 2. Thêm controller cho review vào vehicleController.js
+
+// Add a review to a vehicle
+const addReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rating, comment, name, avatar } = req.body;
+    // Accept name and avatar from body for anonymous users
+
+    if (!rating || !comment) {
+      return res.status(400).json({ message: 'Rating and comment are required' });
+    }
+
+    const vehicle = await Vehicle.findById(id);
+    if (!vehicle) {
+      return res.status(404).json({ message: 'Vehicle not found' });
+    }
+
+    // Allow anonymous review if req.user is not set
+    const review = {
+      user: {
+        name: (req.user && req.user.name) || name || 'Anonymous',
+        avatar: (req.user && req.user.avatar) || avatar || '',
+        isVerified: !!req.user,
+        userId: (req.user && req.user.userId) || null
+      },
+      rating,
+      comment,
+      date: new Date().toLocaleDateString('en-US')
+    };
+
+    vehicle.reviews.unshift(review);
+    await vehicle.save();
+
+    res.status(201).json({ message: 'Review added', review });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to add review', error: error.message });
+  }
+};
+
+// Get all reviews for a vehicle
+const getReviews = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const vehicle = await Vehicle.findById(id, 'reviews');
+    if (!vehicle) {
+      return res.status(404).json({ message: 'Vehicle not found' });
+    }
+    res.status(200).json({ reviews: vehicle.reviews });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to get reviews', error: error.message });
+  }
+};
+
 module.exports = {
   createVehicle,
   deleteVehicle,
   updateVehicle,
   updateVehicleStatus,
   getAllVehicles,
-  getVehicleById
+  getVehicleById,
+  addReview,
+  getReviews
 };

@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 
 const verifyToken = (req, res, next) => {
+  console.log('Authorization header:', req.headers.authorization);
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -28,4 +29,4 @@ const requireCarProvider = (req, res, next) => {
 module.exports = {
   verifyToken,
   requireCarProvider
-}; 
+};

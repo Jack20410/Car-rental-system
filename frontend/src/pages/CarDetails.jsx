@@ -29,25 +29,49 @@ const CarDetails = () => {
   const mapRef = useRef(null);
   const [mapInstance, setMapInstance] = useState(null);
   const [mapLoaded, setMapLoaded] = useState(false);
-    // Thêm các state cho phần đánh giá
+    // Thêm các state cho phần đánh giáa
 const [reviewComment, setReviewComment] = useState('');
 const [reviewRating, setReviewRating] = useState(0);
 const [reviews, setReviews] = useState([]);
 const { user } = useAuth(); // Get user from AuthContext
 const [showReviews, setShowReviews] = useState(true);
 
-// Khởi tạo reviews từ localStorage hoặc car.reviews (nếu có)
+
+// Lấy reviews từ server khi car thay đổi
 useEffect(() => {
-  if (car) {
-    const localKey = `car_reviews_${car._id}`;
-    const storedReviews = localStorage.getItem(localKey);
-    if (storedReviews) {
-      setReviews(JSON.parse(storedReviews));
-    } else if (car.reviews) {
-      setReviews(car.reviews);
+  const fetchReviews = async () => {
+    if (car && car._id) {
+      try {
+        const res = await fetch(`http://localhost:3000/vehicles/${car._id}/reviews`);
+        if (res.ok) {
+          const data = await res.json();
+          setReviews(data.reviews || []);
+        } else {
+          setReviews([]);
+        }
+      } catch (err) {
+        setReviews([]);
+      }
     }
-  }
+  };
+  fetchReviews();
 }, [car]);
+
+
+
+
+// Khởi tạo reviews từ localStorage hoặc car.reviews (nếu có)
+// useEffect(() => {
+//   if (car) {
+//     const localKey = `car_reviews_${car._id}`;
+//     const storedReviews = localStorage.getItem(localKey);
+//     if (storedReviews) {
+//       setReviews(JSON.parse(storedReviews));
+//     } else if (car.reviews) {
+//       setReviews(car.reviews);
+//     }
+//   }
+// }, [car]);
 
   useEffect(() => {
     const fetchCarAndProviderDetails = async () => {
@@ -310,38 +334,50 @@ useEffect(() => {
 
 
 // Định nghĩa hàm handleReviewSubmit
-const handleReviewSubmit = (e) => {
+const handleReviewSubmit = async (e) => {
   e.preventDefault();
   if (!reviewComment.trim() || reviewRating === 0) return;
 
-const newReview = {
-  id: Date.now(),
-  user: {
-    name: user?.name || "Anonymous",
-    avatar: user?.avatar
-      ? (user.avatar.startsWith('http')
-          ? user.avatar
-          : `http://localhost:3001${user.avatar.replace('/uploads', '')}`)
-      : "http://localhost:3001/avatar/user.png",
-    isVerified: true,
-  },
-  rating: reviewRating,
-  comment: reviewComment,
-  date: new Date().toLocaleDateString('en-US'),
-  tripDuration: "1 day",
-};
+  try {
+    // If user is logged in, include name and avatar in the request body
+    const reviewPayload = {
+      rating: reviewRating,
+      comment: reviewComment,
+    };
+    if (user) {
+      reviewPayload.name = user.fullName || user.name || "User";
+      if (user.avatar) {
+        if (user.avatar.startsWith('http')) {
+          reviewPayload.avatar = user.avatar;
+        } else {
+          reviewPayload.avatar = `http://localhost:3001${user.avatar.replace('/uploads', '')}`;
+        }
+      } else {
+        reviewPayload.avatar = "http://localhost:3001/avatar/user.png";
+      }
+    }
 
-  const updatedReviews = [newReview, ...reviews];
-  setReviews(updatedReviews);
+    const token = localStorage.getItem('token');
+    const res = await fetch(`http://localhost:3000/vehicles/${car._id}/reviews`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` })
+      },
+      body: JSON.stringify(reviewPayload)
+    });
 
-  // Lưu reviews vào localStorage theo car._id
-  if (car && car._id) {
-    const localKey = `car_reviews_${car._id}`;
-    localStorage.setItem(localKey, JSON.stringify(updatedReviews));
+    if (res.ok) {
+      const data = await res.json();
+      setReviews(prev => [data.review, ...prev]);
+      setReviewComment('');
+      setReviewRating(0);
+    } else {
+      alert('Failed to submit review');
+    }
+  } catch (err) {
+    alert('Failed to submit review');
   }
-
-  setReviewComment('');
-  setReviewRating(0);
 };
 
 const DEFAULT_AVATAR = "http://localhost:3001/avatar/user.png";

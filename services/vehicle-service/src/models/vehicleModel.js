@@ -71,7 +71,23 @@ const vehicleSchema = new mongoose.Schema({
   },
   approvedAt: {
     type: Date
-  }
+  },
+  reviews: [
+    {
+      user: {
+        name: String,
+        avatar: String,
+        isVerified: Boolean,
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User'
+        }
+      },
+      rating: { type: Number, required: true },
+      comment: { type: String, required: true },
+      date: { type: String, required: true }
+    }
+  ]
 });
 
 module.exports = mongoose.model('Vehicle', vehicleSchema);

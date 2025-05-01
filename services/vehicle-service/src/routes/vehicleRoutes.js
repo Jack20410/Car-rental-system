@@ -1,11 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { createVehicle, 
-        deleteVehicle, 
-        updateVehicle, 
-        updateVehicleStatus, 
-        getAllVehicles, 
-        getVehicleById } = require('../controllers/vehicleController');
+const { 
+  createVehicle, 
+  deleteVehicle, 
+  updateVehicle, 
+  updateVehicleStatus, 
+  getAllVehicles, 
+  getVehicleById,
+  addReview,           // <-- thêm dòng này
+  getReviews           // <-- thêm dòng này
+} = require('../controllers/vehicleController');
 const { verifyToken, requireCarProvider } = require('../middleware/authMiddleware');
 const { validateCreateVehicle } = require('../middleware/vehicleValidation');
 const upload = require('../config/multerConfig');
@@ -84,4 +88,9 @@ router.delete('/vehicles/:id/images', verifyToken, requireCarProvider, async (re
   }
 });
 
-module.exports = router; 
+router.post('/vehicles/:id/reviews', addReview);
+
+// Get all reviews for a vehicle (public)
+router.get('/vehicles/:id/reviews', getReviews);
+
+module.exports = router;
