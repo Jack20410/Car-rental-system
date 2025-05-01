@@ -54,11 +54,19 @@ const CarDetails = () => {
         // Check if we have a car_providerId
         if (data && data.car_providerId) {
           try {
+            // Get the provider ID (handle both object and string cases)
+            const providerId = typeof data.car_providerId === 'object' 
+              ? data.car_providerId._id 
+              : data.car_providerId;
+
             // Fetch provider details
-            const providerResponse = await fetch(`http://localhost:3000/users/${data.car_providerId}`);
+            const providerResponse = await fetch(`http://localhost:3000/users/${providerId}`);
             if (providerResponse.ok) {
               const providerData = await providerResponse.json();
               setProvider(providerData.data);
+              
+              // Update car data with provider info
+              data.car_providerId = providerData.data;
             } else {
               console.warn('Failed to fetch provider details, using default display');
               setProvider(null);
@@ -72,66 +80,7 @@ const CarDetails = () => {
           setProvider(null);
         }
         
-        // Transform the data to match our frontend structure
-        const transformedData = {
-          _id: data._id,
-          name: data.name,
-          brand: data.brand,
-          modelYear: data.modelYear,
-          licensePlate: data.licensePlate,
-          rentalPricePerDay: data.rentalPricePerDay,
-          description: data.description,
-          images: data.images.map(image => `http://localhost:3002${image}`),
-          seats: data.seats,
-          transmission: data.transmission,
-          fuelType: data.fuelType,
-          status: data.status,
-          features: data.features || [],
-          rating: {
-            average: 4.7,
-            total: 0,
-            distribution: {
-              5: 0,
-              4: 0,
-              3: 0,
-              2: 0,
-              1: 0
-            }
-          },
-          reviews: [],
-          owner: provider ? {
-            id: data.car_providerId,
-            name: provider.fullName || 'Car Provider',
-            avatar: provider.avatar ? `http://localhost:3001${provider.avatar}` : "https://randomuser.me/api/portraits/men/32.jpg",
-            joinedDate: provider.createdAt ? new Date(provider.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Unknown date',
-            contact: {
-              email: provider.email || "Contact information unavailable",
-              phone: provider.phoneNumber || "Contact information unavailable"
-            }
-          } : {
-            id: data.car_providerId || 'unknown',
-            name: "Car Provider",
-            avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-            joinedDate: "Unknown date",
-            contact: {
-              email: "Contact information unavailable",
-              phone: "Contact information unavailable"
-            }
-          },
-          location: {
-            address: data.location?.address || '',
-            city: data.location?.city || '',
-            coordinates: {
-              lat: 10.762622,
-              lng: 106.660172
-            },
-            landmark: 'Near city center',
-            pickupInstructions: 'Please contact our staff 15 minutes before arrival.',
-            businessHours: '8:00 AM - 8:00 PM'
-          }
-        };
-        
-        setCar(transformedData);
+        setCar(data);
       } catch (err) {
         console.error('Error:', err);
         setError(err.message);
@@ -141,7 +90,7 @@ const CarDetails = () => {
     };
 
     fetchCarAndProviderDetails();
-  }, [id]);
+  }, [id, navigate]);
 
   // Initialize socket connection
   useEffect(() => {
@@ -237,57 +186,65 @@ const CarDetails = () => {
 
   // Initialize map when car data is loaded
   useEffect(() => {
-    if (car && !mapLoaded) {
-      const initializeMap = async () => {
-        try {
-          // Get coordinates from city name
-          const locationData = await getCoordinates(car.location.city);
-          
-          // Initialize the map if it hasn't been initialized yet
-          if (!mapInstance) {
-            const map = L.map(mapRef.current).setView([locationData.lat, locationData.lng], 17);
-            
-            // Add OpenStreetMap tiles
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
-
-            // Add a marker for the car location
-            const marker = L.marker([locationData.lat, locationData.lng])
-              .addTo(map)
-              .bindPopup(
-                `${car.location.city}<br>`
-              );
-            
-            // Open popup by default
-            marker.openPopup();
-
-            // If we have a bounding box, fit the map to it
-            if (locationData.boundingBox) {
-              map.fitBounds([
-                [locationData.boundingBox[0], locationData.boundingBox[2]],
-                [locationData.boundingBox[1], locationData.boundingBox[3]]
-              ]);
-            }
-
-            setMapInstance(map);
-            setMapLoaded(true);
-          }
-        } catch (error) {
-          console.error('Error initializing map:', error);
-        }
-      };
-
-      initializeMap();
+    // Cleanup previous map instance if it exists
+    if (mapInstance) {
+      mapInstance.remove();
+      setMapInstance(null);
+      setMapLoaded(false);
     }
 
-    // Cleanup function to remove map when component unmounts
+    const initMap = async () => {
+      // Only initialize if we have car data and location
+      if (!car?.location?.city || !mapRef.current || mapLoaded) {
+        return;
+      }
+
+      try {
+        const locationData = await getCoordinates(car.location.city);
+        
+        // Create new map instance
+        const newMap = L.map(mapRef.current).setView([locationData.lat, locationData.lng], 17);
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors'
+        }).addTo(newMap);
+
+        // Add a marker for the car location
+        const marker = L.marker([locationData.lat, locationData.lng])
+          .addTo(newMap)
+          .bindPopup(car.location.city);
+        
+        // Open popup by default
+        marker.openPopup();
+
+        // If we have a bounding box, fit the map to it
+        if (locationData.boundingBox) {
+          newMap.fitBounds([
+            [locationData.boundingBox[0], locationData.boundingBox[2]],
+            [locationData.boundingBox[1], locationData.boundingBox[3]]
+          ]);
+        }
+
+        setMapInstance(newMap);
+        setMapLoaded(true);
+      } catch (error) {
+        console.error('Error initializing map:', error);
+      }
+    };
+
+    // Initialize map
+    initMap();
+
+    // Cleanup function
     return () => {
       if (mapInstance) {
         mapInstance.remove();
+        setMapInstance(null);
+        setMapLoaded(false);
       }
     };
-  }, [car, mapLoaded, mapInstance]);
+  }, [car]); // Only depend on car data changes
 
   const handleBooking = async (e) => {
     e.preventDefault();
@@ -495,13 +452,13 @@ const CarDetails = () => {
         <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
           <div className="aspect-w-16 aspect-h-9 relative">
             <img
-              src={car.images[selectedImage]}
+              src={car.images?.[selectedImage] ? `http://localhost:3002${car.images[selectedImage]}` : "/placeholder-car-image.jpg"}
               alt={`${car.brand} ${car.name}`}
               className="w-full h-[400px] object-cover"
             />
           </div>
           <div className="p-4 flex gap-4 overflow-x-auto">
-            {car.images.map((image, index) => (
+            {car.images?.map((image, index) => (
               <button
                 key={index}
                 onClick={() => setSelectedImage(index)}
@@ -509,7 +466,14 @@ const CarDetails = () => {
                   selectedImage === index ? 'border-primary' : 'border-transparent'
                 }`}
               >
-                <img src={image} alt={`${car.brand} ${car.name} view ${index + 1}`} className="w-full h-full object-cover" />
+                <img 
+                  src={`http://localhost:3002${image}`} 
+                  alt={`${car.brand} ${car.name} view ${index + 1}`} 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.src = "/placeholder-car-image.jpg";
+                  }}
+                />
               </button>
             ))}
           </div>
@@ -634,56 +598,75 @@ const CarDetails = () => {
                 Car Owner
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Owner Profile */}
-                <div className="flex items-start gap-4">
+              <div 
+                onClick={() => {
+                  const providerId = typeof car.car_providerId === 'object' 
+                    ? car.car_providerId._id 
+                    : car.car_providerId;
+                  navigate(`/owner-profile/${providerId}`);
+                }}
+                className="cursor-pointer hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                {/* Owner Profile Header */}
+                <div className="flex items-start gap-4 p-4 border-b border-gray-100">
                   <img
-                    src={car.owner.avatar}
-                    alt={car.owner.name}
-                    className="w-16 h-16 rounded-full"
+                    src={car.car_providerId?.avatar 
+                      ? `http://localhost:3001${car.car_providerId.avatar.replace('/uploads', '')}` 
+                      : "http://localhost:3001/avatar/user.png"}
+                    alt={car.car_providerId?.fullName || 'Car Provider'}
+                    className="w-16 h-16 rounded-full object-cover"
                   />
-                  <div>
+                  <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-medium text-gray-900">{car.owner.name}</h3>
+                      <h3 className="font-medium text-gray-900">{car.car_providerId?.fullName || 'Car Provider'}</h3>
                       <MdVerified className="text-primary" title="Verified Owner" />
                     </div>
-                    <p className="text-sm text-gray-600">Member since {car.owner.joinedDate}</p>
-                  </div>
-                </div>
-
-                {/* Owner Stats */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <BsSpeedometer2 className="text-primary" />
-                    <span>98% response rate</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-700">
-                    <FaCalendarAlt className="text-primary" />
-                    <span>Responds within 1 hour</span>
-                  </div>
-                </div>
-
-                {/* Verification & Contact */}
-                <div>
-                  <div className="space-y-3 mb-4">
-                    <h4 className="font-medium text-gray-800">Contact Information</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {car.owner.contact.email && (
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <MdEmail className="text-primary" />
-                          <span>{car.owner.contact.email}</span>
-                        </div>
-                      )}
-                      {car.owner.contact.phone && (
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <FaPhoneAlt className="text-primary" />
-                          <span>{car.owner.contact.phone}</span>
-                        </div>
-                      )}
+                    <p className="text-sm text-gray-600 mt-1">
+                      Member since {car.car_providerId?.createdAt 
+                        ? new Date(car.car_providerId.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) 
+                        : 'Unknown date'}
+                    </p>
+                    <div className="flex items-center gap-4 mt-2">
+                      <div className="flex items-center gap-2 text-sm text-gray-700">
+                        <BsSpeedometer2 className="text-primary" />
+                        <span>98% response rate</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-700">
+                        <FaCalendarAlt className="text-primary" />
+                        <span>Quick response</span>
+                      </div>
                     </div>
                   </div>
-                  <button className="w-full bg-primary text-white py-2 rounded-lg hover:bg-secondary transition duration-150">
-                    Contact Owner
+                </div>
+
+                {/* Contact Information */}
+                <div className="p-4">
+                  <h4 className="font-medium text-gray-800 mb-3">Contact Information</h4>
+                  <div className="space-y-2">
+                    {car.car_providerId?.email && (
+                      <div className="flex items-center gap-3 text-gray-700 bg-gray-50 p-2 rounded">
+                        <MdEmail className="text-primary text-xl" />
+                        <div>
+                          <div className="text-sm font-medium">Email</div>
+                          <div>{car.car_providerId.email}</div>
+                        </div>
+                      </div>
+                    )}
+                    {car.car_providerId?.phoneNumber && (
+                      <div className="flex items-center gap-3 text-gray-700 bg-gray-50 p-2 rounded">
+                        <FaPhoneAlt className="text-primary text-xl" />
+                        <div>
+                          <div className="text-sm font-medium">Phone</div>
+                          <div>{car.car_providerId.phoneNumber}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button 
+                    className="w-full bg-primary text-white py-3 rounded-lg hover:bg-secondary transition duration-150 mt-4 flex items-center justify-center gap-2"
+                  >
+                    <FaUserCheck className="text-xl" />
+                    View Full Profile
                   </button>
                 </div>
               </div>
