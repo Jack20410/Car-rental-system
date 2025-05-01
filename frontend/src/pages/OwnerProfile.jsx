@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { FaStar, FaStarHalf, FaRegStar, FaUserCheck, FaCar, FaPhone, FaEnvelope } from 'react-icons/fa';
-import { MdVerified, MdLocationOn, MdChevronLeft, MdChevronRight } from 'react-icons/md';
-import { BsSpeedometer2 } from 'react-icons/bs';
+import { FaStar, FaStarHalf, FaRegStar, FaUserCheck, FaCar, FaPhone, FaEnvelope, FaThumbsUp } from 'react-icons/fa';
+import { MdVerified, MdLocationOn, MdChevronLeft, MdChevronRight, MdSort } from 'react-icons/md';
+import { BsSpeedometer2, BsCalendarCheck } from 'react-icons/bs';
 import { formatCurrency } from '../utils/formatCurrency';
 import CarCard from '../components/CarCard';
 
@@ -13,6 +13,9 @@ const OwnerProfile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentCarIndex, setCurrentCarIndex] = useState(0);
+  const [reviews, setReviews] = useState([]);
+  const [sortBy, setSortBy] = useState('newest');
+  const [showAllReviews, setShowAllReviews] = useState(false);
 
   useEffect(() => {
     const fetchOwnerData = async () => {
@@ -45,6 +48,50 @@ const OwnerProfile = () => {
     fetchOwnerData();
   }, [id]);
 
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        // Simulated reviews data - replace with actual API call
+        const mockReviews = [
+          {
+            id: 1,
+            user: {
+              name: "John Doe",
+              avatar: "http://localhost:3001/avatar/user.png",
+              isVerified: true
+            },
+            rating: 5,
+            comment: "Great car provider! Very professional and responsive.",
+            date: "2024-02-15",
+            carRented: "Toyota Camry",
+            rentalDuration: "3 days",
+            helpful: 12
+          },
+          {
+            id: 2,
+            user: {
+              name: "Alice Smith",
+              avatar: "http://localhost:3001/avatar/user.png",
+              isVerified: true
+            },
+            rating: 4.5,
+            comment: "Very good experience overall. The car was in perfect condition.",
+            date: "2024-02-10",
+            carRented: "Honda Civic",
+            rentalDuration: "5 days",
+            helpful: 8
+          },
+          // Add more mock reviews as needed
+        ];
+        setReviews(mockReviews);
+      } catch (error) {
+        console.error('Error fetching reviews:', error);
+      }
+    };
+
+    fetchReviews();
+  }, [id]);
+
   const renderStars = (rating) => {
     const stars = [];
     const fullStars = Math.floor(rating);
@@ -70,6 +117,23 @@ const OwnerProfile = () => {
   const handleNextCars = () => {
     setCurrentCarIndex(prev => Math.min(ownerCars.length - 3, prev + 3));
   };
+
+  const sortReviews = (reviews) => {
+    switch (sortBy) {
+      case 'highest':
+        return [...reviews].sort((a, b) => b.rating - a.rating);
+      case 'lowest':
+        return [...reviews].sort((a, b) => a.rating - b.rating);
+      case 'helpful':
+        return [...reviews].sort((a, b) => b.helpful - a.helpful);
+      case 'newest':
+      default:
+        return [...reviews].sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+  };
+
+  const displayedReviews = showAllReviews ? reviews : reviews.slice(0, 3);
+  const sortedReviews = sortReviews(displayedReviews);
 
   if (loading) {
     return (
@@ -107,40 +171,48 @@ const OwnerProfile = () => {
         {/* Owner Profile Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <div className="flex items-start gap-6">
-            <img
-              src={owner.avatar 
-                ? `http://localhost:3001${owner.avatar.replace('/uploads', '')}` 
-                : "http://localhost:3001/avatar/user.png"}
-              alt={owner.fullName}
-              className="w-24 h-24 rounded-full object-cover"
-            />
+            <div className="relative">
+              <img
+                src={owner.avatar 
+                  ? `http://localhost:3001${owner.avatar.replace('/uploads', '')}` 
+                  : "http://localhost:3001/avatar/user.png"}
+                alt={owner.fullName}
+                className="w-28 h-28 rounded-full object-cover border-4 border-primary"
+              />
+              <MdVerified className="text-primary text-2xl absolute -bottom-1 -right-1 bg-white rounded-full p-1" title="Verified Owner" />
+            </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
                 <h1 className="text-2xl font-bold text-gray-900">{owner.fullName}</h1>
-                <MdVerified className="text-primary text-xl" title="Verified Owner" />
+                <span className="bg-primary bg-opacity-10 text-primary text-sm px-3 py-1 rounded-full">Car Provider</span>
               </div>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-6">
                 Member since {owner.createdAt 
                   ? new Date(owner.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) 
                   : 'Unknown date'}
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center gap-2">
-                  <FaCar className="text-primary" />
-                  <span>{ownerCars.length} Cars Listed</span>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
+                  <FaCar className="text-primary text-xl mb-2" />
+                  <span className="font-semibold text-lg">{ownerCars.length}</span>
+                  <span className="text-sm text-gray-600">Cars Listed</span>
                 </div>
-                {owner.email && (
-                  <div className="flex items-center gap-2">
-                    <FaEnvelope className="text-primary" />
-                    <span>{owner.email}</span>
-                  </div>
-                )}
-                {owner.phoneNumber && (
-                  <div className="flex items-center gap-2">
-                    <FaPhone className="text-primary" />
-                    <span>{owner.phoneNumber}</span>
-                  </div>
-                )}
+                <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
+                  <FaStar className="text-primary text-xl mb-2" />
+                  <span className="font-semibold text-lg">4.8</span>
+                  <span className="text-sm text-gray-600">Rating</span>
+                </div>
+                <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
+                  <BsSpeedometer2 className="text-primary text-xl mb-2" />
+                  <span className="font-semibold text-lg">95%</span>
+                  <span className="text-sm text-gray-600">Response Rate</span>
+                </div>
+                <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
+                  <MdVerified className="text-primary text-xl mb-2" />
+                  <span className="font-semibold text-lg">100%</span>
+                  <span className="text-sm text-gray-600">Completion</span>
+                </div>
               </div>
             </div>
           </div>
@@ -198,6 +270,107 @@ const OwnerProfile = () => {
             <p className="text-gray-600">This car provider hasn't listed any cars yet.</p>
           </div>
         )}
+
+        {/* Reviews Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+              <FaStar className="text-primary" />
+              Reviews and Ratings
+            </h2>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <MdSort className="text-gray-500" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="text-sm text-gray-600 border-none focus:ring-0 cursor-pointer"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="highest">Highest Rating</option>
+                  <option value="lowest">Lowest Rating</option>
+                  <option value="helpful">Most Helpful</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Reviews Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 p-4 bg-gray-50 rounded-lg">
+            <div className="flex flex-col items-center">
+              <span className="text-3xl font-bold text-gray-900">4.8</span>
+              <div className="flex gap-1 my-2">{renderStars(4.8)}</div>
+              <span className="text-sm text-gray-600">Average Rating</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-3xl font-bold text-gray-900">{reviews.length}</span>
+              <BsSpeedometer2 className="text-primary text-xl my-2" />
+              <span className="text-sm text-gray-600">Total Reviews</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-3xl font-bold text-gray-900">95%</span>
+              <BsCalendarCheck className="text-primary text-xl my-2" />
+              <span className="text-sm text-gray-600">Completion Rate</span>
+            </div>
+          </div>
+
+          {/* Reviews List */}
+          <div className="space-y-6">
+            {sortedReviews.map((review) => (
+              <div key={review.id} className="border-b border-gray-100 pb-6 last:border-0">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <img
+                      src={review.user.avatar}
+                      alt={review.user.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-gray-900">{review.user.name}</h3>
+                        {review.user.isVerified && (
+                          <MdVerified className="text-primary" title="Verified User" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <span>{new Date(review.date).toLocaleDateString()}</span>
+                        <span>•</span>
+                        <span>{review.carRented}</span>
+                        <span>•</span>
+                        <span>{review.rentalDuration}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    {renderStars(review.rating)}
+                  </div>
+                </div>
+                <p className="text-gray-700 mb-4">{review.comment}</p>
+                <button 
+                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary transition-colors"
+                  onClick={() => {
+                    // Implement helpful functionality
+                  }}
+                >
+                  <FaThumbsUp />
+                  <span>Helpful ({review.helpful})</span>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Show More Button */}
+          {reviews.length > 3 && (
+            <div className="text-center mt-8">
+              <button
+                onClick={() => setShowAllReviews(!showAllReviews)}
+                className="text-primary font-medium hover:text-secondary transition-colors"
+              >
+                {showAllReviews ? "Show Less" : `Show All ${reviews.length} Reviews`}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

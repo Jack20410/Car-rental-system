@@ -579,11 +579,13 @@ const CarDetails = () => {
                     <div className="space-y-2">
                       <p className="flex items-start gap-2 text-gray-700">
                         <AiOutlineSafety className="text-primary mt-1" />
-                        {car.location.pickupInstructions}
+                        {/* {car.location.pickupInstructions} */}
+                        Self take-over
                       </p>
                       <p className="flex items-start gap-2 text-gray-700">
                         <FaCalendarAlt className="text-primary mt-1" />
-                        Business Hours: {car.location.businessHours}
+                        {/* Business Hours: {car.location.businessHours} */}
+                        Business Hours: 7:00 AM - 10:00 PM
                       </p>
                     </div>
                   </div>
@@ -593,9 +595,9 @@ const CarDetails = () => {
 
             {/* Car Owner Section */}
             <div className="bg-white rounded-lg shadow-sm p-6 mt-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <FaUserCheck className="text-primary" />
-                Car Owner
+              <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                <FaUserCheck className="text-primary text-xl" />
+                Car Owner Information
               </h2>
 
               <div 
@@ -605,72 +607,67 @@ const CarDetails = () => {
                     : car.car_providerId;
                   navigate(`/owner-profile/${providerId}`);
                 }}
-                className="cursor-pointer hover:bg-gray-50 rounded-lg transition-colors"
+                className="cursor-pointer hover:bg-gray-50 rounded-lg transition-colors p-4 border border-gray-100"
               >
                 {/* Owner Profile Header */}
-                <div className="flex items-start gap-4 p-4 border-b border-gray-100">
-                  <img
-                    src={car.car_providerId?.avatar 
-                      ? `http://localhost:3001${car.car_providerId.avatar.replace('/uploads', '')}` 
-                      : "http://localhost:3001/avatar/user.png"}
-                    alt={car.car_providerId?.fullName || 'Car Provider'}
-                    className="w-16 h-16 rounded-full object-cover"
-                  />
+                <div className="flex items-start gap-6">
+                  <div className="relative">
+                    <img
+                      src={provider?.avatar ? `http://localhost:3001${provider.avatar.replace('/uploads', '')}` : "http://localhost:3001/avatar/user.png"}
+                      alt={provider?.fullName || 'Car Provider'}
+                      className="w-20 h-20 rounded-full object-cover border-2 border-primary"
+                    />
+                    <MdVerified className="text-primary text-xl absolute -bottom-1 -right-1 bg-white rounded-full" title="Verified Owner" />
+                  </div>
+                  
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium text-gray-900">{car.car_providerId?.fullName || 'Car Provider'}</h3>
-                      <MdVerified className="text-primary" title="Verified Owner" />
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-semibold text-gray-900">{provider?.fullName || 'Car Provider'}</h3>
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Member since {car.car_providerId?.createdAt 
-                        ? new Date(car.car_providerId.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) 
-                        : 'Unknown date'}
+                    <p className="text-sm text-gray-600 mb-3">
+                      Member since {provider?.createdAt ? new Date(provider.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Unknown date'}
                     </p>
-                    <div className="flex items-center gap-4 mt-2">
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
                         <BsSpeedometer2 className="text-primary" />
-                        <span>98% response rate</span>
+                        <span className="text-sm text-gray-700">Quick Response</span>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <FaCalendarAlt className="text-primary" />
-                        <span>Quick response</span>
+                      <div className="flex items-center gap-2">
+                        <MdEmail className="text-primary" />
+                        <span className="text-sm text-gray-700">Email Verified</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FaPhoneAlt className="text-primary" />
+                        <span className="text-sm text-gray-700">Phone Verified</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Contact Information */}
-                <div className="p-4">
-                  <h4 className="font-medium text-gray-800 mb-3">Contact Information</h4>
-                  <div className="space-y-2">
-                    {car.car_providerId?.email && (
-                      <div className="flex items-center gap-3 text-gray-700 bg-gray-50 p-2 rounded">
-                        <MdEmail className="text-primary text-xl" />
-                        <div>
-                          <div className="text-sm font-medium">Email</div>
-                          <div>{car.car_providerId.email}</div>
-                        </div>
-                      </div>
-                    )}
-                    {car.car_providerId?.phoneNumber && (
-                      <div className="flex items-center gap-3 text-gray-700 bg-gray-50 p-2 rounded">
-                        <FaPhoneAlt className="text-primary text-xl" />
-                        <div>
-                          <div className="text-sm font-medium">Phone</div>
-                          <div>{car.car_providerId.phoneNumber}</div>
-                        </div>
-                      </div>
-                    )}
+                {/* Statistics */}
+                <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-gray-100">
+                  <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-lg">
+                    <div className="p-2 bg-primary bg-opacity-10 rounded-lg">
+                      <MdVerified className="text-primary text-2xl" />
+                    </div>
+                    <div>
+                      <span className="block font-semibold text-xl text-gray-900">95%</span>
+                      <span className="text-sm text-gray-600">Approval Rate</span>
+                    </div>
                   </div>
-                  <button 
-                    className="w-full bg-primary text-white py-3 rounded-lg hover:bg-secondary transition duration-150 mt-4 flex items-center justify-center gap-2"
-                  >
-                    <FaUserCheck className="text-xl" />
-                    View Full Profile
-                  </button>
+                  <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-lg">
+                    <div className="p-2 bg-primary bg-opacity-10 rounded-lg">
+                      <FaStar className="text-primary text-2xl" />
+                    </div>
+                    <div>
+                      <span className="block font-semibold text-xl text-gray-900">4.8</span>
+                      <span className="text-sm text-gray-600">Rating Average</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+
             
             {/* Reviews and Ratings Section */}
             <div className="bg-white rounded-lg shadow-sm p-6 mt-8">
