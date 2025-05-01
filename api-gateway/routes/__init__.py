@@ -8,6 +8,7 @@ from .notification_routes import router as notification_router
 from .admin_routes import router as admin_router
 from .support_routes import router as support_router
 from .health_routes import router as health_router
+from .rating_routes import router as rating_router
 
 __all__ = [
     "user_router",
@@ -17,5 +18,6 @@ __all__ = [
     "notification_router",
     "admin_router",
     "support_router",
-    "health_router"
-] 
+    "health_router",
+    "rating_router"
+]

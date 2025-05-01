@@ -13,7 +13,8 @@ from routes import (
     user_router,
     vehicle_router,
     rental_router,
-    health_router
+    health_router,
+    rating_router, 
 )
 
 # Import utility functions
@@ -67,6 +68,7 @@ app.include_router(health_router)
 app.include_router(user_router)
 app.include_router(vehicle_router)
 app.include_router(rental_router)
+app.include_router(rating_router)  # <-- Thêm dòng này
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -75,4 +77,4 @@ async def shutdown_event():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "3000"))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True) 
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

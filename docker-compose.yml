@@ -93,10 +93,30 @@ services:
     networks:
       - car-rental-network
 
+  # Rating Service
+  rating-service:
+    build: ./services/rating-service
+    ports:
+      - "3008:3008"
+    environment:
+      - PORT=3008
+      - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/rating_service_db
+      - JWT_SECRET=ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt
+    volumes:
+      - ./services/rating-service:/app
+      - /app/node_modules
+      - ./uploads:/uploads
+    depends_on:
+      - user-service
+      - vehicle-service
+      - rental-service
+    networks:
+      - car-rental-network
+
 networks:
   car-rental-network:
     driver: bridge
 
 volumes:
   uploads_data:
-    driver: local 
+    driver: local
