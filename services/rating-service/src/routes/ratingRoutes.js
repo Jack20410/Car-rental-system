@@ -11,6 +11,9 @@ router.get('/:carId', ratingController.getRatingsByCar);
 // GET /:carId/average - Get average rating for a car
 router.get('/:carId/average', ratingController.getAverageRating);
 
+// GET /by-provider/:providerId - Get all ratings for a provider
+router.get('/by-provider/:providerId', ratingController.getRatingsByProvider);
+
 // DELETE /:id - Delete a rating
 router.delete('/:id', ratingController.deleteRating);
 

@@ -35,8 +35,36 @@ const OwnerProfile = () => {
           throw new Error('Failed to fetch owner cars');
         }
         const carsData = await carsResponse.json();
-        setOwnerCars(carsData.data?.vehicles || []);
+        const cars = carsData.data?.vehicles || [];
+        setOwnerCars(cars);
 
+        // Fetch all ratings for these cars
+        if (cars.length > 0) {
+          const vehicleIds = cars.map(car => car._id).join(',');
+          const ratingsResponse = await fetch(`http://localhost:3000/ratings/by-provider/${id}?vehicleIds=${vehicleIds}`);
+          if (!ratingsResponse.ok) {
+            throw new Error('Failed to fetch reviews');
+          }
+          const ratingsData = await ratingsResponse.json();
+          setReviews(
+            ratingsData.map(rating => ({
+              id: rating.id || rating._id,
+              user: {
+                name: rating.userName || "Anonymous",
+                avatar: rating.userAvatar || "http://localhost:3001/avatar/user.png",
+                isVerified: true,
+              },
+              rating: rating.rating,
+              comment: rating.comment,
+              date: rating.createdAt,
+              carRented: cars.find(car => car._id === rating.vehicleId)?.name || "",
+              rentalDuration: "N/A", // You can enhance this if you store duration
+              helpful: rating.helpful || 0,
+            }))
+          );
+        } else {
+          setReviews([]);
+        }
       } catch (error) {
         console.error('Error fetching owner data:', error);
         setError(error.message);
@@ -91,6 +119,14 @@ const OwnerProfile = () => {
 
     fetchReviews();
   }, [id]);
+
+  const averageRating = reviews.length
+  ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+  : "N/A";
+const totalRentals = ownerCars.reduce((sum, car) => sum + (car.totalRentals || 0), 0);
+
+const fiveStarCount = reviews.filter(r => Math.round(r.rating) === 5).length;
+const fiveStarRatio = reviews.length ? ((fiveStarCount / reviews.length) * 100).toFixed(0) + "%" : "N/A";
 
   const renderStars = (rating) => {
     const stars = [];
@@ -200,18 +236,18 @@ const OwnerProfile = () => {
                 </div>
                 <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
                   <FaStar className="text-primary text-xl mb-2" />
-                  <span className="font-semibold text-lg">4.8</span>
-                  <span className="text-sm text-gray-600">Rating</span>
+                  <span className="font-semibold text-lg">{averageRating}</span>
+                  <span className="text-sm text-gray-600">Average Rating</span>
                 </div>
                 <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
                   <BsSpeedometer2 className="text-primary text-xl mb-2" />
-                  <span className="font-semibold text-lg">95%</span>
-                  <span className="text-sm text-gray-600">Response Rate</span>
+                  <span className="font-semibold text-lg">{totalRentals}</span>
+                  <span className="text-sm text-gray-600">Rental Completed</span>
                 </div>
                 <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
                   <MdVerified className="text-primary text-xl mb-2" />
-                  <span className="font-semibold text-lg">100%</span>
-                  <span className="text-sm text-gray-600">Completion</span>
+                  <span className="font-semibold text-lg">{fiveStarRatio}</span>
+                  <span className="text-sm text-gray-600">5 star rate</span>
                 </div>
               </div>
             </div>
@@ -289,7 +325,6 @@ const OwnerProfile = () => {
                   <option value="newest">Newest First</option>
                   <option value="highest">Highest Rating</option>
                   <option value="lowest">Lowest Rating</option>
-                  <option value="helpful">Most Helpful</option>
                 </select>
               </div>
             </div>
@@ -298,8 +333,8 @@ const OwnerProfile = () => {
           {/* Reviews Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 p-4 bg-gray-50 rounded-lg">
             <div className="flex flex-col items-center">
-              <span className="text-3xl font-bold text-gray-900">4.8</span>
-              <div className="flex gap-1 my-2">{renderStars(4.8)}</div>
+              <span className="text-3xl font-bold text-gray-900">{averageRating}</span>
+              <div className="flex gap-1 my-2">{renderStars(Number(averageRating))}</div>
               <span className="text-sm text-gray-600">Average Rating</span>
             </div>
             <div className="flex flex-col items-center">
@@ -307,10 +342,10 @@ const OwnerProfile = () => {
               <BsSpeedometer2 className="text-primary text-xl my-2" />
               <span className="text-sm text-gray-600">Total Reviews</span>
             </div>
-            <div className="flex flex-col items-center">
-              <span className="text-3xl font-bold text-gray-900">95%</span>
-              <BsCalendarCheck className="text-primary text-xl my-2" />
-              <span className="text-sm text-gray-600">Completion Rate</span>
+            <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
+              <MdVerified className="text-primary text-xl mb-2" />
+              <span className="font-semibold text-lg">{fiveStarRatio}</span>
+              <span className="text-sm text-gray-600">5 star rate</span>
             </div>
           </div>
 
@@ -337,7 +372,6 @@ const OwnerProfile = () => {
                         <span>•</span>
                         <span>{review.carRented}</span>
                         <span>•</span>
-                        <span>{review.rentalDuration}</span>
                       </div>
                     </div>
                   </div>
@@ -346,15 +380,6 @@ const OwnerProfile = () => {
                   </div>
                 </div>
                 <p className="text-gray-700 mb-4">{review.comment}</p>
-                <button 
-                  className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary transition-colors"
-                  onClick={() => {
-                    // Implement helpful functionality
-                  }}
-                >
-                  <FaThumbsUp />
-                  <span>Helpful ({review.helpful})</span>
-                </button>
               </div>
             ))}
           </div>
@@ -376,4 +401,4 @@ const OwnerProfile = () => {
   );
 };
 
-export default OwnerProfile; 
+export default OwnerProfile;

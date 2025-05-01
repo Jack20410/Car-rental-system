@@ -38,7 +38,40 @@ const CarDetails = () => {
   const [showReviews, setShowReviews] = useState(true);
   const [totalPrice, setTotalPrice] = useState(0);
   const [socket, setSocket] = useState(null);
+  const [sortBy, setSortBy] = useState('newest');
 
+
+
+  // Fetch ratings from rating-service when carId changes
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchRatings = async () => {
+      try {
+        const res = await fetch(`http://localhost:3000/ratings/${id}`);
+        if (!res.ok) throw new Error('Failed to fetch ratings');
+        const data = await res.json();
+        setReviews(
+          data.map(rating => ({
+            id: rating.id || rating._id,
+            user: {
+              name: rating.userName || "Anonymous", // Now this will be present
+              avatar: rating.userAvatar || "http://localhost:3001/avatar/user.png",
+              isVerified: true,
+            },
+            rating: rating.rating,
+            comment: rating.comment,
+            date: new Date(rating.createdAt).toLocaleDateString('en-US'),
+            tripDuration: "1 day",
+          }))
+        );
+      } catch (err) {
+        console.error('Error fetching ratings:', err);
+      }
+    };
+
+    fetchRatings();
+  }, [id]); // Only depend on id
   useEffect(() => {
     const fetchCarAndProviderDetails = async () => {
       try {
@@ -162,6 +195,21 @@ const CarDetails = () => {
         boundingBox: null
       };
     }
+  };
+
+  // Hàm sort reviews
+  const sortReviews = (reviewsToSort) => {
+    return [...reviewsToSort].sort((a, b) => {
+      switch (sortBy) {
+        case 'highest':
+          return b.rating - a.rating;
+        case 'lowest':
+          return a.rating - b.rating;
+        case 'newest':
+        default:
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+      }
+    });
   };
 
   // Calculate days between two dates
@@ -334,41 +382,74 @@ const CarDetails = () => {
     }
   };
 
-  // Handle review submission
-  const handleReviewSubmit = (e) => {
-    e.preventDefault();
-    if (!reviewComment.trim() || reviewRating === 0) return;
 
-    const newReview = {
-      id: Date.now(),
-      user: {
-        name: user?.name || "Anonymous",
-        avatar: user?.avatar
-          ? (user.avatar.startsWith('http')
-              ? user.avatar
-              : `http://localhost:3001${user.avatar.replace('/uploads', '')}`)
-          : "http://localhost:3001/avatar/user.png",
-        isVerified: true,
-      },
-      rating: reviewRating,
-      comment: reviewComment,
-      date: new Date().toLocaleDateString('en-US'),
-      tripDuration: "1 day",
-    };
+  
+const handleReviewSubmit = async (e) => {
+  e.preventDefault();
+  if (!reviewComment.trim() || reviewRating === 0) return;
 
-    const updatedReviews = [newReview, ...reviews];
-    setReviews(updatedReviews);
-
-    // Save reviews to localStorage by car._id
-    if (car && car._id) {
-      const localKey = `car_reviews_${car._id}`;
-      localStorage.setItem(localKey, JSON.stringify(updatedReviews));
+  try {
+    // Get auth token and userId if needed
+    const auth = localStorage.getItem('auth');
+    const { token, userId } = auth ? JSON.parse(auth) : {};
+    if (!token) {
+      toast.error('Please login to submit a review');
+      return;
     }
 
+    const reviewPayload = {
+      vehicleId: id,
+      userId: userId || user?._id || "anonymous",
+      userName: user?.name || "Anonymous", // Add this line
+      userAvatar: user?.avatar
+        ? (user.avatar.startsWith('http')
+            ? user.avatar
+            : `http://localhost:3001${user.avatar.replace('/uploads', '')}`)
+        : "http://localhost:3001/avatar/user.png", // Add this line
+      rating: reviewRating,
+      comment: reviewComment,
+    };  
+
+    const res = await fetch('http://localhost:3000/ratings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(reviewPayload)
+    });
+
+    if (!res.ok) throw new Error('Failed to submit review');
+    const newReview = await res.json();
+
+    // Optionally, refetch reviews or append the new one
+    setReviews(prev => [
+      {
+        id: newReview.id || newReview._id,
+        user: {
+          name: user?.name || "Anonymous",
+          avatar: user?.avatar
+            ? (user.avatar.startsWith('http')
+                ? user.avatar
+                : `http://localhost:3001${user.avatar.replace('/uploads', '')}`)
+            : "http://localhost:3001/avatar/user.png",
+          isVerified: true,
+        },
+        rating: newReview.rating,
+        comment: newReview.comment,
+        date: new Date(newReview.createdAt).toLocaleDateString('en-US'),
+        tripDuration: "1 day",
+      },
+      ...prev
+    ]);
     setReviewComment('');
     setReviewRating(0);
-  };
-
+    toast.success('Review submitted!');
+  } catch (err) {
+    toast.error('Failed to submit review');
+    console.error(err);
+  }
+};
   const handleOwnerClick = () => {
     if (provider?._id) {
       navigate(`/owner-profile/${provider._id}`);
@@ -648,20 +729,24 @@ const CarDetails = () => {
                 <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-gray-100">
                   <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-lg">
                     <div className="p-2 bg-primary bg-opacity-10 rounded-lg">
-                      <MdVerified className="text-primary text-2xl" />
+                      <FaStar className="text-primary text-2xl" />
                     </div>
                     <div>
-                      <span className="block font-semibold text-xl text-gray-900">95%</span>
-                      <span className="text-sm text-gray-600">Approval Rate</span>
+                      <span className="block font-semibold text-xl text-gray-900">
+                        {reviews.length > 0 
+                          ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) 
+                          : "N/A"}
+                      </span>
+                      <span className="text-sm text-gray-600">Average Rating</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-lg">
                     <div className="p-2 bg-primary bg-opacity-10 rounded-lg">
-                      <FaStar className="text-primary text-2xl" />
+                      <BsSpeedometer2 className="text-primary text-2xl" />
                     </div>
                     <div>
-                      <span className="block font-semibold text-xl text-gray-900">4.8</span>
-                      <span className="text-sm text-gray-600">Rating Average</span>
+                      <span className="block font-semibold text-xl text-gray-900">{car.totalRentals || 0}</span>
+                      <span className="text-sm text-gray-600">Rental Completed</span>
                     </div>
                   </div>
                 </div>
@@ -675,6 +760,19 @@ const CarDetails = () => {
                 <FaStar className="text-primary" />
                 Reviews and Ratings
               </h2>
+
+                        {/* Dropdown chọn sort */}
+            <div className="flex justify-end mb-4">
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                className="border border-gray-300 rounded px-3 py-1 text-sm"
+              >
+                <option value="newest">Newest First</option>
+                <option value="highest">Highest Rating</option>
+                <option value="lowest">Lowest Rating</option>
+              </select>
+            </div>
 
               {/* Leave a Review Form */}
               <div className="mb-8">
@@ -721,7 +819,7 @@ const CarDetails = () => {
               {/* Reviews List */}
               {showReviews && (
                 <div className="space-y-6">
-                  {reviews.map((review) => (
+                  {sortReviews(reviews).map((review) => (
                     <div key={review.id} className="border-b border-gray-200 pb-6 last:border-0">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-4">
@@ -740,7 +838,6 @@ const CarDetails = () => {
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                               <span>{review.date}</span>
                               <span>•</span>
-                              <span>{review.tripDuration} rental</span>
                             </div>
                           </div>
                         </div>
@@ -921,5 +1018,8 @@ const CarDetails = () => {
 };
 
 export default CarDetails;
+
+
+
 
 
