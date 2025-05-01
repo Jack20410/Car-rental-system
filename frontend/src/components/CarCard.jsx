@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaCar, FaGasPump, FaCog, FaUsers, FaPlus } from 'react-icons/fa';
+import { FaCar, FaGasPump, FaCog, FaUsers, FaPlus, FaUser } from 'react-icons/fa';
 import { formatCurrency } from '../utils/formatCurrency';
 
 const CarCard = ({ car }) => {
@@ -25,7 +25,15 @@ const CarCard = ({ car }) => {
           </span>
         </div>
         <div className="p-4">
-          <h3 className="font-semibold text-gray-900 mb-2">{car.name}</h3>
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="font-semibold text-gray-900">{car.name}</h3>
+            {car.car_providerId && (
+              <div className="flex items-center text-xs text-gray-600">
+                <FaUser className="text-primary mr-1" />
+                <span>{car.car_providerId.fullName}</span>
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-2 mb-3 text-sm text-gray-600">
             <div className="flex items-center gap-1">
               <FaUsers className="text-primary" />

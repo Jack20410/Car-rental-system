@@ -11,6 +11,7 @@ import CarDetails from './pages/CarDetails';
 import Profile from './pages/Profile';
 import Rentals from './pages/Rentals';
 import ManageCars from './pages/ManageCars';
+import OwnerProfile from './pages/OwnerProfile';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -27,6 +28,7 @@ function App() {
               <Route path="cars/:id" element={<CarDetails />} />
               <Route path="login" element={<Login />} />
               <Route path="register" element={<Register />} />
+              <Route path="owner-profile/:id" element={<OwnerProfile />} />
               
               {/* Protected routes */}
               <Route element={<ProtectedRoute />}>

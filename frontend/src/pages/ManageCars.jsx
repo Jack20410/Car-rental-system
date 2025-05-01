@@ -293,9 +293,6 @@ const ManageCars = () => {
       const token = JSON.parse(localStorage.getItem('auth'))?.token;
       if (!token) throw new Error('No authentication token found');
   
-      // Example: Toggle between 'Available' and 'Retnted'
-      const newStatus = car.status === 'Available' ? 'Rented' : 'Available';
-  
       const response = await fetch(`http://localhost:3000/vehicles/${car._id}/status`, {
         method: 'PATCH',
         headers: {
@@ -695,11 +692,10 @@ const ManageCars = () => {
                     <div className="flex justify-between items-center mb-2">
                       <h3 className="text-lg font-semibold text-gray-900">{car.name}</h3>
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                        car.status === 'Pending' ? 'bg-green-100 text-green-800' :
                         car.status === 'Available' ? 'bg-blue-100 text-blue-800' :
-                        car.status === 'Unavailable'? 'bg-red-100 text-red-800' :
+                        car.status === 'Unavailable' ? 'bg-red-100 text-red-800' :
                         car.status === 'Rented' ? 'bg-purple-100 text-purple-800' :
-                        'bg-red-100 text-red-800'
+                        'bg-gray-100 text-gray-800'
                       }`}>
                         {car.status}
                       </span>
@@ -729,10 +725,9 @@ const ManageCars = () => {
                         className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded hover:bg-yellow-200"
                         value={car.status}
                         onChange={e => handleChangeStatus(car, e.target.value)}
+                        disabled={car.status === 'Rented'}
                       >
-                        <option value="Pending">Pending</option>
                         <option value="Available">Available</option>
-                        <option value="Rented">Rented</option>
                         <option value="Unavailable">Unavailable</option>
                       </select>
                       <button

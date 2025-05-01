@@ -1,6 +1,33 @@
 const Vehicle = require('../models/vehicleModel');
 const axios = require('axios');
 
+const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+
+// Helper function to fetch user details
+const fetchUserDetails = async (userId) => {
+  try {
+    const response = await axios.get(`${USER_SERVICE_URL}/users/${userId}`);
+    return response.data.data;
+  } catch (error) {
+    console.error(`Error fetching user details for ID ${userId}:`, error.message);
+    return null;
+  }
+};
+
+// Helper function to attach user details to vehicle
+const attachUserDetails = async (vehicle) => {
+  if (!vehicle.car_providerId) return vehicle;
+  
+  const userDetails = await fetchUserDetails(vehicle.car_providerId);
+  if (userDetails) {
+    return {
+      ...vehicle.toObject(),
+      car_providerId: userDetails
+    };
+  }
+  return vehicle;
+};
+
 const createVehicle = async (req, res) => {
   try {
     // Handle uploaded files
@@ -9,7 +36,6 @@ const createVehicle = async (req, res) => {
     const vehicleData = {
       ...req.body,
       car_providerId: req.user.userId,
-      status: 'Pending',
       images: imagePaths
     };
 
@@ -133,7 +159,6 @@ const updateVehicle = async (req, res) => {
 
     // Prevent updating certain fields
     delete updateData.car_providerId; // Cannot change ownership
-    delete updateData.status; // Status changes should be handled separately
     delete updateData.existingImages; // Remove the existingImages field from the update data
 
     const updatedVehicle = await Vehicle.findByIdAndUpdate(
@@ -180,8 +205,8 @@ const updateVehicleStatus = async (req, res) => {
       });
     }
 
-    // Validate status
-    const validStatuses = ['Available', 'Rented', 'Maintenance', 'Unavailable'];
+    // Validate status against model's enum
+    const validStatuses = vehicle.schema.path('status').enumValues;
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
@@ -235,34 +260,33 @@ const getAllVehicles = async (req, res) => {
     if (status) filter.status = status;
     if (car_providerId) filter.car_providerId = car_providerId;
     if (city) {
-      // Remove spaces and special characters from the search term
       const normalizedCity = city.replace(/[\s-]+/g, '').toLowerCase();
-      // Create a regex that matches the city name regardless of spaces
       filter['location.city'] = {
         $regex: normalizedCity.split('').join('\\s*'),
         $options: 'i'
       };
     }
     
-    // Price range filter
     if (minPrice || maxPrice) {
       filter.rentalPricePerDay = {};
       if (minPrice) filter.rentalPricePerDay.$gte = Number(minPrice);
       if (maxPrice) filter.rentalPricePerDay.$lte = Number(maxPrice);
     }
 
-    // Calculate skip value for pagination
     const skip = (Number(page) - 1) * Number(limit);
-
-    // Build sort object
     const sortOptions = {};
     sortOptions[sortBy] = order === 'desc' ? -1 : 1;
 
-    // Execute query with filters, sorting, and pagination
+    // Get vehicles
     const vehicles = await Vehicle.find(filter)
       .sort(sortOptions)
       .skip(skip)
       .limit(Number(limit));
+
+    // Attach user details to each vehicle
+    const vehiclesWithUserDetails = await Promise.all(
+      vehicles.map(vehicle => attachUserDetails(vehicle))
+    );
 
     // Get total count for pagination
     const total = await Vehicle.countDocuments(filter);
@@ -271,7 +295,7 @@ const getAllVehicles = async (req, res) => {
       success: true,
       message: 'Vehicles retrieved successfully',
       data: {
-        vehicles,
+        vehicles: vehiclesWithUserDetails,
         pagination: {
           total,
           page: Number(page),
@@ -301,9 +325,12 @@ const getVehicleById = async (req, res) => {
       });
     }
 
+    // Attach user details
+    const vehicleWithUserDetails = await attachUserDetails(vehicle);
+
     res.status(200).json({
       message: 'Vehicle retrieved successfully',
-      data: vehicle
+      data: vehicleWithUserDetails
     });
   } catch (error) {
     if (error.name === 'CastError') {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FaCar, FaGasPump, FaCog, FaUsers, FaCalendarAlt, FaMapMarkerAlt, FaStar, FaStarHalf, FaRegStar, FaPhoneAlt, FaUserCheck } from 'react-icons/fa';
 import { BsSpeedometer2, BsGearFill, BsShieldCheck } from 'react-icons/bs';
@@ -7,12 +7,15 @@ import { MdLocalOffer, MdCancel, MdGavel, MdSmokeFree, MdLocationOn, MdDirection
 import { GiCardDiscard, GiTrashCan, GiFruitBowl, GiChemicalDrop } from 'react-icons/gi';
 import { FaCarSide } from 'react-icons/fa6';
 import { formatCurrency } from '../utils/formatCurrency';
+import L from 'leaflet';
+import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
 import api from '../utils/api';
 
 const CarDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [selectedImage, setSelectedImage] = useState(0);
   const [car, setCar] = useState(null);
   const [provider, setProvider] = useState(null);
@@ -20,12 +23,21 @@ const CarDetails = () => {
   const [error, setError] = useState(null);
   const [pickupDate, setPickupDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
+  const [numberOfDays, setNumberOfDays] = useState(0);
   const [isHourlyRent, setIsHourlyRent] = useState(false);
   const [pickupTime, setPickupTime] = useState('');
   const [returnTime, setReturnTime] = useState('');
+  const [numberOfHours, setNumberOfHours] = useState(0);
+  const mapRef = useRef(null);
+  const [mapInstance, setMapInstance] = useState(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviews, setReviews] = useState([]);
+  const { user } = useAuth();
+  const [showReviews, setShowReviews] = useState(true);
   const [totalPrice, setTotalPrice] = useState(0);
   const [socket, setSocket] = useState(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchCarAndProviderDetails = async () => {
@@ -174,6 +186,109 @@ const CarDetails = () => {
     socket.emit('calculate_price', data);
   }, [socket, id, pickupDate, returnDate, pickupTime, returnTime, isHourlyRent]);
 
+  // Function to get coordinates from city name using OpenStreetMap Nominatim
+  const getCoordinates = async (city) => {
+    try {
+      // Append "Viet Nam" to the search query for better accuracy
+      const searchQuery = `${city}, Viet Nam`;
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1&countrycodes=vn`
+      );
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        return {
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon),
+          boundingBox: data[0].boundingbox
+        };
+      }
+      throw new Error('Location not found');
+    } catch (error) {
+      console.error('Error getting coordinates:', error);
+      // Default coordinates for Vietnam (Hanoi)
+      return { 
+        lat: 21.028511, 
+        lng: 105.804817,
+        boundingBox: null
+      };
+    }
+  };
+
+  // Calculate days between two dates
+  const calculateDays = (start, end) => {
+    if (!start || !end) return 0;
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const diffTime = endDate - startDate;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+  // Calculate hours between two times
+  const calculateHours = (startDate, startTime, endDate, endTime) => {
+    if (!startDate || !endDate || !startTime || !endTime) return 0;
+    const start = new Date(`${startDate}T${startTime}`);
+    const end = new Date(`${endDate}T${endTime}`);
+    const diffTime = end - start;
+    const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
+    return diffHours > 0 ? diffHours : 0;
+  };
+
+  // Initialize map when car data is loaded
+  useEffect(() => {
+    if (car && !mapLoaded) {
+      const initializeMap = async () => {
+        try {
+          // Get coordinates from city name
+          const locationData = await getCoordinates(car.location.city);
+          
+          // Initialize the map if it hasn't been initialized yet
+          if (!mapInstance) {
+            const map = L.map(mapRef.current).setView([locationData.lat, locationData.lng], 17);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Add a marker for the car location
+            const marker = L.marker([locationData.lat, locationData.lng])
+              .addTo(map)
+              .bindPopup(
+                `${car.location.city}<br>`
+              );
+            
+            // Open popup by default
+            marker.openPopup();
+
+            // If we have a bounding box, fit the map to it
+            if (locationData.boundingBox) {
+              map.fitBounds([
+                [locationData.boundingBox[0], locationData.boundingBox[2]],
+                [locationData.boundingBox[1], locationData.boundingBox[3]]
+              ]);
+            }
+
+            setMapInstance(map);
+            setMapLoaded(true);
+          }
+        } catch (error) {
+          console.error('Error initializing map:', error);
+        }
+      };
+
+      initializeMap();
+    }
+
+    // Cleanup function to remove map when component unmounts
+    return () => {
+      if (mapInstance) {
+        mapInstance.remove();
+      }
+    };
+  }, [car, mapLoaded, mapInstance]);
+
   const handleBooking = async (e) => {
     e.preventDefault();
     
@@ -261,6 +376,69 @@ const CarDetails = () => {
       toast.error(errorMessage);
     }
   };
+
+  // Handle review submission
+  const handleReviewSubmit = (e) => {
+    e.preventDefault();
+    if (!reviewComment.trim() || reviewRating === 0) return;
+
+    const newReview = {
+      id: Date.now(),
+      user: {
+        name: user?.name || "Anonymous",
+        avatar: user?.avatar
+          ? (user.avatar.startsWith('http')
+              ? user.avatar
+              : `http://localhost:3001${user.avatar.replace('/uploads', '')}`)
+          : "http://localhost:3001/avatar/user.png",
+        isVerified: true,
+      },
+      rating: reviewRating,
+      comment: reviewComment,
+      date: new Date().toLocaleDateString('en-US'),
+      tripDuration: "1 day",
+    };
+
+    const updatedReviews = [newReview, ...reviews];
+    setReviews(updatedReviews);
+
+    // Save reviews to localStorage by car._id
+    if (car && car._id) {
+      const localKey = `car_reviews_${car._id}`;
+      localStorage.setItem(localKey, JSON.stringify(updatedReviews));
+    }
+
+    setReviewComment('');
+    setReviewRating(0);
+  };
+
+  const handleOwnerClick = () => {
+    if (provider?._id) {
+      navigate(`/owner-profile/${provider._id}`);
+    }
+  };
+
+  const DEFAULT_AVATAR = "http://localhost:3001/avatar/user.png";
+  function ReviewAvatar({ avatar, name, className }) {
+    return avatar ? (
+      <img
+        src={avatar}
+        alt={name}
+        className={`${className} rounded-full object-cover`}
+        onError={(e) => {
+          e.target.src = DEFAULT_AVATAR;
+          e.target.onerror = () => {
+            e.target.style.display = 'none';
+            e.target.parentElement.innerHTML = `<div class="${className} rounded-full bg-primary text-white flex items-center justify-center">${name?.charAt(0).toUpperCase() || 'U'}</div>`;
+          };
+        }}
+      />
+    ) : (
+      <div className={`${className} rounded-full bg-primary text-white flex items-center justify-center`}>
+        {name ? name.charAt(0).toUpperCase() : 'U'}
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -409,47 +587,46 @@ const CarDetails = () => {
                 Car Location
               </h2>
               <div className="space-y-4">
-                {/* Map Placeholder */}
-                <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <MdDirections className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500">Map will be integrated here</p>
-                  </div>
-                </div>
+                {/* Leaflet Map */}
+                <div 
+                  ref={mapRef}
+                  className="w-full h-64 rounded-lg"
+                  style={{ background: '#f1f1f1', position: 'relative', zIndex: 0 }}
+                />
 
                 {/* Location Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
                     <h3 className="font-medium text-gray-800">Address Details</h3>
                     <div className="space-y-2">
-                        <p className="flex items-start gap-2 text-gray-700">
+                      <p className="flex items-start gap-2 text-gray-700">
                         <FaMapMarkerAlt className="text-primary mt-1" />
                         <span>
-                            {car.location.address}, {car.location.city}
-                            <br />
-                            <span className="text-gray-500 text-sm">{car.location.landmark}</span>
+                          {car.location.address}, {car.location.city}
+                          <br />
+                          <span className="text-gray-500 text-sm">{car.location.landmark}</span>
                         </span>
-                        </p>
+                      </p>
                     </div>
-                    </div>
+                  </div>
 
-                    <div className="space-y-3">
+                  <div className="space-y-3">
                     <h3 className="font-medium text-gray-800">Pickup Information</h3>
                     <div className="space-y-2">
-                        <p className="flex items-start gap-2 text-gray-700">
+                      <p className="flex items-start gap-2 text-gray-700">
                         <AiOutlineSafety className="text-primary mt-1" />
                         {car.location.pickupInstructions}
-                        </p>
-                        <p className="flex items-start gap-2 text-gray-700">
+                      </p>
+                      <p className="flex items-start gap-2 text-gray-700">
                         <FaCalendarAlt className="text-primary mt-1" />
                         Business Hours: {car.location.businessHours}
-                        </p>
+                      </p>
                     </div>
+                  </div>
                 </div>
+              </div>
             </div>
-            </div>
-            </div>
-            
+
             {/* Car Owner Section */}
             <div className="bg-white rounded-lg shadow-sm p-6 mt-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -519,78 +696,91 @@ const CarDetails = () => {
                 Reviews and Ratings
               </h2>
 
-              {/* Rating Overview */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                {/* Average Rating */}
-                <div className="text-center">
-                  <div className="text-4xl font-bold text-gray-900 mb-2">{car.rating.average}</div>
-                  <div className="flex justify-center mb-1">
-                    {renderStars(car.rating.average)}
+              {/* Leave a Review Form */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Leave a Review</h3>
+                <form className="space-y-4" onSubmit={handleReviewSubmit}>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Your Rating</label>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setReviewRating(star)}
+                          className="focus:outline-none"
+                        >
+                          {reviewRating >= star ? (
+                            <FaStar className="text-yellow-400 text-2xl" />
+                          ) : (
+                            <FaRegStar className="text-yellow-400 text-2xl" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <p className="text-gray-600">{car.rating.total} reviews</p>
-                </div>
-
-                {/* Rating Distribution */}
-                <div className="col-span-2">
-                  {Object.entries(car.rating.distribution)
-                    .sort((a, b) => b[0] - a[0])
-                    .map(([stars, count]) => (
-                      <div key={stars} className="flex items-center mb-2">
-                        <div className="w-12 text-sm text-gray-600">{stars} stars</div>
-                        <div className="flex-1 mx-4">
-                          <div className="h-2 rounded-full bg-gray-200">
-                            <div
-                              className="h-2 rounded-full bg-primary"
-                              style={{
-                                width: `${(count / car.rating.total) * 100}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div className="w-12 text-sm text-gray-600 text-right">{count}</div>
-                      </div>
-                    ))}
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Your Comment</label>
+                    <textarea
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                      rows={3}
+                      placeholder="Share your experience..."
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-secondary transition"
+                  >
+                    Submit Review
+                  </button>
+                </form>
               </div>
 
               {/* Reviews List */}
-              <div className="space-y-6">
-                {car.reviews.map((review) => (
-                  <div key={review.id} className="border-b border-gray-200 pb-6 last:border-0">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        <img
-                          src={review.user.avatar}
-                          alt={review.user.name}
-                          className="w-12 h-12 rounded-full"
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-medium text-gray-900">{review.user.name}</h3>
-                            {review.user.isVerified && (
-                              <MdVerified className="text-primary" title="Verified User" />
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <span>{review.date}</span>
-                            <span>•</span>
-                            <span>{review.tripDuration} rental</span>
+              {showReviews && (
+                <div className="space-y-6">
+                  {reviews.map((review) => (
+                    <div key={review.id} className="border-b border-gray-200 pb-6 last:border-0">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-4">
+                          <ReviewAvatar
+                            avatar={review.user.avatar}
+                            name={review.user.name}
+                            className="w-12 h-12"
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-medium text-gray-900">{review.user.name}</h3>
+                              {review.user.isVerified && (
+                                <MdVerified className="text-primary" title="Verified User" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <span>{review.date}</span>
+                              <span>•</span>
+                              <span>{review.tripDuration} rental</span>
+                            </div>
                           </div>
                         </div>
+                        <div className="flex gap-1">
+                          {renderStars(review.rating)}
+                        </div>
                       </div>
-                      <div className="flex gap-1">
-                        {renderStars(review.rating)}
-                      </div>
+                      <p className="text-gray-700">{review.comment}</p>
                     </div>
-                    <p className="text-gray-700">{review.comment}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
-              {/* Show More Button */}
+              {/* Toggle Button */}
               <div className="text-center mt-6">
-                <button className="text-primary font-medium hover:text-secondary transition-colors">
-                  Show More Reviews
+                <button
+                  className="text-primary font-medium hover:text-secondary transition-colors"
+                  onClick={() => setShowReviews((prev) => !prev)}
+                >
+                  {showReviews ? "Hide Reviews" : "Show Reviews"}
                 </button>
               </div>
             </div>

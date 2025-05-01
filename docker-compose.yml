@@ -66,6 +66,8 @@ services:
     environment:
       - PORT=3002
       - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/vehicle_service_db
+      - USER_SERVICE_URL=http://user-service:3001
+      - JWT_SECRET=ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt
     volumes:
       - ./services/vehicle-service:/app
       - /app/node_modules
