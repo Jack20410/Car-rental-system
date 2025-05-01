@@ -1,11 +1,53 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FaCar, FaGasPump, FaCog, FaUsers, FaPlus, FaUser } from 'react-icons/fa';
+import { FaCar, FaGasPump, FaCog, FaUsers, FaPlus, FaUser, FaStar, FaStarHalf, FaRegStar } from 'react-icons/fa';
 import { formatCurrency } from '../utils/formatCurrency';
 
 const CarCard = ({ car }) => {
+  const [averageRating, setAverageRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
   const displayedFeatures = car.features?.slice(0, 4) || [];
   const remainingFeaturesCount = car.features ? Math.max(0, car.features.length - 4) : 0;
+
+  useEffect(() => {
+    const fetchRatings = async () => {
+      try {
+        const response = await fetch(`http://localhost:3000/ratings/${car._id}`);
+        if (response.ok) {
+          const ratings = await response.json();
+          if (ratings && ratings.length > 0) {
+            const avg = ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length;
+            setAverageRating(avg);
+            setTotalReviews(ratings.length);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching ratings:', error);
+      }
+    };
+
+    if (car._id) {
+      fetchRatings();
+    }
+  }, [car._id]);
+
+  const renderStars = (rating) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
+
+    for (let i = 1; i <= 5; i++) {
+      if (i <= fullStars) {
+        stars.push(<FaStar key={i} className="text-yellow-400 text-sm" />);
+      } else if (i === fullStars + 1 && hasHalfStar) {
+        stars.push(<FaStarHalf key={i} className="text-yellow-400 text-sm" />);
+      } else {
+        stars.push(<FaRegStar key={i} className="text-yellow-400 text-sm" />);
+      }
+    }
+
+    return stars;
+  };
 
   return (
     <Link to={`/cars/${car._id}`} className="block">
@@ -34,6 +76,17 @@ const CarCard = ({ car }) => {
               </div>
             )}
           </div>
+
+          {/* Rating Section */}
+          <div className="flex items-center gap-2 mb-3">
+            <div className="flex">
+              {renderStars(averageRating)}
+            </div>
+            <span className="text-sm text-gray-600">
+              ({totalReviews} {totalReviews === 1 ? 'review' : 'reviews'})
+            </span>
+          </div>
+
           <div className="grid grid-cols-2 gap-2 mb-3 text-sm text-gray-600">
             <div className="flex items-center gap-1">
               <FaUsers className="text-primary" />
