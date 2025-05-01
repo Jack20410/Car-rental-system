@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../utils/formatCurrency';
+import { useChat } from '../context/ChatContext';
 
 // Modal Component
 const Modal = ({ isOpen, onClose, children }) => {
@@ -59,6 +60,11 @@ const ManageCars = () => {
   });
   const [editingCar, setEditingCar] = useState(null);
   const [imageError, setImageError] = useState('');
+  const [customers, setCustomers] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [messageInput, setMessageInput] = useState('');
+  const { sendMessage, chats, startChat } = useChat();
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
 
   // Check auth directly from session storage as a fallback
   useEffect(() => {
@@ -340,8 +346,63 @@ const ManageCars = () => {
       alert(`Error changing status: ${error.message}`);
     }
   };
-  
-  
+
+  // Function to fetch customers who have rented cars from this provider
+  const fetchCustomers = async () => {
+    try {
+      setIsLoadingCustomers(true);
+      const auth = JSON.parse(localStorage.getItem('auth'));
+      const token = auth?.token;
+      const providerId = auth?.user?._id;
+
+      if (!token || !providerId) {
+        throw new Error('No authentication token or provider ID found');
+      }
+
+      const response = await fetch(`http://localhost:3000/rentals/provider/${providerId}/customers`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCustomers(data.customers || []);
+      } else {
+        throw new Error('Failed to fetch customers');
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+    } finally {
+      setIsLoadingCustomers(false);
+    }
+  };
+
+  // Load customers when messages tab is activated
+  useEffect(() => {
+    if (activeTab === 'messages') {
+      fetchCustomers();
+    }
+  }, [activeTab]);
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!messageInput.trim() || !selectedCustomer) return;
+
+    const auth = JSON.parse(localStorage.getItem('auth'));
+    const providerId = auth?.user?._id;
+
+    await sendMessage({
+      content: messageInput,
+      senderId: providerId,
+      recipientId: selectedCustomer._id,
+      timestamp: new Date().toISOString()
+    });
+
+    setMessageInput('');
+  };
+
   return (
     <div className="container mx-auto px-4 pt-20">
       <div className="max-w-4xl mx-auto">
@@ -368,6 +429,16 @@ const ManageCars = () => {
                 } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
               >
                 Car Rental Management
+              </button>
+              <button
+                onClick={() => setActiveTab('messages')}
+                className={`${
+                  activeTab === 'messages'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
+              >
+                Messages
               </button>
             </nav>
           </div>
@@ -889,6 +960,107 @@ const ManageCars = () => {
                 This section will show rental requests, booking status,
                 and allow managing rentals.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Messages Tab Content */}
+        {activeTab === 'messages' && (
+          <div className="bg-white shadow-md rounded-lg p-6">
+            <div className="grid grid-cols-3 gap-6 h-[600px]">
+              {/* Customers List */}
+              <div className="border-r pr-4">
+                <h3 className="text-lg font-semibold mb-4">Customers</h3>
+                {isLoadingCustomers ? (
+                  <p>Loading customers...</p>
+                ) : customers.length === 0 ? (
+                  <p className="text-gray-500">No customers found</p>
+                ) : (
+                  <div className="space-y-2">
+                    {customers.map((customer) => (
+                      <button
+                        key={customer._id}
+                        onClick={() => {
+                          setSelectedCustomer(customer);
+                          startChat(customer._id);
+                        }}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${
+                          selectedCustomer?._id === customer._id
+                            ? 'bg-primary text-white'
+                            : 'hover:bg-gray-100'
+                        }`}
+                      >
+                        <p className="font-medium">{customer.name}</p>
+                        <p className="text-sm opacity-75">
+                          {customer.email}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Chat Area */}
+              <div className="col-span-2">
+                {selectedCustomer ? (
+                  <div className="h-full flex flex-col">
+                    {/* Chat Header */}
+                    <div className="border-b pb-4 mb-4">
+                      <h3 className="text-lg font-semibold">
+                        Chat with {selectedCustomer.name}
+                      </h3>
+                    </div>
+
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto mb-4 space-y-4">
+                      {chats[selectedCustomer._id]?.messages.map((message, index) => (
+                        <div
+                          key={index}
+                          className={`flex ${
+                            message.senderId === user._id ? 'justify-end' : 'justify-start'
+                          }`}
+                        >
+                          <div
+                            className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                              message.senderId === user._id
+                                ? 'bg-primary text-white'
+                                : 'bg-gray-100'
+                            }`}
+                          >
+                            <p>{message.content}</p>
+                            <span className="text-xs opacity-75">
+                              {new Date(message.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Message Input */}
+                    <form onSubmit={handleSendMessage} className="mt-auto">
+                      <div className="flex space-x-2">
+                        <input
+                          type="text"
+                          value={messageInput}
+                          onChange={(e) => setMessageInput(e.target.value)}
+                          placeholder="Type your message..."
+                          className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:border-primary"
+                        />
+                        <button
+                          type="submit"
+                          className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-secondary transition-colors"
+                        >
+                          Send
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    Select a customer to start chatting
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
