@@ -39,8 +39,20 @@ const CarDetails = () => {
   const [totalPrice, setTotalPrice] = useState(0);
   const [socket, setSocket] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
-
-
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [selectedDates, setSelectedDates] = useState({
+    pickup: { date: '' },
+    return: { date: '' }
+  });
+  const [currentView, setCurrentView] = useState({
+    month: new Date().getMonth(),
+    year: new Date().getFullYear()
+  });
+  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
 
   // Fetch ratings from rating-service when carId changes
   useEffect(() => {
@@ -373,25 +385,6 @@ const CarDetails = () => {
         navigate('/login');
         return;
       }
-
-      // Get car_providerId from provider data
-      if (!provider?._id) {
-        toast.error('Provider information is missing. Please try again.');
-        return;
-      }
-
-      const bookingData = {
-        vehicleId: id,
-        car_providerId: provider._id,
-        startDate: isHourlyRent 
-          ? `${pickupDate}T${pickupTime}` 
-          : pickupDate,
-        endDate: isHourlyRent 
-          ? `${pickupDate}T${returnTime}` 
-          : returnDate,
-        totalPrice: totalPrice || car.rentalPricePerDay
-      };
-
       const response = await fetch('http://localhost:3000/rentals', {
         method: 'POST',
         headers: {
@@ -402,7 +395,7 @@ const CarDetails = () => {
       });
       const data = await response.json();
       if (data.success) {
-        toast.success('🚗 Booking successful! Check My Rentals for details', {
+        toast.success('🚗 Đặt xe thành công! Kiểm tra mục Thuê xe của tôi để xem chi tiết', {
           onClose: () => navigate('/rentals')
         });
       } else {
@@ -509,6 +502,104 @@ const CarDetails = () => {
     );
   }
 
+  // Hàm tính giá thuê giống backend (đặt trước return)
+  const calculateRentalPriceFrontend = (startDate, startTime, endDate, endTime, rentalPricePerDay) => {
+    if (!startDate || !startTime || !endDate || !endTime) return 0;
+    const start = new Date(`${startDate}T${startTime}`);
+    const end = new Date(`${endDate}T${endTime}`);
+    if (isNaN(start) || isNaN(end) || end <= start) return 0;
+
+    const isSameDay = start.toDateString() === end.toDateString();
+    if (isSameDay) {
+      const hourDiff = (end - start) / (1000 * 60 * 60);
+      if (hourDiff <= 4) {
+        return rentalPricePerDay * 0.35;
+      } else if (hourDiff <= 8) {
+        return rentalPricePerDay * 0.55;
+      } else if (hourDiff <= 12) {
+        return rentalPricePerDay * 0.70;
+      } else if (hourDiff <= 16) {
+        return rentalPricePerDay * 0.85;
+      } else if (hourDiff <= 22) {
+        return rentalPricePerDay;
+      } else {
+        return rentalPricePerDay;
+      }
+    } else {
+      const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+      if (days === 1) {
+        return rentalPricePerDay;
+      } else if (days <= 3) {
+        return days * rentalPricePerDay * 0.85;
+      } else if (days <= 6) {
+        return days * rentalPricePerDay * 0.75;
+      } else {
+        return days * rentalPricePerDay * 0.70;
+      }
+    }
+  };
+
+  const generateCalendarDays = (month, year) => {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay();
+    const days = [];
+    const adjustedFirstDay = firstDay === 0 ? 6 : firstDay - 1;
+    for (let i = 0; i < adjustedFirstDay; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(i);
+    return days;
+  };
+
+  const nextMonth = () => {
+    setCurrentView(prev => prev.month === 11 ? { month: 0, year: prev.year + 1 } : { ...prev, month: prev.month + 1 });
+  };
+
+  const prevMonth = () => {
+    setCurrentView(prev => prev.month === 0 ? { month: 11, year: prev.year - 1 } : { ...prev, month: prev.month - 1 });
+  };
+
+  const formatDateDisplay = () => {
+    if (!selectedDates.pickup.date || !selectedDates.return.date) return 'Chọn ngày nhận và trả xe';
+    const formatDate = (dateStr) => {
+      const date = new Date(dateStr);
+      const day = date.getDate();
+      const month = date.getMonth() + 1;
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+    return `${formatDate(selectedDates.pickup.date)} - ${formatDate(selectedDates.return.date)}`;
+  };
+
+  const handleDaySelect = (day, month, year) => {
+    if (!day) return;
+    const dateStr = `${year}-${String(month+1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    if (!selectedDates.pickup.date || selectedDates.return.date) {
+      setSelectedDates({ pickup: { date: dateStr }, return: { date: '' } });
+    } else {
+      const pickupDate = new Date(selectedDates.pickup.date);
+      const newDate = new Date(dateStr);
+      if (newDate >= pickupDate) {
+        setSelectedDates(prev => ({ ...prev, return: { date: dateStr } }));
+      } else {
+        setSelectedDates({ pickup: { date: dateStr }, return: { date: selectedDates.pickup.date } });
+      }
+    }
+  };
+
+  const isDaySelected = (day, month, year) => {
+    if (!day) return false;
+    const dateStr = `${year}-${String(month+1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return selectedDates.pickup.date === dateStr || selectedDates.return.date === dateStr;
+  };
+
+  const isDayInRange = (day, month, year) => {
+    if (!day || !selectedDates.pickup.date || !selectedDates.return.date) return false;
+    const dateStr = `${year}-${String(month+1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const date = new Date(dateStr);
+    const pickup = new Date(selectedDates.pickup.date);
+    const returnDate = new Date(selectedDates.return.date);
+    return date > pickup && date < returnDate;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -556,6 +647,22 @@ const CarDetails = () => {
 
     return stars;
   };
+
+  const localTotalPrice = isHourlyRent
+    ? calculateRentalPriceFrontend(
+        pickupDate,
+        pickupTime,
+        pickupDate,
+        returnTime,
+        car.rentalPricePerDay
+      )
+    : calculateRentalPriceFrontend(
+        pickupDate,
+        pickupTime,
+        returnDate,
+        returnTime,
+        car.rentalPricePerDay
+      );
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
@@ -944,7 +1051,7 @@ const CarDetails = () => {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                   <MdLocalOffer className="text-primary" />
-                  {formatCurrency(totalPrice || car.rentalPricePerDay)}
+                  {formatCurrency(car.rentalPricePerDay)}
                 </h2>
                 <span className="text-gray-600">per day</span>
               </div>
@@ -968,63 +1075,193 @@ const CarDetails = () => {
               </div>
 
               <form className="space-y-4" onSubmit={handleBooking}>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
-                    <FaCalendarAlt className="text-primary" />
-                    Ngày lấy xe
-                  </label>
-                  <input
-                    type="date"
-                    value={pickupDate}
-                    onChange={(e) => setPickupDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Giờ lấy xe</label>
-                      <input
-                        type="time"
-                        value={pickupTime}
-                        onChange={(e) => setPickupTime(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                        placeholder="Giờ lấy xe"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Giờ trả xe</label>
-                      <input
-                        type="time"
-                        value={returnTime}
-                        onChange={(e) => setReturnTime(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                        placeholder="Giờ trả xe"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Return Date Input - chỉ hiện khi thuê theo ngày */}
+                {/* Thuê theo ngày: dùng date range picker */}
                 {!isHourlyRent && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                       <FaCalendarAlt className="text-primary" />
-                      Ngày trả xe
+                      Ngày nhận/trả xe
+                    </label>
+                    <div
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary cursor-pointer bg-white"
+                      onClick={() => setShowDateModal(true)}
+                    >
+                      {pickupDate && returnDate ? `${new Date(pickupDate).toLocaleDateString('vi-VN')} - ${new Date(returnDate).toLocaleDateString('vi-VN')}` : 'Chọn ngày nhận và trả xe'}
+                    </div>
+                    {/* Modal chọn ngày dạng range */}
+                    {showDateModal && (
+                      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-auto">
+                          <div className="p-4 border-b flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-gray-800">Chọn ngày nhận và trả xe</h2>
+                            <button onClick={() => setShowDateModal(false)} className="text-gray-500 hover:text-gray-700">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Tháng hiện tại */}
+                            <div>
+                              <div className="flex justify-between items-center mb-4">
+                                <button onClick={prevMonth} className="p-1 text-gray-600 hover:text-blue-600">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                  </svg>
+                                </button>
+                                <h3 className="font-medium text-lg text-gray-800">
+                                  {months[currentView.month]} {currentView.year}
+                                </h3>
+                                <div className="w-5"></div>
+                              </div>
+                              <div className="grid grid-cols-7 mb-2">
+                                {weekDays.map(day => (
+                                  <div key={day} className="text-center text-sm font-medium py-2 text-gray-700">{day}</div>
+                                ))}
+                              </div>
+                              <div className="grid grid-cols-7 gap-1">
+                                {generateCalendarDays(currentView.month, currentView.year).map((day, index) => (
+                                  <div
+                                    key={index}
+                                    className={`h-10 flex items-center justify-center text-sm rounded-md ${!day ? 'text-gray-300' : 'cursor-pointer hover:bg-gray-100 text-gray-800'} ${isDaySelected(day, currentView.month, currentView.year) ? 'bg-blue-600 text-white hover:bg-blue-700' : ''} ${isDayInRange(day, currentView.month, currentView.year) ? 'bg-blue-100 text-gray-800' : ''}`}
+                                    onClick={() => handleDaySelect(day, currentView.month, currentView.year)}
+                                  >
+                                    {day}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Tháng tiếp theo */}
+                            <div>
+                              <div className="flex justify-between items-center mb-4">
+                                <div className="w-5"></div>
+                                <h3 className="font-medium text-lg text-gray-800">
+                                  {currentView.month === 11 ? `${months[0]} ${currentView.year + 1}` : `${months[currentView.month + 1]} ${currentView.year}`}
+                                </h3>
+                                <button onClick={nextMonth} className="p-1 text-gray-600 hover:text-blue-600">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-7 mb-2">
+                                {weekDays.map(day => (
+                                  <div key={day} className="text-center text-sm font-medium py-2 text-gray-700">{day}</div>
+                                ))}
+                              </div>
+                              <div className="grid grid-cols-7 gap-1">
+                                {generateCalendarDays(currentView.month === 11 ? 0 : currentView.month + 1, currentView.month === 11 ? currentView.year + 1 : currentView.year).map((day, index) => (
+                                  <div
+                                    key={index}
+                                    className={`h-10 flex items-center justify-center text-sm rounded-md ${!day ? 'text-gray-300' : 'cursor-pointer hover:bg-gray-100 text-gray-800'} ${isDaySelected(day, currentView.month === 11 ? 0 : currentView.month + 1, currentView.month === 11 ? currentView.year + 1 : currentView.year) ? 'bg-blue-600 text-white hover:bg-blue-700' : ''} ${isDayInRange(day, currentView.month === 11 ? 0 : currentView.month + 1, currentView.month === 11 ? currentView.year + 1 : currentView.year) ? 'bg-blue-100 text-gray-800' : ''}`}
+                                    onClick={() => handleDaySelect(day, currentView.month === 11 ? 0 : currentView.month + 1, currentView.month === 11 ? currentView.year + 1 : currentView.year)}
+                                  >
+                                    {day}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="p-4 border-t flex justify-end">
+                            <button
+                              onClick={() => {
+                                setShowDateModal(false);
+                                if (selectedDates.pickup.date && selectedDates.return.date) {
+                                  setPickupDate(selectedDates.pickup.date);
+                                  setReturnDate(selectedDates.return.date);
+                                }
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg transition"
+                            >
+                              Xác nhận
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Giờ lấy xe</label>
+                        <input
+                          type="time"
+                          value={pickupTime}
+                          onChange={(e) => setPickupTime(e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                          placeholder="Giờ lấy xe"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Giờ trả xe</label>
+                        <input
+                          type="time"
+                          value={returnTime}
+                          onChange={(e) => setReturnTime(e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                          placeholder="Giờ trả xe"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* Thuê theo giờ: giữ nguyên giao diện cũ */}
+                {isHourlyRent && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                      <FaCalendarAlt className="text-primary" />
+                      Ngày lấy xe
                     </label>
                     <input
                       type="date"
-                      value={returnDate}
-                      onChange={(e) => setReturnDate(e.target.value)}
-                      min={pickupDate || new Date().toISOString().split('T')[0]}
+                      value={pickupDate}
+                      onChange={(e) => setPickupDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                     />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Giờ lấy xe</label>
+                        <input
+                          type="time"
+                          value={pickupTime}
+                          onChange={(e) => setPickupTime(e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                          placeholder="Giờ lấy xe"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Giờ trả xe</label>
+                        <select
+                          value={returnTime}
+                          onChange={e => setReturnTime(e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                          disabled={!pickupTime}
+                        >
+                          <option value="">Chọn giờ trả xe</option>
+                          {pickupTime && [4, 8, 12, 16, 22].map(hours => {
+                            const [h, m] = pickupTime.split(':').map(Number);
+                            const date = new Date();
+                            date.setHours(h, m, 0, 0);
+                            date.setHours(date.getHours() + hours);
+                            const returnHour = date.getHours().toString().padStart(2, '0');
+                            const returnMinute = date.getMinutes().toString().padStart(2, '0');
+                            const today = new Date();
+                            today.setHours(h, m, 0, 0);
+                            const isNextDay = date.getDate() !== today.getDate();
+                            return (
+                              <option key={hours} value={`${returnHour}:${returnMinute}`}>
+                                {`${returnHour}:${returnMinute} (${hours} tiếng${isNextDay ? ' - sang ngày hôm sau' : ''})`}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 )}
-
                 <div className="border-t border-gray-200 pt-4">
                   <div className="flex justify-between font-bold text-lg">
                     <span>Tổng cộng</span>
-                    <span>{formatCurrency(totalPrice || car.rentalPricePerDay)}</span>
+                    <span>{formatCurrency(localTotalPrice || car.rentalPricePerDay)}</span>
                   </div>
                 </div>
 

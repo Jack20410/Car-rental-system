@@ -3,29 +3,35 @@ const axios = require('axios');
 
 // Helper function to calculate rental price
 const calculateRentalPrice = (start, end, vehicle) => {
-  // Check if rental is within the same day
   const isSameDay = start.toDateString() === end.toDateString();
-  
+
   if (isSameDay) {
-    // Calculate hours for same-day rental
     const hourDiff = (end - start) / (1000 * 60 * 60);
-    
-    // If rental is under 6 hours, charge 50% of daily rate
-    if (hourDiff = 6) {
-      return vehicle.rentalPricePerDay * 0.75;
-    }
-    // If rental is 6-12 hours, charge 75% of daily rate
-    else if (hourDiff = 12) {
-      return vehicle.rentalPricePerDay ;
-    }
-    // If over 12 hours, charge full day rate
-    else if (hourDiff = 20) {
-      return vehicle.rentalPricePerDay *1.25;
+
+    if (hourDiff <= 4) {
+      return vehicle.rentalPricePerDay * 0.35;
+    } else if (hourDiff <= 8) {
+      return vehicle.rentalPricePerDay * 0.55;
+    } else if (hourDiff <= 12) {
+      return vehicle.rentalPricePerDay * 0.70;
+    } else if (hourDiff <= 16) {
+      return vehicle.rentalPricePerDay * 0.85;
+    } else if (hourDiff <= 22) {
+      return vehicle.rentalPricePerDay;
+    } else {
+      return vehicle.rentalPricePerDay;
     }
   } else {
-    // Calculate number of days (rounded up)
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-    return days * vehicle.rentalPricePerDay;
+    if (days === 1) {
+      return vehicle.rentalPricePerDay;
+    } else if (days <= 3) {
+      return days * vehicle.rentalPricePerDay * 0.85;
+    } else if (days <= 6) {
+      return days * vehicle.rentalPricePerDay * 0.75;
+    } else {
+      return days * vehicle.rentalPricePerDay * 0.70;
+    }
   }
 };
 
@@ -115,21 +121,10 @@ exports.createRental = async (req, res) => {
     // Calculate total price using the new helper function
     const totalPrice = calculateRentalPrice(start, end, vehicle);
 
-    // Get car_providerId from vehicle data
-    const car_providerId = vehicle.car_providerId;
-
-    if (!car_providerId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Vehicle provider information is missing'
-      });
-    }
-
-    // Create rental record with initial status history and car_providerId
+    // Create rental record with initial status history
     const rental = new Rental({
       userId,
       vehicleId,
-      car_providerId,
       startDate: start,
       endDate: end,
       totalPrice,
@@ -452,120 +447,4 @@ exports.checkAvailability = async (req, res) => {
       error: error.message
     });
   }
-};
-
-// Get all rentals (public function)
-exports.getAllRentals = async (req, res) => {
-  try {
-    // Apply filters if provided in query params
-    const filter = {};
-    const { status, paymentStatus, userId, vehicleId } = req.query;
-    
-    if (status) filter.status = status;
-    if (paymentStatus) filter.paymentStatus = paymentStatus;
-    if (userId) filter.userId = userId;
-    if (vehicleId) filter.vehicleId = vehicleId;
-    
-    // Apply pagination
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-    
-    // Get total count for pagination
-    const total = await Rental.countDocuments(filter);
-    
-    // Get rentals with pagination and sorting
-    const rentals = await Rental.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-    
-    return res.status(200).json({
-      success: true,
-      message: 'All rentals retrieved successfully',
-      data: {
-        rentals,
-        pagination: {
-          total,
-          page,
-          limit,
-          pages: Math.ceil(total / limit)
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Error retrieving all rentals:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while retrieving rentals'
-    });
-  }
-};
-
-// Get rentals for a car provider
-exports.getProviderRentals = async (req, res) => {
-  try {
-    const car_providerId = req.user.userId; // Get provider's ID from authenticated user
-    const { status, paymentStatus } = req.query;
-    
-    console.log('Fetching rentals for provider:', {
-      car_providerId,
-      userRole: req.user.role,
-      status,
-      paymentStatus
-    });
-
-    // Verify user is a car provider
-    if (req.user.role !== 'car_provider') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Only car providers can access their rentals.'
-      });
-    }
-
-    // Build filter object
-    const filter = { car_providerId };
-    if (status) filter.status = status;
-    if (paymentStatus) filter.paymentStatus = paymentStatus;
-
-    console.log('Applying filter:', filter);
-
-    // Apply pagination
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    // Get total count for pagination
-    const total = await Rental.countDocuments(filter);
-
-    // Get rentals without population first
-    const rentals = await Rental.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    console.log(`Found ${rentals.length} rentals for provider`);
-
-    return res.status(200).json({
-      success: true,
-      message: 'Provider rentals retrieved successfully',
-      data: {
-        rentals,
-        pagination: {
-          total,
-          page,
-          limit,
-          pages: Math.ceil(total / limit)
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Error retrieving provider rentals:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while retrieving provider rentals',
-      error: error.message
-    });
-  }
 }; 
-
