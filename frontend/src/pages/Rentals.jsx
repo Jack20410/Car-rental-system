@@ -53,14 +53,17 @@ const RentalCard = ({ rental, onCancel }) => {
   }, [rental.vehicleId]);
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
+    if (!dateString) return '';
+    let date = new Date(dateString);
+    // Trừ đi 7 tiếng để về đúng giờ Việt Nam nếu bị cộng dư
+    date = new Date(date.getTime() - 7 * 60 * 60 * 1000);
+    return date.toLocaleString('vi-VN', {
       year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
       hour: '2-digit',
       minute: '2-digit'
-    }).format(date);
+    });
   };
 
   const getStatusColor = (status) => {

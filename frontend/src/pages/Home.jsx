@@ -65,7 +65,7 @@ const Home = () => {
                 throw new Error(`Failed to fetch cars for ${location.name}`);
               }
               const data = await response.json();
-              const carCount = data.data?.vehicles?.length || 0;
+              const carCount = (data.data?.vehicles?.filter(car => car.status === 'Available').length) || 0;
               return {
                 ...location,
                 carCount: `${carCount} cars available`
@@ -126,11 +126,13 @@ const Home = () => {
           return;
         }
         
+        // Lọc chỉ các xe Available
+        const availableVehicles = vehicles.filter(car => car.status === 'Available');
         // Get random cars but ensure they have images
-        const carsWithImages = vehicles.filter(car => car.images?.length > 0 || car.image);
-        const randomCars = [...(carsWithImages.length > 0 ? carsWithImages : vehicles)]
+        const carsWithImages = availableVehicles.filter(car => car.images?.length > 0 || car.image);
+        const randomCars = [...(carsWithImages.length > 0 ? carsWithImages : availableVehicles)]
           .sort(() => Math.random() - 0.5)
-          .slice(0, Math.min(6, vehicles.length));
+          .slice(0, Math.min(6, availableVehicles.length));
 
         console.log('Featured cars:', randomCars);
         setFeaturedCars(randomCars);

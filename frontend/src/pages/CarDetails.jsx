@@ -294,69 +294,85 @@ const CarDetails = () => {
     };
   }, [car]); // Only depend on car data changes
 
+  // Hàm chuyển ngày giờ sang ISO string với offset +07:00 (giờ Việt Nam)
+  function toVNISOString(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return '';
+    // Tạo đối tượng Date từ local time
+    const date = new Date(`${dateStr}T${timeStr}`);
+    // Lấy timestamp + 7 tiếng (nếu trình duyệt đang ở múi giờ khác)
+    const vnDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000) + 7 * 60 * 60 * 1000);
+    // Trả về ISO string với offset +07:00
+    return vnDate.toISOString().replace('Z', '+07:00');
+  }
+
   const handleBooking = async (e) => {
     e.preventDefault();
     
-    // Validate dates
-    if (!pickupDate || !returnDate) {
-      toast.error('Please select both pickup and return dates');
-      return;
+    if (isHourlyRent) {
+      // Validate thuê theo giờ
+      if (!pickupDate || !pickupTime || !returnTime) {
+        toast.error('Vui lòng chọn đầy đủ ngày, giờ lấy xe và giờ trả xe');
+        return;
+      }
+      const startDateTime = new Date(`${pickupDate}T${pickupTime}`);
+      const endDateTime = new Date(`${pickupDate}T${returnTime}`);
+      if (startDateTime < new Date()) {
+        toast.error('Giờ lấy xe không được ở quá khứ');
+        return;
+      }
+      if (endDateTime <= startDateTime) {
+        toast.error('Giờ trả xe phải sau giờ lấy xe');
+        return;
+      }
+      // Gửi dữ liệu cho thuê theo giờ (đúng múi giờ VN)
+      await submitBooking({
+        vehicleId: id,
+        startDate: toVNISOString(pickupDate, pickupTime),
+        endDate: toVNISOString(pickupDate, returnTime),
+        totalPrice: totalPrice || car.rentalPricePerDay
+      });
+    } else {
+      // Validate thuê theo ngày
+      if (!pickupDate || !returnDate || !pickupTime || !returnTime) {
+        toast.error('Vui lòng chọn đầy đủ ngày, giờ lấy xe và ngày, giờ trả xe');
+        return;
+      }
+      const startDateTime = new Date(`${pickupDate}T${pickupTime}`);
+      const endDateTime = new Date(`${returnDate}T${returnTime}`);
+      if (startDateTime < new Date()) {
+        toast.error('Ngày/giờ lấy xe không được ở quá khứ');
+        return;
+      }
+      if (endDateTime <= startDateTime) {
+        toast.error('Ngày/giờ trả xe phải sau ngày/giờ lấy xe');
+        return;
+      }
+      // Gửi dữ liệu cho thuê theo ngày (đúng múi giờ VN)
+      await submitBooking({
+        vehicleId: id,
+        startDate: toVNISOString(pickupDate, pickupTime),
+        endDate: toVNISOString(returnDate, returnTime),
+        totalPrice: totalPrice || car.rentalPricePerDay
+      });
     }
+  };
 
-    // Validate times for hourly rental
-    if (isHourlyRent && (!pickupTime || !returnTime)) {
-      toast.error('Please select both pickup and return times');
-      return;
-    }
-
-    // Create date objects for validation
-    const startDateTime = isHourlyRent 
-      ? new Date(`${pickupDate}T${pickupTime}`)
-      : new Date(pickupDate);
-    
-    const endDateTime = isHourlyRent
-      ? new Date(`${pickupDate}T${returnTime}`)
-      : new Date(returnDate);
-
-    // Validate dates are not in the past
-    if (startDateTime < new Date()) {
-      toast.error('Pickup date/time cannot be in the past');
-      return;
-    }
-
-    // Validate end date is after start date
-    if (endDateTime <= startDateTime) {
-      toast.error('Return date/time must be after pickup date/time');
-      return;
-    }
-
+  // Hàm submitBooking tách riêng để tái sử dụng
+  const submitBooking = async (bookingData) => {
     try {
       // Get auth token
       const auth = localStorage.getItem('auth');
       if (!auth) {
-        toast.error('Please login to book a car');
+        toast.error('Vui lòng đăng nhập để đặt xe');
         navigate('/login');
         return;
       }
-
       const { token } = JSON.parse(auth);
       if (!token) {
-        toast.error('Authentication token not found. Please login again');
+        toast.error('Không tìm thấy token xác thực. Vui lòng đăng nhập lại');
         navigate('/login');
         return;
       }
-
-      const bookingData = {
-        vehicleId: id,
-        startDate: isHourlyRent 
-          ? `${pickupDate}T${pickupTime}` 
-          : pickupDate,
-        endDate: isHourlyRent 
-          ? `${pickupDate}T${returnTime}` 
-          : returnDate,
-        totalPrice: totalPrice || car.rentalPricePerDay
-      };
-
       const response = await fetch('http://localhost:3000/rentals', {
         method: 'POST',
         headers: {
@@ -365,91 +381,87 @@ const CarDetails = () => {
         },
         body: JSON.stringify(bookingData)
       });
-      
       const data = await response.json();
-      
       if (data.success) {
-        toast.success('🚗 Booking successful! Check My Rentals for details', {
+        toast.success('🚗 Đặt xe thành công! Kiểm tra mục Thuê xe của tôi để xem chi tiết', {
           onClose: () => navigate('/rentals')
         });
       } else {
-        throw new Error(data.message || 'Failed to book the car');
+        throw new Error(data.message || 'Đặt xe thất bại');
       }
     } catch (error) {
       console.error('Booking error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to book the car. Please try again.';
+      const errorMessage = error.response?.data?.message || error.message || 'Đặt xe thất bại. Vui lòng thử lại.';
       toast.error(errorMessage);
     }
   };
 
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!reviewComment.trim() || reviewRating === 0) return;
 
-  
-const handleReviewSubmit = async (e) => {
-  e.preventDefault();
-  if (!reviewComment.trim() || reviewRating === 0) return;
+    try {
+      // Get auth token and userId if needed
+      const auth = localStorage.getItem('auth');
+      const { token, userId } = auth ? JSON.parse(auth) : {};
+      if (!token) {
+        toast.error('Please login to submit a review');
+        return;
+      }
 
-  try {
-    // Get auth token and userId if needed
-    const auth = localStorage.getItem('auth');
-    const { token, userId } = auth ? JSON.parse(auth) : {};
-    if (!token) {
-      toast.error('Please login to submit a review');
-      return;
-    }
+      const reviewPayload = {
+        vehicleId: id,
+        userId: userId || user?._id || "anonymous",
+        userName: user?.name || "Anonymous", // Add this line
+        userAvatar: user?.avatar
+          ? (user.avatar.startsWith('http')
+              ? user.avatar
+              : `http://localhost:3001${user.avatar.replace('/uploads', '')}`)
+          : "http://localhost:3001/avatar/user.png", // Add this line
+        rating: reviewRating,
+        comment: reviewComment,
+      };  
 
-    const reviewPayload = {
-      vehicleId: id,
-      userId: userId || user?._id || "anonymous",
-      userName: user?.name || "Anonymous", // Add this line
-      userAvatar: user?.avatar
-        ? (user.avatar.startsWith('http')
-            ? user.avatar
-            : `http://localhost:3001${user.avatar.replace('/uploads', '')}`)
-        : "http://localhost:3001/avatar/user.png", // Add this line
-      rating: reviewRating,
-      comment: reviewComment,
-    };  
-
-    const res = await fetch('http://localhost:3000/ratings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(reviewPayload)
-    });
-
-    if (!res.ok) throw new Error('Failed to submit review');
-    const newReview = await res.json();
-
-    // Optionally, refetch reviews or append the new one
-    setReviews(prev => [
-      {
-        id: newReview.id || newReview._id,
-        user: {
-          name: user?.name || "Anonymous",
-          avatar: user?.avatar
-            ? (user.avatar.startsWith('http')
-                ? user.avatar
-                : `http://localhost:3001${user.avatar.replace('/uploads', '')}`)
-            : "http://localhost:3001/avatar/user.png",
-          isVerified: true,
+      const res = await fetch('http://localhost:3000/ratings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        rating: newReview.rating,
-        comment: newReview.comment,
-        date: new Date(newReview.createdAt).toLocaleDateString('en-US'),
-        tripDuration: "1 day",
-      },
-      ...prev
-    ]);
-    setReviewComment('');
-    setReviewRating(0);
-    toast.success('Review submitted!');
-  } catch (err) {
-    toast.error('Failed to submit review');
-    console.error(err);
-  }
-};
+        body: JSON.stringify(reviewPayload)
+      });
+
+      if (!res.ok) throw new Error('Failed to submit review');
+      const newReview = await res.json();
+
+      // Optionally, refetch reviews or append the new one
+      setReviews(prev => [
+        {
+          id: newReview.id || newReview._id,
+          user: {
+            name: user?.name || "Anonymous",
+            avatar: user?.avatar
+              ? (user.avatar.startsWith('http')
+                  ? user.avatar
+                  : `http://localhost:3001${user.avatar.replace('/uploads', '')}`)
+              : "http://localhost:3001/avatar/user.png",
+            isVerified: true,
+          },
+          rating: newReview.rating,
+          comment: newReview.comment,
+          date: new Date(newReview.createdAt).toLocaleDateString('en-US'),
+          tripDuration: "1 day",
+        },
+        ...prev
+      ]);
+      setReviewComment('');
+      setReviewRating(0);
+      toast.success('Review submitted!');
+    } catch (err) {
+      toast.error('Failed to submit review');
+      console.error(err);
+    }
+  };
   const handleOwnerClick = () => {
     if (provider?._id) {
       navigate(`/owner-profile/${provider._id}`);
@@ -940,7 +952,7 @@ const handleReviewSubmit = async (e) => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <FaCalendarAlt className="text-primary" />
-                    Pickup Date
+                    Ngày lấy xe
                   </label>
                   <input
                     type="date"
@@ -949,44 +961,44 @@ const handleReviewSubmit = async (e) => {
                     min={new Date().toISOString().split('T')[0]}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                   />
-                  {isHourlyRent && (
-                    <div className="flex gap-2 mt-2">
-                      <input
-                        type="time"
-                        value={pickupTime}
-                        onChange={(e) => setPickupTime(e.target.value)}
-                        className="w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                        placeholder="Pickup Time"
-                      />
-                      <input
-                        type="time"
-                        value={returnTime}
-                        onChange={(e) => setReturnTime(e.target.value)}
-                        className="w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                        placeholder="Return Time"
-                      />
-                    </div>
-                  )}
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="time"
+                      value={pickupTime}
+                      onChange={(e) => setPickupTime(e.target.value)}
+                      className="w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                      placeholder="Giờ lấy xe"
+                    />
+                    <input
+                      type="time"
+                      value={returnTime}
+                      onChange={(e) => setReturnTime(e.target.value)}
+                      className="w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                      placeholder="Giờ trả xe"
+                    />
+                  </div>
                 </div>
 
-                {/* Return Date Input */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
-                    <FaCalendarAlt className="text-primary" />
-                    Return Date
-                  </label>
-                  <input
-                    type="date"
-                    value={returnDate}
-                    onChange={(e) => setReturnDate(e.target.value)}
-                    min={pickupDate || new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                  />
-                </div>
+                {/* Return Date Input - chỉ hiện khi thuê theo ngày */}
+                {!isHourlyRent && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                      <FaCalendarAlt className="text-primary" />
+                      Ngày trả xe
+                    </label>
+                    <input
+                      type="date"
+                      value={returnDate}
+                      onChange={(e) => setReturnDate(e.target.value)}
+                      min={pickupDate || new Date().toISOString().split('T')[0]}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+                )}
 
                 <div className="border-t border-gray-200 pt-4">
                   <div className="flex justify-between font-bold text-lg">
-                    <span>Total</span>
+                    <span>Tổng cộng</span>
                     <span>{formatCurrency(totalPrice || car.rentalPricePerDay)}</span>
                   </div>
                 </div>
@@ -995,7 +1007,7 @@ const handleReviewSubmit = async (e) => {
                   type="submit"
                   className="w-full bg-primary text-white py-3 rounded-lg hover:bg-secondary transition duration-150"
                 >
-                  Book Now
+                  Đặt xe ngay
                 </button>
               </form>
 
@@ -1006,7 +1018,7 @@ const handleReviewSubmit = async (e) => {
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <MdCancel className="h-5 w-5 text-primary mr-2" />
-                  Free cancellation up to 24 hours before pickup
+                  Miễn phí huỷ trước 24h nhận xe
                 </div>
               </div>
             </div>
