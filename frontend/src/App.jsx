@@ -67,6 +67,7 @@ function App() {
               draggable
               pauseOnHover
               theme="light"
+              style={{ zIndex: 9999 }}
             />
           </div>
         </ChatProvider>

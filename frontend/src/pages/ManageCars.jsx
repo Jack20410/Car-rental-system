@@ -414,8 +414,18 @@ const ManageCars = () => {
   // Scroll to bottom when messages change
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'end',
+        inline: 'nearest'
+      });
     }
+    
+    // Prevent body scroll when viewing messages
+    return () => {
+      // Reset any scroll behavior when component unmounts
+      document.body.style.overflow = '';
+    };
   }, [chatMessages]);
 
   const handleSendMessage = async (e) => {
@@ -441,6 +451,13 @@ const ManageCars = () => {
         };
         setChatMessages(prev => [...(prev || []), newMessage]);
         setMessageInput('');
+        
+        // Scroll to bottom after a small delay to ensure the DOM has updated
+        setTimeout(() => {
+          if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          }
+        }, 100);
       } else {
         console.error('Failed to send message');
         toast.error('Failed to send message. Please try again.');
@@ -668,7 +685,7 @@ const ManageCars = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 pt-20">
+    <div className="container mx-auto px-4 pt-5 pb-10">
       <div className="max-w-4xl mx-auto">
         {/* Tabs */}
         <div className="mb-6">
@@ -1373,12 +1390,12 @@ const ManageCars = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[600px]">
               {/* Customers List */}
-              <div className="border rounded-lg overflow-hidden h-full flex flex-col">
+              <div className="border rounded-lg overflow-hidden h-full">
                 <div className="bg-gray-50 p-3 border-b">
                   <h3 className="font-medium text-gray-700">Customers</h3>
                 </div>
                 
-                <div className="divide-y overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                <div className="h-[calc(100%-48px)] overflow-y-auto">
                   {isLoadingCustomers ? (
                     <div className="p-4 text-center">Loading customers...</div>
                   ) : customers.length === 0 ? (
@@ -1404,7 +1421,7 @@ const ManageCars = () => {
               </div>
 
               {/* Chat Area */}
-              <div className="col-span-2 border rounded-lg flex flex-col h-full">
+              <div className="col-span-2 border rounded-lg flex flex-col h-full overflow-hidden chat-container">
                 {selectedCustomer ? (
                   <>
                     {/* Chat Header */}
@@ -1432,53 +1449,63 @@ const ManageCars = () => {
                       </div>
                     </div>
                     
-                    {/* Chat Messages Area */}
-                    <div className="flex-1 overflow-hidden">
-                      <div className="h-full overflow-y-auto p-4 space-y-3" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+                    {/* Chat Messages Area - Improved Structure */}
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                      <div 
+                        className="chat-message-container"
+                        onClick={(e) => {
+                          // Prevent clicks inside chat from scrolling the page
+                          e.stopPropagation();
+                        }}
+                      >
                         {chatMessages?.length === 0 ? (
                           <div className="text-center text-gray-500 my-4">
                             <p>No messages yet. Start a conversation!</p>
                           </div>
                         ) : (
-                          chatMessages?.map((msg, index) => {
-                            const isMyMessage = msg.senderId === user._id;
-                            return (
-                              <div 
-                                key={`${msg.senderId}-${msg.timestamp}-${index}`}
-                                className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'} w-full`}
-                              >
+                          <div className="space-y-3">
+                            {chatMessages.map((msg, index) => {
+                              const isMyMessage = msg.senderId === user._id;
+                              return (
                                 <div 
-                                  className={`p-3 rounded-lg shadow-sm ${
-                                    isMyMessage ? 'bg-blue-100' : 'bg-white'
-                                  } max-w-[85%] break-words`}
+                                  key={`${msg.senderId}-${msg.timestamp}-${index}`}
+                                  className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
                                 >
-                                  <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                                  <span className="text-xs text-gray-500 mt-1 block">
-                                    {formatMessageTime(msg.timestamp)}
-                                  </span>
+                                  <div 
+                                    className={`chat-bubble ${
+                                      isMyMessage ? 'chat-bubble-sent' : 'chat-bubble-received'
+                                    }`}
+                                  >
+                                    <div className="break-words overflow-hidden">
+                                      <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                                      <span className="text-xs text-gray-500 mt-1 block">
+                                        {formatMessageTime(msg.timestamp)}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })
+                              );
+                            })}
+                            <div ref={messagesEndRef} className="h-0 w-full"></div>
+                          </div>
                         )}
-                        <div ref={messagesEndRef} />
                       </div>
                     </div>
                     
                     {/* Message Input */}
-                    <div className="p-3 border-t bg-white mt-auto">
+                    <div className="chat-input-container">
                       <form onSubmit={handleSendMessage} className="flex space-x-2">
                         <input
                           type="text"
                           value={messageInput}
                           onChange={(e) => setMessageInput(e.target.value)}
                           placeholder="Type a message..."
-                          className="flex-grow border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="chat-input flex-1"
                         />
                         <button
                           type="submit"
                           disabled={!connected}
-                          className="bg-primary text-white px-4 py-2 rounded-md hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="chat-send-button"
                         >
                           Send
                         </button>
@@ -1486,7 +1513,7 @@ const ManageCars = () => {
                     </div>
                   </>
                 ) : (
-                  <div className="flex-grow flex flex-col items-center justify-center p-6 text-center text-gray-500">
+                  <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-gray-500">
                     <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>

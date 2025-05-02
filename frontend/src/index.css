@@ -9,4 +9,31 @@
   body {
     @apply bg-gray-50;
   }
+}
+
+/* Chat container specific styles */
+.chat-message-container {
+  max-height: calc(100% - 120px);
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+}
+
+/* Prevent page scroll when inside chat */
+.chat-container {
+  contain: content;
+}
+
+/* Hide scrollbar in webkit browsers but keep functionality */
+.chat-message-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-message-container::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.chat-message-container::-webkit-scrollbar-track {
+  background: transparent;
 } 
