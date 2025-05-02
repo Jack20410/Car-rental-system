@@ -11,6 +11,11 @@ const rentalSchema = new mongoose.Schema({
     required: true,
     ref: 'Vehicle'
   },
+  car_providerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    ref: 'User'
+  },
   startDate: {
     type: Date,
     required: true

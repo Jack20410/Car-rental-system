@@ -373,6 +373,25 @@ const CarDetails = () => {
         navigate('/login');
         return;
       }
+
+      // Get car_providerId from provider data
+      if (!provider?._id) {
+        toast.error('Provider information is missing. Please try again.');
+        return;
+      }
+
+      const bookingData = {
+        vehicleId: id,
+        car_providerId: provider._id,
+        startDate: isHourlyRent 
+          ? `${pickupDate}T${pickupTime}` 
+          : pickupDate,
+        endDate: isHourlyRent 
+          ? `${pickupDate}T${returnTime}` 
+          : returnDate,
+        totalPrice: totalPrice || car.rentalPricePerDay
+      };
+
       const response = await fetch('http://localhost:3000/rentals', {
         method: 'POST',
         headers: {
@@ -383,7 +402,7 @@ const CarDetails = () => {
       });
       const data = await response.json();
       if (data.success) {
-        toast.success('🚗 Đặt xe thành công! Kiểm tra mục Thuê xe của tôi để xem chi tiết', {
+        toast.success('🚗 Booking successful! Check My Rentals for details', {
           onClose: () => navigate('/rentals')
         });
       } else {

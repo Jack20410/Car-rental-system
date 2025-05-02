@@ -6,7 +6,9 @@ const {
   getRentalById, 
   updateRentalStatus, 
   updatePaymentStatus,
-  checkAvailability 
+  checkAvailability,
+  getAllRentals,
+  getProviderRentals
 } = require('../controllers/rentalController');
 const { 
   verifyToken, 
@@ -17,6 +19,7 @@ const {
 const { validateCreateRental } = require('../middleware/rentalValidation');
 
 // Public routes
+router.get('/all', getAllRentals);
 // GET - Check rental availability
 router.get('/availability', checkAvailability);
 
@@ -25,7 +28,6 @@ router.get('/availability', checkAvailability);
 router.post(
   '/',
   verifyToken,
-  requireCustomer,
   validateCreateRental,
   createRental
 );
@@ -35,15 +37,21 @@ router.post(
 router.get(
   '/',
   verifyToken,
-  requireCustomer,
   getUserRentals
+);
+
+// GET - Get all rentals for the authenticated car provider
+router.get(
+  '/provider',
+  verifyToken,
+  requireCarProvider,
+  getProviderRentals
 );
 
 // GET - Get a specific rental by ID
 router.get(
   '/:id',
   verifyToken,
-  requireCustomer,
   getRentalById
 );
 

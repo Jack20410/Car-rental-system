@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ChatProvider } from './context/ChatContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useEffect } from 'react';
@@ -34,39 +35,41 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <div className="min-h-screen bg-gray-50 w-full overflow-x-hidden">
-          <ScrollToTop />
-          <Navbar />
-          <Routes>
-            <Route path="/" element={<MainLayout />}>
-              <Route index element={<Home />} />
-              <Route path="cars" element={<Cars />} />
-              <Route path="cars/:id" element={<CarDetails />} />
-              <Route path="login" element={<Login />} />
-              <Route path="register" element={<Register />} />
-              <Route path="owner-profile/:id" element={<OwnerProfile />} />
-              
-              {/* Protected routes */}
-              <Route element={<ProtectedRoute />}>
-                <Route path="profile" element={<Profile />} />
-                <Route path="rentals" element={<Rentals />} />
-                <Route path="manage-cars" element={<ManageCars />} />
+        <ChatProvider>
+          <div className="min-h-screen bg-gray-50 w-full overflow-x-hidden">
+            <ScrollToTop />
+            <Navbar />
+            <Routes>
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<Home />} />
+                <Route path="cars" element={<Cars />} />
+                <Route path="cars/:id" element={<CarDetails />} />
+                <Route path="login" element={<Login />} />
+                <Route path="register" element={<Register />} />
+                <Route path="owner-profile/:id" element={<OwnerProfile />} />
+                
+                {/* Protected routes */}
+                <Route element={<ProtectedRoute />}>
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="rentals" element={<Rentals />} />
+                  <Route path="manage-cars" element={<ManageCars />} />
+                </Route>
               </Route>
-            </Route>
-          </Routes>
-          <ToastContainer
-            position="top-right"
-            autoClose={3000}
-            hideProgressBar={false}
-            newestOnTop
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-            theme="light"
-          />
-        </div>
+            </Routes>
+            <ToastContainer
+              position="top-right"
+              autoClose={3000}
+              hideProgressBar={false}
+              newestOnTop
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="light"
+            />
+          </div>
+        </ChatProvider>
       </AuthProvider>
     </Router>
   );

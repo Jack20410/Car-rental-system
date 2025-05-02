@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../utils/formatCurrency';
 import { useChat } from '../context/ChatContext';
+import { toast } from 'react-toastify';
 
 // Modal Component
 const Modal = ({ isOpen, onClose, children }) => {
@@ -63,8 +64,15 @@ const ManageCars = () => {
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [messageInput, setMessageInput] = useState('');
-  const { sendMessage, chats, startChat } = useChat();
+  const { startChat, sendMessage, getCurrentChatMessages, currentChat, setCurrentChat, connectionError, clearChatHistory, reconnect, connected } = useChat();
+  const [activeChat, setActiveChat] = useState(null);
+  const messagesEndRef = useRef(null);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [rentals, setRentals] = useState([]);
+  const [isLoadingRentals, setIsLoadingRentals] = useState(false);
+  const [rentalStatusFilter, setRentalStatusFilter] = useState('all');
+  const [rentalVehicles, setRentalVehicles] = useState({});
 
   // Check auth directly from session storage as a fallback
   useEffect(() => {
@@ -347,6 +355,99 @@ const ManageCars = () => {
     }
   };
 
+
+
+  // Function to format chat timestamp
+  const formatMessageTime = (timestamp) => {
+    if (!timestamp) return '';
+    
+    const messageDate = new Date(timestamp);
+    return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Store messages in local state for better rendering
+  useEffect(() => {
+    if (!currentChat) return;
+    
+    // Get current messages and update local state
+    const messages = getCurrentChatMessages();
+    console.log("Setting chat messages:", messages);
+    setChatMessages(messages || []);
+
+    // Subscribe to new messages
+    const handleNewMessage = (message) => {
+      console.log("New message received:", message);
+      setChatMessages(prev => [...(prev || []), message]);
+    };
+
+    // Add message listener using window events since WebSocket handling is done in ChatContext
+    window.addEventListener('chat-message', handleNewMessage);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('chat-message', handleNewMessage);
+    };
+  }, [currentChat]);
+
+  // Sync with getCurrentChatMessages when they change
+  useEffect(() => {
+    const messages = getCurrentChatMessages();
+    if (messages && messages.length > 0) {
+      setChatMessages(messages);
+    }
+  }, [getCurrentChatMessages]);
+
+  // Start or select a chat when customer is selected
+  useEffect(() => {
+    if (selectedCustomer) {
+      console.log("Starting chat with customer:", selectedCustomer);
+      startChat(selectedCustomer);
+      setActiveChat(selectedCustomer._id);
+    }
+  }, [selectedCustomer, startChat]);
+
+  // Debug current chat state
+  useEffect(() => {
+    console.log("Current chat state:", { currentChat, messages: chatMessages });
+  }, [currentChat, chatMessages]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!messageInput.trim() || !selectedCustomer || !connected) return;
+
+    const auth = JSON.parse(localStorage.getItem('auth'));
+    const providerId = auth?.user?._id;
+
+    if (providerId && selectedCustomer._id) {
+      // Use chat context to send message
+      const success = sendMessage({
+        content: messageInput,
+        recipientId: selectedCustomer._id
+      });
+
+      if (success) {
+        // Update local messages immediately for better UX
+        const newMessage = {
+          senderId: providerId,
+          text: messageInput,
+          timestamp: new Date().toISOString()
+        };
+        setChatMessages(prev => [...(prev || []), newMessage]);
+        setMessageInput('');
+      } else {
+        console.error('Failed to send message');
+        toast.error('Failed to send message. Please try again.');
+      }
+    }
+  };
+
   // Function to fetch customers who have rented cars from this provider
   const fetchCustomers = async () => {
     try {
@@ -355,25 +456,116 @@ const ManageCars = () => {
       const token = auth?.token;
       const providerId = auth?.user?._id;
 
+      console.log("Current provider ID:", providerId);
+
       if (!token || !providerId) {
         throw new Error('No authentication token or provider ID found');
       }
 
-      const response = await fetch(`http://localhost:3000/rentals/provider/${providerId}/customers`, {
+      // Get all rentals and extract customer info
+      const rentalsResponse = await fetch(`http://localhost:3000/rentals/all`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setCustomers(data.customers || []);
-      } else {
-        throw new Error('Failed to fetch customers');
+      if (!rentalsResponse.ok) {
+        throw new Error('Failed to fetch rentals data');
       }
+
+      const rentalsData = await rentalsResponse.json();
+      // The rentals are in data.rentals, not directly in data
+      const rentals = rentalsData.data?.rentals || [];
+      
+      console.log("Fetched rentals:", rentals);
+      
+      // Create a map to store unique customers
+      const customersMap = new Map();
+      
+      // Process each rental to find those related to this provider
+      for (let i = 0; i < rentals.length; i++) {
+        const rental = rentals[i];
+        if (rental.vehicleId) {
+          try {
+            console.log(`Processing rental ${i+1}/${rentals.length} with vehicleId: ${rental.vehicleId}`);
+            
+            // Get vehicle details to check if it belongs to this provider
+            const vehicleResponse = await fetch(`http://localhost:3000/vehicles/${rental.vehicleId}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (vehicleResponse.ok) {
+              const vehicleData = await vehicleResponse.json();
+              const vehicle = vehicleData.data;
+              
+              // Get the provider ID from the vehicle
+              const vehicleProviderId = vehicle?.car_providerId?._id || vehicle?.car_providerId;
+              
+              console.log(`Vehicle ${rental.vehicleId} belongs to provider:`, vehicleProviderId);
+              console.log(`Comparing with current provider:`, providerId);
+              
+              // Check if this vehicle belongs to the current provider
+              if (vehicle && vehicleProviderId === providerId) {
+                console.log(`Match found! Adding customer ${rental.userId} to the list`);
+                
+                // Add customer to map if not already added
+                if (rental.userId && !customersMap.has(rental.userId)) {
+                  // Try to get user details if available
+                  try {
+                    const userResponse = await fetch(`http://localhost:3000/users/${rental.userId}`, {
+                      headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                      }
+                    });
+                    
+                    if (userResponse.ok) {
+                      const userData = await userResponse.json();
+                      const user = userData.data;
+                      
+                      customersMap.set(rental.userId, {
+                        _id: rental.userId,
+                        fullName: user?.fullName || rental.customer?.fullName || 'Unknown Customer',
+                        email: user?.email || rental.customer?.email || 'No email available'
+                      });
+      } else {
+                      // Fallback to rental customer data
+                      customersMap.set(rental.userId, {
+                        _id: rental.userId,
+                        fullName: rental.customer?.fullName || 'Unknown Customer',
+                        email: rental.customer?.email || 'No email available'
+                      });
+                    }
+                  } catch (error) {
+                    // If we can't get user details, use what we have
+                    customersMap.set(rental.userId, {
+                      _id: rental.userId,
+                      fullName: rental.customer?.fullName || 'Unknown Customer',
+                      email: rental.customer?.email || 'No email available'
+                    });
+                  }
+                }
+              } else {
+                console.log(`No match for vehicle ${rental.vehicleId}`);
+              }
+            }
+          } catch (err) {
+            console.error(`Error processing rental ${rental._id}:`, err);
+          }
+        }
+      }
+      
+      // Convert map to array for state
+      const customersList = Array.from(customersMap.values());
+      console.log("Extracted customers:", customersList);
+      setCustomers(customersList);
     } catch (error) {
       console.error('Error fetching customers:', error);
+      toast.error('Could not load customers. Please try again later.');
     } finally {
       setIsLoadingCustomers(false);
     }
@@ -386,21 +578,93 @@ const ManageCars = () => {
     }
   }, [activeTab]);
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!messageInput.trim() || !selectedCustomer) return;
+  // Add this function to fetch rentals
+  const fetchRentals = async () => {
+    try {
+      setIsLoadingRentals(true);
+      const auth = JSON.parse(localStorage.getItem('auth'));
+      const token = auth?.token;
 
-    const auth = JSON.parse(localStorage.getItem('auth'));
-    const providerId = auth?.user?._id;
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
 
-    await sendMessage({
-      content: messageInput,
-      senderId: providerId,
-      recipientId: selectedCustomer._id,
-      timestamp: new Date().toISOString()
-    });
+      const response = await fetch('http://localhost:3000/rentals/provider', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-    setMessageInput('');
+      if (!response.ok) {
+        throw new Error('Failed to fetch rentals');
+      }
+
+      const data = await response.json();
+      const rentalsData = data.data.rentals;
+
+      // Fetch vehicle details for each rental
+      const vehicleDetails = {};
+      for (const rental of rentalsData) {
+        try {
+          const vehicleResponse = await fetch(`http://localhost:3000/vehicles/${rental.vehicleId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (vehicleResponse.ok) {
+            const vehicleData = await vehicleResponse.json();
+            vehicleDetails[rental.vehicleId] = vehicleData.data;
+          }
+        } catch (error) {
+          console.error(`Error fetching vehicle details for ${rental.vehicleId}:`, error);
+        }
+      }
+
+      setRentalVehicles(vehicleDetails);
+      setRentals(rentalsData);
+    } catch (error) {
+      console.error('Error fetching rentals:', error);
+      toast.error('Failed to fetch rentals');
+    } finally {
+      setIsLoadingRentals(false);
+    }
+  };
+
+  // Add this useEffect to fetch rentals when the tab changes
+  useEffect(() => {
+    if (activeTab === 'rental-management') {
+      fetchRentals();
+    }
+  }, [activeTab]);
+
+  // Add this function to handle rental status updates
+  const handleRentalStatusChange = async (rentalId, newStatus) => {
+    try {
+      const auth = JSON.parse(localStorage.getItem('auth'));
+      const token = auth?.token;
+
+      const response = await fetch(`http://localhost:3000/rentals/${rentalId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update rental status');
+      }
+
+      // Refresh rentals after status update
+      fetchRentals();
+      toast.success('Rental status updated successfully');
+    } catch (error) {
+      console.error('Error updating rental status:', error);
+      toast.error('Failed to update rental status');
+    }
   };
 
   return (
@@ -939,9 +1203,8 @@ const ManageCars = () => {
               <div className="flex space-x-2">
                 <select 
                   className="bg-white border border-gray-300 rounded-md px-3 py-2 text-sm"
-                  onChange={(e) => {
-                    // Add filter handling here
-                  }}
+                  value={rentalStatusFilter}
+                  onChange={(e) => setRentalStatusFilter(e.target.value)}
                 >
                   <option value="all">All Status</option>
                   <option value="pending">Pending</option>
@@ -953,111 +1216,282 @@ const ManageCars = () => {
               </div>
             </div>
 
-            {/* Placeholder for rental management content */}
-            <div className="space-y-4">
-              <p className="text-gray-500 text-center py-8">
-                Rental management features will be implemented here.
-                This section will show rental requests, booking status,
-                and allow managing rentals.
-              </p>
-            </div>
+            {isLoadingRentals ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-gray-500">Loading rentals...</p>
+              </div>
+            ) : rentals.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No rental requests found.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {rentals
+                  .filter(rental => rentalStatusFilter === 'all' || rental.status === rentalStatusFilter)
+                  .map(rental => {
+                    const vehicle = rentalVehicles[rental.vehicleId];
+                    return (
+                      <div key={rental._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-start gap-4">
+                          {/* Vehicle Image */}
+                          <div className="w-48 h-32 rounded-lg overflow-hidden">
+                            {vehicle?.images?.[0] ? (
+                              <img
+                                src={`http://localhost:3002${vehicle.images[0]}`}
+                                alt={vehicle.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                                <span className="text-gray-400">No image</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Rental Details */}
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h3 className="text-lg font-semibold">{vehicle?.name || 'Unknown Vehicle'}</h3>
+                                <p className="text-gray-600">{vehicle?.brand} • {vehicle?.modelYear}</p>
+                              </div>
+                              <div className="flex flex-col items-end">
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                  rental.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  rental.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                                  rental.status === 'active' ? 'bg-green-100 text-green-800' :
+                                  rental.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                  rental.status === 'completed' ? 'bg-gray-100 text-gray-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {rental.status.charAt(0).toUpperCase() + rental.status.slice(1)}
+                                </span>
+                                <span className="text-sm text-gray-500 mt-1">
+                                  Payment: {rental.paymentStatus.charAt(0).toUpperCase() + rental.paymentStatus.slice(1)}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="mt-2 grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-sm text-gray-500">Start Date</p>
+                                <p className="font-medium">{new Date(rental.startDate).toLocaleDateString()}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500">End Date</p>
+                                <p className="font-medium">{new Date(rental.endDate).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 flex justify-between items-center">
+                              <div className="text-lg font-semibold text-primary">
+                                {formatCurrency(rental.totalPrice)}
+                              </div>
+                              
+                              {/* Status Actions */}
+                              <div className="flex gap-2">
+                                {rental.status === 'pending' && (
+                                  <>
+                                    <button
+                                      onClick={() => handleRentalStatusChange(rental._id, 'approved')}
+                                      className="px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={() => handleRentalStatusChange(rental._id, 'rejected')}
+                                      className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
+                                    >
+                                      Reject
+                                    </button>
+                                  </>
+                                )}
+                                {rental.status === 'approved' && (
+                                  <button
+                                    onClick={() => handleRentalStatusChange(rental._id, 'active')}
+                                    className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                  >
+                                    Start Rental
+                                  </button>
+                                )}
+                                {rental.status === 'active' && (
+                                  <button
+                                    onClick={() => handleRentalStatusChange(rental._id, 'completed')}
+                                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                                  >
+                                    Complete
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         )}
 
         {/* Messages Tab Content */}
         {activeTab === 'messages' && (
-          <div className="bg-white shadow-md rounded-lg p-6">
-            <div className="grid grid-cols-3 gap-6 h-[600px]">
-              {/* Customers List */}
-              <div className="border-r pr-4">
-                <h3 className="text-lg font-semibold mb-4">Customers</h3>
-                {isLoadingCustomers ? (
-                  <p>Loading customers...</p>
-                ) : customers.length === 0 ? (
-                  <p className="text-gray-500">No customers found</p>
-                ) : (
-                  <div className="space-y-2">
-                    {customers.map((customer) => (
-                      <button
-                        key={customer._id}
-                        onClick={() => {
-                          setSelectedCustomer(customer);
-                          startChat(customer._id);
-                        }}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${
-                          selectedCustomer?._id === customer._id
-                            ? 'bg-primary text-white'
-                            : 'hover:bg-gray-100'
-                        }`}
-                      >
-                        <p className="font-medium">{customer.name}</p>
-                        <p className="text-sm opacity-75">
-                          {customer.email}
-                        </p>
-                      </button>
-                    ))}
+          <div className="bg-white shadow-md rounded-lg">
+            <div className="p-6 border-b">
+              <h2 className="text-2xl font-bold text-gray-900">Customer Messages</h2>
+            </div>
+
+            {/* Show connection error if there's a problem with WebSocket */}
+            {connectionError && (
+              <div className="bg-red-50 p-4 rounded-md mb-6">
+                <div className="flex flex-col">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">Chat service is currently unavailable</h3>
+                      <div className="mt-2 text-sm text-red-700">
+                        <p>Please ensure the chat service is running and try to reconnect.</p>
+                      </div>
+                    </div>
                   </div>
-                )}
+                  <div className="mt-3 ml-8">
+                    <button
+                      onClick={reconnect}
+                      className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded-md text-sm font-medium transition-colors"
+                    >
+                      Reconnect
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[600px]">
+              {/* Customers List */}
+              <div className="border rounded-lg overflow-hidden h-full flex flex-col">
+                <div className="bg-gray-50 p-3 border-b">
+                  <h3 className="font-medium text-gray-700">Customers</h3>
+                </div>
+                
+                <div className="divide-y overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                  {isLoadingCustomers ? (
+                    <div className="p-4 text-center">Loading customers...</div>
+                  ) : customers.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">No customers found</div>
+                  ) : (
+                    customers.map(customer => (
+                      <div 
+                        key={customer._id} 
+                        className={`p-3 hover:bg-gray-50 cursor-pointer flex items-center ${selectedCustomer?._id === customer._id ? 'bg-blue-50' : ''}`}
+                        onClick={() => setSelectedCustomer(customer)}
+                      >
+                        <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center mr-3">
+                          {customer.fullName ? customer.fullName.charAt(0).toUpperCase() : 'U'}
+                        </div>
+                        <div>
+                          <h4 className="font-medium">{customer.fullName || 'Unknown User'}</h4>
+                          <p className="text-sm text-gray-500">{customer.email}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
 
               {/* Chat Area */}
-              <div className="col-span-2">
+              <div className="col-span-2 border rounded-lg flex flex-col h-full">
                 {selectedCustomer ? (
-                  <div className="h-full flex flex-col">
+                  <>
                     {/* Chat Header */}
-                    <div className="border-b pb-4 mb-4">
-                      <h3 className="text-lg font-semibold">
-                        Chat with {selectedCustomer.name}
-                      </h3>
-                    </div>
-
-                    {/* Messages */}
-                    <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-                      {chats[selectedCustomer._id]?.messages.map((message, index) => (
-                        <div
-                          key={index}
-                          className={`flex ${
-                            message.senderId === user._id ? 'justify-end' : 'justify-start'
-                          }`}
-                        >
-                          <div
-                            className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                              message.senderId === user._id
-                                ? 'bg-primary text-white'
-                                : 'bg-gray-100'
-                            }`}
-                          >
-                            <p>{message.content}</p>
-                            <span className="text-xs opacity-75">
-                              {new Date(message.timestamp).toLocaleTimeString()}
-                            </span>
-                          </div>
+                    <div className="bg-gray-50 p-3 border-b flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center mr-3">
+                          {selectedCustomer.fullName ? selectedCustomer.fullName.charAt(0).toUpperCase() : 'C'}
                         </div>
-                      ))}
+                        <div>
+                          <h3 className="font-medium">{selectedCustomer.fullName || 'Unknown Customer'}</h3>
+                          <p className="text-xs text-gray-500">{selectedCustomer.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} 
+                          title={connected ? 'Connected' : 'Disconnected'}>
+                        </div>
+                        <button 
+                          onClick={() => clearChatHistory()} 
+                          className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded transition-colors"
+                          title="Clear chat history"
+                        >
+                          Clear Chat
+                        </button>
+                      </div>
                     </div>
-
+                    
+                    {/* Chat Messages Area */}
+                    <div className="flex-1 overflow-hidden">
+                      <div className="h-full overflow-y-auto p-4 space-y-3" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+                        {chatMessages?.length === 0 ? (
+                          <div className="text-center text-gray-500 my-4">
+                            <p>No messages yet. Start a conversation!</p>
+                          </div>
+                        ) : (
+                          chatMessages?.map((msg, index) => {
+                            const isMyMessage = msg.senderId === user._id;
+                            return (
+                              <div 
+                                key={`${msg.senderId}-${msg.timestamp}-${index}`}
+                                className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'} w-full`}
+                              >
+                                <div 
+                                  className={`p-3 rounded-lg shadow-sm ${
+                                    isMyMessage ? 'bg-blue-100' : 'bg-white'
+                                  } max-w-[85%] break-words`}
+                                >
+                                  <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                                  <span className="text-xs text-gray-500 mt-1 block">
+                                    {formatMessageTime(msg.timestamp)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                        <div ref={messagesEndRef} />
+                      </div>
+                    </div>
+                    
                     {/* Message Input */}
-                    <form onSubmit={handleSendMessage} className="mt-auto">
-                      <div className="flex space-x-2">
+                    <div className="p-3 border-t bg-white mt-auto">
+                      <form onSubmit={handleSendMessage} className="flex space-x-2">
                         <input
                           type="text"
                           value={messageInput}
                           onChange={(e) => setMessageInput(e.target.value)}
-                          placeholder="Type your message..."
-                          className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:border-primary"
+                          placeholder="Type a message..."
+                          className="flex-grow border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <button
                           type="submit"
-                          className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-secondary transition-colors"
+                          disabled={!connected}
+                          className="bg-primary text-white px-4 py-2 rounded-md hover:bg-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Send
                         </button>
-                      </div>
-                    </form>
-                  </div>
+                      </form>
+                    </div>
+                  </>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-gray-500">
-                    Select a customer to start chatting
+                  <div className="flex-grow flex flex-col items-center justify-center p-6 text-center text-gray-500">
+                    <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    <h3 className="text-lg font-medium mb-1">No conversation selected</h3>
+                    <p className="max-w-xs">Select a customer from the list to start chatting</p>
                   </div>
                 )}
               </div>
