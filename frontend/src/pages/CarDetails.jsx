@@ -961,21 +961,27 @@ const CarDetails = () => {
                     min={new Date().toISOString().split('T')[0]}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                   />
-                  <div className="flex gap-2 mt-2">
-                    <input
-                      type="time"
-                      value={pickupTime}
-                      onChange={(e) => setPickupTime(e.target.value)}
-                      className="w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                      placeholder="Giờ lấy xe"
-                    />
-                    <input
-                      type="time"
-                      value={returnTime}
-                      onChange={(e) => setReturnTime(e.target.value)}
-                      className="w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                      placeholder="Giờ trả xe"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Giờ lấy xe</label>
+                      <input
+                        type="time"
+                        value={pickupTime}
+                        onChange={(e) => setPickupTime(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                        placeholder="Giờ lấy xe"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Giờ trả xe</label>
+                      <input
+                        type="time"
+                        value={returnTime}
+                        onChange={(e) => setReturnTime(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                        placeholder="Giờ trả xe"
+                      />
+                    </div>
                   </div>
                 </div>
 
