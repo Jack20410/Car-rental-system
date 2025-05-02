@@ -3,29 +3,35 @@ const axios = require('axios');
 
 // Helper function to calculate rental price
 const calculateRentalPrice = (start, end, vehicle) => {
-  // Check if rental is within the same day
   const isSameDay = start.toDateString() === end.toDateString();
-  
+
   if (isSameDay) {
-    // Calculate hours for same-day rental
     const hourDiff = (end - start) / (1000 * 60 * 60);
-    
-    // If rental is under 6 hours, charge 50% of daily rate
-    if (hourDiff <= 6) {
-      return vehicle.rentalPricePerDay * 0.5;
-    }
-    // If rental is 6-12 hours, charge 75% of daily rate
-    else if (hourDiff <= 12) {
-      return vehicle.rentalPricePerDay * 0.75;
-    }
-    // If over 12 hours, charge full day rate
-    else {
+
+    if (hourDiff <= 4) {
+      return vehicle.rentalPricePerDay * 0.35;
+    } else if (hourDiff <= 8) {
+      return vehicle.rentalPricePerDay * 0.55;
+    } else if (hourDiff <= 12) {
+      return vehicle.rentalPricePerDay * 0.70;
+    } else if (hourDiff <= 16) {
+      return vehicle.rentalPricePerDay * 0.85;
+    } else if (hourDiff <= 22) {
+      return vehicle.rentalPricePerDay;
+    } else {
       return vehicle.rentalPricePerDay;
     }
   } else {
-    // Calculate number of days (rounded up)
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-    return days * vehicle.rentalPricePerDay;
+    if (days === 1) {
+      return vehicle.rentalPricePerDay;
+    } else if (days <= 3) {
+      return days * vehicle.rentalPricePerDay * 0.85;
+    } else if (days <= 6) {
+      return days * vehicle.rentalPricePerDay * 0.75;
+    } else {
+      return days * vehicle.rentalPricePerDay * 0.70;
+    }
   }
 };
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../utils/formatCurrency';
-import { useChat } from '../context/ChatContext';
+// import { useChat } from '../context/ChatContext';
 
 // Modal Component
 const Modal = ({ isOpen, onClose, children }) => {
