@@ -163,11 +163,14 @@ const Cars = () => {
     });
   }, [filteredCars, sortBy]);
 
+  // Lọc chỉ các xe Available
+  const availableCars = sortedCars.filter(car => car.status === 'Available');
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 9;
-  const totalPages = Math.ceil(sortedCars.length / pageSize);
-  const paginatedCars = sortedCars.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.ceil(availableCars.length / pageSize);
+  const paginatedCars = availableCars.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   // Reset to page 1 when filters or sort changes
   React.useEffect(() => {
@@ -408,7 +411,7 @@ const Cars = () => {
             <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
               <div className="flex flex-col sm:flex-row justify-between items-center">
                 <p className="text-gray-600 mb-4 sm:mb-0">
-                  {sortedCars.length} cars found
+                  {availableCars.length} cars found
                 </p>
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-700">Sort by:</span>

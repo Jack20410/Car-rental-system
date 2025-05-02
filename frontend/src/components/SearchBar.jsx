@@ -182,7 +182,9 @@ const SearchBar = () => {
             console.log('Extracted vehicles:', vehicles);
 
             // Filter vehicles based on availability
-            const filteredVehicles = vehicles.filter(vehicle => vehicle !== null);
+            const filteredVehicles = vehicles.filter(
+              vehicle => vehicle !== null && vehicle.status === 'Available'
+            );
             
             console.log('Filtered vehicles:', filteredVehicles);
             
