@@ -22,7 +22,7 @@ async def check_rental_availability(request: Request):
     return await proxy_request(request, target_url)
 
 # General rental routes
-@router.api_route("/rentals/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+@router.api_route("/rentals/{path:path}", methods=["GET", "POST", "PUT","PATCH","DELETE"])
 async def rental_service_routes(request: Request, path: str):
     """Handle all other rental-related requests"""
     logger.info(f"Routing rental request to path: {path}")

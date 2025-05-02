@@ -8,12 +8,19 @@ const {
   updatePaymentStatus,
   checkAvailability 
 } = require('../controllers/rentalController');
-const { verifyToken, requireCustomer } = require('../middleware/authMiddleware');
+const { 
+  verifyToken, 
+  requireCustomer,
+  requireCarProvider,
+  requireRole 
+} = require('../middleware/authMiddleware');
 const { validateCreateRental } = require('../middleware/rentalValidation');
 
+// Public routes
 // GET - Check rental availability
 router.get('/availability', checkAvailability);
 
+// Customer routes
 // POST - Create a new rental (customer only)
 router.post(
   '/',
@@ -24,6 +31,7 @@ router.post(
 );
 
 // GET - Get all rentals for the authenticated user
+// Need to change for only role admin
 router.get(
   '/',
   verifyToken,
@@ -39,19 +47,19 @@ router.get(
   getRentalById
 );
 
-// PATCH - Update rental status (cancel, complete)
+// Update rental status - Combined route for all status updates
 router.patch(
   '/:id/status',
   verifyToken,
-  requireCustomer,
+  requireRole(['admin', 'customer', 'car_provider']),
   updateRentalStatus
 );
 
-// PATCH - Update payment status
+// Payment status updates
 router.patch(
   '/:id/payment',
   verifyToken,
-  requireCustomer,
+  requireRole(['admin', 'system']),
   updatePaymentStatus
 );
 

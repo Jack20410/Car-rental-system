@@ -25,7 +25,7 @@ const rentalSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'active', 'completed', 'cancelled'],
+    enum: ['pending', 'cancelled', 'approved', 'rejected', 'active', 'completed'],
     default: 'pending'
   },
   paymentStatus: {
@@ -34,10 +34,60 @@ const rentalSchema = new mongoose.Schema({
     default: 'unpaid'
   },
   paymentId: {
-    type: mongoose.Schema.Types.ObjectId,  // <-- sửa thành ObjectId
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Payment'
-  }
-}, { timestamps: true }); // <-- tự động createdAt, updatedAt
+  },
+  statusHistory: [{
+    status: {
+      type: String,
+      enum: ['pending', 'cancelled', 'approved', 'rejected', 'active', 'completed']
+    },
+    changedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  paymentHistory: [{
+    status: {
+      type: String,
+      enum: ['unpaid', 'paid', 'refunded']
+    },
+    changedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
+}, { timestamps: true });
 
+// Pre-save middleware to track status changes
+rentalSchema.pre('save', function(next) {
+  // If this is a new document, add initial status to histories
+  if (this.isNew) {
+    this.statusHistory = [{
+      status: this.status,
+      changedAt: new Date()
+    }];
+    this.paymentHistory = [{
+      status: this.paymentStatus,
+      changedAt: new Date()
+    }];
+  } else {
+    // If status has changed, add to history
+    if (this.isModified('status')) {
+      this.statusHistory.push({
+        status: this.status,
+        changedAt: new Date()
+      });
+    }
+    // If payment status has changed, add to history
+    if (this.isModified('paymentStatus')) {
+      this.paymentHistory.push({
+        status: this.paymentStatus,
+        changedAt: new Date()
+      });
+    }
+  }
+  next();
+});
 
 module.exports = mongoose.model('Rental', rentalSchema);

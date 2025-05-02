@@ -115,7 +115,7 @@ exports.createRental = async (req, res) => {
     // Calculate total price using the new helper function
     const totalPrice = calculateRentalPrice(start, end, vehicle);
 
-    // Create rental record
+    // Create rental record with initial status history
     const rental = new Rental({
       userId,
       vehicleId,
@@ -123,7 +123,9 @@ exports.createRental = async (req, res) => {
       endDate: end,
       totalPrice,
       status: 'pending',
-      paymentStatus: 'unpaid'
+      paymentStatus: 'unpaid',
+      statusHistory: [{ status: 'pending', changedAt: new Date() }],
+      paymentHistory: [{ status: 'unpaid', changedAt: new Date() }]
     });
 
     await rental.save();
@@ -137,7 +139,6 @@ exports.createRental = async (req, res) => {
       );
     } catch (error) {
       console.error('Could not update vehicle status:', error.message);
-      // Continue with the rental creation even if the status update fails
     }
 
     return res.status(201).json({
@@ -218,15 +219,15 @@ exports.getRentalById = async (req, res) => {
   }
 };
 
-// Update rental status (cancel, complete)
+// Update rental status (cancel, approve, reject, complete)
 exports.updateRentalStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    const userId = req.user.userId;
+    const userRole = req.user.role;
     
     // Validate status
-    const validStatuses = ['pending', 'active', 'completed', 'cancelled'];
+    const validStatuses = ['pending', 'cancelled', 'approved', 'rejected', 'active', 'completed'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
@@ -242,29 +243,54 @@ exports.updateRentalStatus = async (req, res) => {
         message: 'Rental not found'
       });
     }
-    
-    // Check if the user is the owner of the rental
-    if (rental.userId.toString() !== userId) {
+
+    // Define allowed transitions based on user role
+    const allowedTransitions = {
+      customer: {
+        pending: ['cancelled']
+      },
+      car_provider: {
+        pending: ['approved', 'rejected']
+      },
+      admin: {
+        pending: ['cancelled', 'approved', 'rejected'],
+        approved: ['active', 'cancelled'],
+        active: ['completed'],
+        cancelled: [],
+        rejected: [],
+        completed: []
+      }
+    };
+
+    // Get allowed next statuses for current user role and rental status
+    const allowedNextStatuses = allowedTransitions[userRole]?.[rental.status] || [];
+
+    // Check if the status transition is allowed for this user role
+    if (!allowedNextStatuses.includes(status)) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to update this rental'
+        message: `You are not authorized to change status from ${rental.status} to ${status}`
       });
     }
-    
-    // Update rental status
-    rental.status = status;
-    await rental.save();
-    
-    // If rental is cancelled or completed, update vehicle status
-    if (status === 'cancelled' || status === 'completed') {
-      try {
-        await axios.patch(
-          `${process.env.VEHICLE_SERVICE_URL}/vehicles/${rental.vehicleId}/status`,
-          { status: 'Available' },
-          { headers: { Authorization: req.headers.authorization } }
-        );
-      } catch (error) {
-        console.error('Could not update vehicle status:', error.message);
+
+    // Only update if status is actually changing
+    if (rental.status !== status) {
+      rental.status = status;
+      // statusHistory will be automatically updated by the pre-save middleware
+      
+      await rental.save();
+      
+      // Update vehicle status based on rental status
+      if (['cancelled', 'completed', 'rejected'].includes(status)) {
+        try {
+          await axios.patch(
+            `${process.env.VEHICLE_SERVICE_URL}/vehicles/${rental.vehicleId}/status`,
+            { status: 'Available' },
+            { headers: { Authorization: req.headers.authorization } }
+          );
+        } catch (error) {
+          console.error('Could not update vehicle status:', error.message);
+        }
       }
     }
     
@@ -314,9 +340,28 @@ exports.updatePaymentStatus = async (req, res) => {
         message: 'Not authorized to update this rental'
       });
     }
+
+    // Validate payment status transition
+    const validTransitions = {
+      'unpaid': ['paid'],
+      'paid': ['refunded'],
+      'refunded': []
+    };
+
+    if (!validTransitions[rental.paymentStatus].includes(paymentStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot transition from ${rental.paymentStatus} to ${paymentStatus}`
+      });
+    }
     
-    // Update payment status
+    // Update payment status and add to history
     rental.paymentStatus = paymentStatus;
+    rental.paymentHistory.push({
+      status: paymentStatus,
+      changedAt: new Date()
+    });
+
     await rental.save();
     
     return res.status(200).json({
@@ -362,7 +407,7 @@ exports.checkAvailability = async (req, res) => {
     // Find rentals that overlap with the given date range
     const overlappingRentals = await Rental.find({
       $and: [
-        { status: { $nin: ['cancelled'] } },
+        { status: { $nin: ['cancelled', 'rejected'] } },
         {
           $or: [
             // Rental starts during the requested period
