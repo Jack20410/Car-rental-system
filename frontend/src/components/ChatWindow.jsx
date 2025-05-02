@@ -79,7 +79,7 @@ const ChatWindow = ({ chatId, recipient }) => {
     }
     
     const contextMessages = messages[chatId] || [];
-    console.log(`ChatWindow: Syncing ${contextMessages.length} messages for chat ID ${chatId}`);
+    // console.log(`ChatWindow: Syncing ${contextMessages.length} messages for chat ID ${chatId}`);
     
     if (contextMessages.length > 0) {
       // Set messages from context, sorted by timestamp

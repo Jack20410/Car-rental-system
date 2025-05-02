@@ -293,9 +293,10 @@ exports.updateRentalStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     const userRole = req.user.role;
+    const userId = req.user.userId;
     
     // Validate status
-    const validStatuses = ['pending', 'cancelled', 'approved', 'rejected', 'active', 'completed'];
+    const validStatuses = ['pending', 'cancelled', 'rejected', 'approved', 'started', 'completed'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
@@ -312,18 +313,20 @@ exports.updateRentalStatus = async (req, res) => {
       });
     }
 
-    // Define allowed transitions based on user role
+    // Define allowed transitions based on user role and conditions
     const allowedTransitions = {
       customer: {
-        pending: ['cancelled']
+        pending: ['cancelled'],
+        approved: ['started']
       },
       car_provider: {
-        pending: ['approved', 'rejected']
+        pending: ['approved', 'rejected'],
+        started: ['completed']
       },
       admin: {
         pending: ['cancelled', 'approved', 'rejected'],
-        approved: ['active', 'cancelled'],
-        active: ['completed'],
+        approved: ['started'],
+        started: ['completed'],
         cancelled: [],
         rejected: [],
         completed: []
@@ -339,6 +342,28 @@ exports.updateRentalStatus = async (req, res) => {
         success: false,
         message: `You are not authorized to change status from ${rental.status} to ${status}`
       });
+    }
+
+    // Additional validation for customer role
+    if (userRole === 'customer') {
+      // Verify if the user is the owner of the rental
+      if (rental.userId.toString() !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only update your own rentals'
+        });
+      }
+    }
+
+    // Additional validation for car_provider role
+    if (userRole === 'car_provider') {
+      // Verify if the user is the provider of the rental
+      if (rental.car_providerId.toString() !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only update rentals for your vehicles'
+        });
+      }
     }
 
     // Only update if status is actually changing

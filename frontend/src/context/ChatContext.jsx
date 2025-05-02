@@ -317,7 +317,7 @@ export const ChatProvider = ({ children }) => {
     if (!chatId || !user?._id) return [];
     
     try {
-      console.log('Loading messages for chat:', chatId);
+      // console.log('Loading messages for chat:', chatId);
       const host = import.meta.env.VITE_CHAT_SERVICE_URL || window.location.hostname;
       const port = import.meta.env.VITE_CHAT_SERVICE_PORT || '3005';
       const response = await fetch(`http://${host}:${port}/api/messages/${chatId}`);
@@ -327,7 +327,7 @@ export const ChatProvider = ({ children }) => {
       }
       
       const chatMessages = await response.json();
-      console.log(`Loaded ${chatMessages.length} messages for chat ${chatId}`);
+      // console.log(`Loaded ${chatMessages.length} messages for chat ${chatId}`);
       
       // Update the messages state with the loaded messages
       setMessages(prev => {

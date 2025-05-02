@@ -321,7 +321,7 @@ const ManageCars = () => {
     }
   };
 
-   const handleDeleteCar = async (carId) => {
+  const handleDeleteCar = async (carId) => {
     if (!window.confirm('Are you sure you want to delete this car?')) return;
     try {
       const token = JSON.parse(localStorage.getItem('auth'))?.token;
@@ -344,6 +344,8 @@ const ManageCars = () => {
       alert(`Error deleting car: ${error.message}`);
     }
   };
+
+  // Handle change car status
   const handleChangeStatus = async (car, newStatus) => {
     try {
       const token = JSON.parse(localStorage.getItem('auth'))?.token;
@@ -429,7 +431,7 @@ const ManageCars = () => {
       // The rentals are in data.rentals, not directly in data
       const rentals = rentalsData.data?.rentals || [];
       
-      console.log("Fetched rentals:", rentals);
+      // console.log("Fetched rentals:", rentals);
       
       // Create a map to store unique customers
       const customersMap = new Map();
@@ -439,7 +441,7 @@ const ManageCars = () => {
         const rental = rentals[i];
         if (rental.vehicleId) {
           try {
-            console.log(`Processing rental ${i+1}/${rentals.length} with vehicleId: ${rental.vehicleId}`);
+            // console.log(`Processing rental ${i+1}/${rentals.length} with vehicleId: ${rental.vehicleId}`);
             
             // Get vehicle details to check if it belongs to this provider
             const vehicleResponse = await fetch(`http://localhost:3000/vehicles/${rental.vehicleId}`, {
@@ -1297,9 +1299,10 @@ const ManageCars = () => {
                   <option value="all">All Status</option>
                   <option value="pending">Pending</option>
                   <option value="approved">Approved</option>
-                  <option value="active">Active</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="started">Started</option>
                   <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="rejected">Rejected</option>
                 </select>
               </div>
             </div>
@@ -1348,9 +1351,10 @@ const ManageCars = () => {
                                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                                   rental.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                   rental.status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                                  rental.status === 'active' ? 'bg-green-100 text-green-800' :
-                                  rental.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                  rental.status === 'started' ? 'bg-green-100 text-green-800' :
                                   rental.status === 'completed' ? 'bg-gray-100 text-gray-800' :
+                                  rental.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                  rental.status === 'rejected' ? 'bg-red-100 text-red-800' :
                                   'bg-gray-100 text-gray-800'
                                 }`}>
                                   {rental.status.charAt(0).toUpperCase() + rental.status.slice(1)}
@@ -1395,15 +1399,7 @@ const ManageCars = () => {
                                     </button>
                                   </>
                                 )}
-                                {rental.status === 'approved' && (
-                                  <button
-                                    onClick={() => handleRentalStatusChange(rental._id, 'active')}
-                                    className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                                  >
-                                    Start Rental
-                                  </button>
-                                )}
-                                {rental.status === 'active' && (
+                                {rental.status === 'started' && (
                                   <button
                                     onClick={() => handleRentalStatusChange(rental._id, 'completed')}
                                     className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"

@@ -30,7 +30,7 @@ const rentalSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'cancelled', 'approved', 'rejected', 'active', 'completed'],
+    enum: ['pending', 'cancelled', 'rejected', 'approved', 'started', 'completed'],
     default: 'pending'
   },
   paymentStatus: {
@@ -45,7 +45,7 @@ const rentalSchema = new mongoose.Schema({
   statusHistory: [{
     status: {
       type: String,
-      enum: ['pending', 'cancelled', 'approved', 'rejected', 'active', 'completed']
+      enum: ['pending', 'cancelled', 'rejected', 'approved', 'started', 'completed']
     },
     changedAt: {
       type: Date,
