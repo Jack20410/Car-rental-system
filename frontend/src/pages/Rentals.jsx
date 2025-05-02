@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import api, { endpoints } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/formatCurrency';
 import { toast } from 'react-toastify';
 import { useChat } from '../context/ChatContext';
+import ChatWindow from '../components/ChatWindow';
 
 const RentalCard = ({ rental, onCancel }) => {
   const [provider, setProvider] = useState(null);
@@ -216,6 +217,7 @@ const RentalCard = ({ rental, onCancel }) => {
 
 const Rentals = () => {
   const { user } = useAuth();
+  const location = useLocation();
   const [rentals, setRentals] = useState([]);
   const [loading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -226,10 +228,76 @@ const Rentals = () => {
   const [isLoadingProviders, setIsLoadingProviders] = useState(true);
   
   // Chat context
-  const { startChat, sendMessage, getCurrentChatMessages, currentChat, setCurrentChat, connectionError, clearChatHistory, reconnect, connected } = useChat();
+  const {
+    connected,
+    connectionError,
+    sendMessage,
+    currentChat,
+    setCurrentChat,
+    reconnect,
+    createChatId,
+    loadChatMessages,
+    unreadMessages
+  } = useChat();
   const messagesEndRef = useRef(null);
   const [activeChat, setActiveChat] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
+  const processedMessageIds = useRef(new Set());
+
+  // Handle new messages with useCallback and prevent duplicate processing
+  const handleNewMessage = useCallback((event) => {
+    console.log("Event received in Rentals:", event);
+    
+    // Make sure we have the message data from the event
+    const message = event.detail;
+    if (!message) {
+      console.error("Message event received but no detail found:", event);
+      return;
+    }
+    
+    // Create a unique message identifier
+    const messageId = `${message.senderId}_${message.timestamp}_${message.text}`;
+    
+    // Skip if we've already processed this message
+    if (processedMessageIds.current.has(messageId)) {
+      console.log("Skipping already processed message:", messageId);
+      return;
+    }
+    
+    console.log("New message received in Rentals:", message);
+    processedMessageIds.current.add(messageId);
+    
+    // Only add message to this chat if it belongs to the current conversation
+    if (currentChat && message.chatId === currentChat.id) {
+      setChatMessages(prev => {
+        // Check if message is already in the array
+        const isDuplicate = prev.some(m => 
+          m.senderId === message.senderId && 
+          m.text === message.text && 
+          m.timestamp === message.timestamp
+        );
+        
+        if (isDuplicate) {
+          console.log("Duplicate message detected, skipping update");
+          return prev;
+        }
+        
+        console.log("Adding new message to chat:", message);
+        return [...prev, message];
+      });
+    } else {
+      console.log("Message doesn't belong to current chat or no chat is selected");
+      if (currentChat) {
+        console.log("Current chat ID:", currentChat.id);
+        console.log("Message chat ID:", message.chatId);
+      }
+    }
+  }, [currentChat]);
+
+  // Clear processed messages when currentChat changes
+  useEffect(() => {
+    processedMessageIds.current.clear();
+  }, [currentChat]);
 
   const fetchRentals = async () => {
     try {
@@ -243,7 +311,7 @@ const Rentals = () => {
     }
   };
 
-  const fetchProviders = async () => {
+  const fetchProviders = useCallback(async () => {
     try {
       setIsLoadingProviders(true);
       const auth = JSON.parse(localStorage.getItem('auth'));
@@ -339,13 +407,43 @@ const Rentals = () => {
       const providersList = Array.from(providersMap.values());
       console.log("Extracted providers:", providersList);
       setProviders(providersList);
+
+      // Check if we should auto-select a provider with unread messages
+      // This happens when user clicks on notification bell
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'messages' && providersList.length > 0) {
+        // Get unread messages status
+        const unreadMessages = JSON.parse(localStorage.getItem('unread_messages') || '{}');
+        
+        // Find a provider with unread messages
+        let providerWithUnread = null;
+        
+        // Look through unread message chats to find a provider
+        for (const chatId in unreadMessages) {
+          if (unreadMessages[chatId] > 0) {
+            // Chat IDs are formed as smaller_id_larger_id
+            const ids = chatId.split('_');
+            // Find which ID is the provider (not the current user)
+            const providerId = ids.find(id => id !== userId);
+            
+            if (providerId) {
+              // Find this provider in our list
+              providerWithUnread = providersList.find(p => p._id === providerId);
+              if (providerWithUnread) break;
+            }
+          }
+        }
+        
+        // Auto-select the first provider with unread messages, or the first provider if none have unread messages
+        setSelectedProvider(providerWithUnread || providersList[0]);
+      }
     } catch (error) {
       console.error('Error fetching providers:', error);
       toast.error('Could not load providers. Please try again later.');
     } finally {
       setIsLoadingProviders(false);
     }
-  };
+  }, [user, createChatId]);
 
   useEffect(() => {
     fetchRentals();
@@ -380,35 +478,52 @@ const Rentals = () => {
 
   // Store messages in local state for better rendering
   useEffect(() => {
-    if (!currentChat) return;
-    
-    // Get current messages and update local state
-    const messages = getCurrentChatMessages();
-    console.log("Setting chat messages:", messages);
-    setChatMessages(messages || []);
+    if (currentChat) {
+      console.log("Current chat changed:", currentChat);
+      setActiveChat(currentChat);
+      
+      // Get current messages and update local state
+      const loadMessages = async () => {
+        await loadChatMessages(currentChat.id);
+      };
+      loadMessages();
+    }
+  }, [currentChat, loadChatMessages]);
 
-    // Subscribe to new messages
-    const handleNewMessage = (message) => {
-      console.log("New message received:", message);
-      setChatMessages(prev => [...(prev || []), message]);
-    };
-
-    // Add message listener using window events since WebSocket handling is done in ChatContext
+  // Listen for new messages
+  useEffect(() => {
     window.addEventListener('chat-message', handleNewMessage);
-
-    // Cleanup
     return () => {
       window.removeEventListener('chat-message', handleNewMessage);
     };
-  }, [currentChat]);
+  }, [handleNewMessage]);
 
-  // Sync with getCurrentChatMessages when they change
-  useEffect(() => {
-    const messages = getCurrentChatMessages();
-    if (messages && messages.length > 0) {
-      setChatMessages(messages);
+  // Start chat with provider
+  const startChat = (provider) => {
+    if (!provider) return;
+    
+    try {
+      // Clear previous chat messages first
+      setChatMessages([]);
+      processedMessageIds.current.clear();
+      
+      // Use the consistent chatId function to ensure the same ID is used in both directions
+      const chatId = createChatId(user._id, provider._id);
+      console.log(`Setting up chat with ${provider.fullName}, chatId: ${chatId}`);
+      
+      // Set the current chat with the consistent ID
+      setCurrentChat({
+        id: chatId,
+        recipient: provider
+      });
+      
+      // Pre-load messages for this chat
+      loadChatMessages(chatId);
+    } catch (error) {
+      console.error("Error setting up chat:", error);
+      toast.error("Failed to set up chat. Please try again.");
     }
-  }, [getCurrentChatMessages]);
+  };
 
   // Start or select a chat when provider is selected
   useEffect(() => {
@@ -417,7 +532,18 @@ const Rentals = () => {
       startChat(selectedProvider);
       setActiveChat(selectedProvider._id);
     }
-  }, [selectedProvider, startChat]);
+  }, [selectedProvider]);
+
+  // Clear chat state when user changes or logs out
+  useEffect(() => {
+    if (!user) {
+      // Clear all chat-related state
+      setChatMessages([]);
+      setCurrentChat(null);
+      setActiveChat(null);
+      processedMessageIds.current.clear();
+    }
+  }, [user]);
 
   // Debug current chat state
   useEffect(() => {
@@ -426,20 +552,22 @@ const Rentals = () => {
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'end',
-        inline: 'nearest'
-      });
-    }
+    // Use RequestAnimationFrame to ensure DOM is ready
+    const scrollTimeout = requestAnimationFrame(() => {
+      if (messagesEndRef.current && currentChat) {
+        // Find the container element for this specific chat
+        const chatContainer = messagesEndRef.current.closest('.chat-message-container');
+        if (chatContainer) {
+          // Scroll the container instead of using scrollIntoView (which can affect page position)
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+      }
+    });
     
-    // Prevent body scroll when viewing messages
     return () => {
-      // Reset any scroll behavior when component unmounts
-      document.body.style.overflow = '';
+      cancelAnimationFrame(scrollTimeout);
     };
-  }, [chatMessages]);
+  }, [chatMessages, currentChat]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -451,13 +579,24 @@ const Rentals = () => {
     if (!currentChat) {
       console.log("No current chat, starting a new one");
       startChat(selectedProvider);
-      return; // Wait for chat to be established
+      
+      // Save the message to send after chat is established
+      setTimeout(() => {
+        sendMessage({
+          content: messageInput,
+          recipientId: selectedProvider._id
+        });
+        setMessageInput('');
+      }, 500);
+      
+      return;
     }
     
     // Use chat context to send message
     const success = sendMessage({
       content: messageInput,
-      recipientId: selectedProvider._id
+      recipientId: selectedProvider._id,
+      chatId: currentChat.id
     });
     
     if (success) {
@@ -465,22 +604,37 @@ const Rentals = () => {
       const newMessage = {
         senderId: user._id,
         text: messageInput,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        chatId: currentChat.id
       };
       setChatMessages(prev => [...(prev || []), newMessage]);
       setMessageInput('');
       
-      // Scroll to bottom after a small delay to ensure the DOM has updated
-      setTimeout(() => {
+      // Request to scroll chat container to bottom after state update
+      requestAnimationFrame(() => {
         if (messagesEndRef.current) {
-          messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+          const chatContainer = messagesEndRef.current.closest('.chat-message-container');
+          if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+          }
         }
-      }, 100);
+      });
     } else {
       console.error('Failed to send message');
       toast.error('Failed to send message. Please try again.');
     }
   };
+
+  // Check for tab query parameter to set active tab automatically
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam === 'messages') {
+      setActiveTab('messages');
+      // Fetch providers when switching to messages tab from notification
+      fetchProviders();
+    }
+  }, [location, fetchProviders]);
 
   if (loading) {
     return (
@@ -617,137 +771,55 @@ const Rentals = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[600px]">
-              {/* Providers List */}
-              <div className="border rounded-lg overflow-hidden h-full">
-                <div className="bg-gray-50 p-3 border-b">
-                  <h3 className="font-medium text-gray-700">Car Providers</h3>
-                </div>
-                
-                <div className="h-[calc(100%-48px)] overflow-y-auto">
-                  {isLoadingProviders ? (
-                    <div className="p-4 text-center">Loading providers...</div>
-                  ) : providers.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">No providers found</div>
-                  ) : (
-                    providers.map(provider => (
-                      <div 
-                        key={provider._id} 
-                        className={`p-3 hover:bg-gray-50 cursor-pointer flex items-center ${selectedProvider?._id === provider._id ? 'bg-blue-50' : ''}`}
-                        onClick={() => setSelectedProvider(provider)}
-                      >
-                        <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center mr-3">
-                          {provider.fullName ? provider.fullName.charAt(0).toUpperCase() : 'P'}
-                        </div>
-                        <div>
-                          <h4 className="font-medium">{provider.fullName || 'Unknown Provider'}</h4>
-                          <p className="text-sm text-gray-500">{provider.email}</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
+            <div className="grid grid-cols-4 h-[655px]">
+              {/* Providers list */}
+              <div className="col-span-1 border-r border-gray-200 overflow-y-auto">
+                <div className="p-4">
+                  <h2 className="text-lg font-semibold mb-4">Car Providers</h2>
+                  <div className="space-y-2">
+                    {providers.map(provider => {
+                      // Check if this provider has unread messages
+                      const providerChatId = createChatId(user._id, provider._id);
+                      const hasUnread = unreadMessages[providerChatId] && unreadMessages[providerChatId] > 0;
+                      
+                      return (
+                        <button
+                          key={provider._id}
+                          onClick={() => startChat(provider)}
+                          className={`w-full p-3 rounded-lg text-left transition-colors relative ${
+                            currentChat?.recipient?._id === provider._id
+                              ? 'bg-blue-50 text-blue-700'
+                              : hasUnread 
+                                ? 'bg-yellow-50 hover:bg-yellow-100' 
+                                : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="font-medium">{provider.fullName}</div>
+                          <div className="text-sm text-gray-500">{provider.email}</div>
+                          
+                          {/* Unread indicator */}
+                          {hasUnread && (
+                            <span className="absolute top-3 right-3 h-3 w-3 bg-red-500 rounded-full animate-pulse"></span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              {/* Chat Area */}
-              <div className="col-span-2 border rounded-lg flex flex-col h-full overflow-hidden chat-container">
-                {selectedProvider ? (
-                  <>
-                    {/* Chat Header */}
-                    <div className="bg-gray-50 p-3 border-b flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center mr-3">
-                          {selectedProvider.fullName ? selectedProvider.fullName.charAt(0).toUpperCase() : 'P'}
-                        </div>
-                        <div>
-                          <h3 className="font-medium">{selectedProvider.fullName || 'Unknown Provider'}</h3>
-                          <p className="text-xs text-gray-500">{selectedProvider.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} 
-                          title={connected ? 'Connected' : 'Disconnected'}>
-                        </div>
-                        <button 
-                          onClick={() => clearChatHistory()} 
-                          className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded transition-colors"
-                          title="Clear chat history"
-                        >
-                          Clear Chat
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Chat Messages Area - Improved Structure */}
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                      <div 
-                        className="chat-message-container"
-                        onClick={(e) => {
-                          // Prevent clicks inside chat from scrolling the page
-                          e.stopPropagation();
-                        }}
-                      >
-                        {chatMessages?.length === 0 ? (
-                          <div className="text-center text-gray-500 my-4">
-                            <p>No messages yet. Start a conversation!</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {chatMessages.map((msg, index) => {
-                              const isMyMessage = msg.senderId === user._id;
-                              return (
-                                <div 
-                                  key={`${msg.senderId}-${msg.timestamp}-${index}`}
-                                  className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
-                                >
-                                  <div 
-                                    className={`chat-bubble ${
-                                      isMyMessage ? 'chat-bubble-sent' : 'chat-bubble-received'
-                                    }`}
-                                  >
-                                    <div className="break-words overflow-hidden">
-                                      <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                                      <span className="text-xs text-gray-500 mt-1 block">
-                                        {formatMessageTime(msg.timestamp)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            <div ref={messagesEndRef} className="h-0 w-full"></div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Message Input */}
-                    <div className="chat-input-container">
-                      <form onSubmit={handleSendMessage} className="flex space-x-2">
-                        <input
-                          type="text"
-                          value={messageInput}
-                          onChange={(e) => setMessageInput(e.target.value)}
-                          placeholder="Type a message..."
-                          className="chat-input flex-1"
-                        />
-                        <button
-                          type="submit"
-                          disabled={!connected}
-                          className="chat-send-button"
-                        >
-                          Send
-                        </button>
-                      </form>
-                    </div>
-                  </>
+              {/* Chat window */}
+              <div className="col-span-3 p-4">
+                {currentChat ? (
+                  <div className="h-full chat-wrapper">
+                    <ChatWindow 
+                      chatId={currentChat.id} 
+                      recipient={currentChat.recipient}
+                    />
+                  </div>
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-gray-500">
-                    <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                    <h3 className="text-lg font-medium mb-1">No conversation selected</h3>
-                    <p className="max-w-xs">Select a provider from the list to start chatting</p>
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    Select a provider to start chatting
                   </div>
                 )}
               </div>

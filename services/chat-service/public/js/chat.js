@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let userId = null;
     let userColor = null;
     let connectedUsers = [];
+    let currentChatId = null; // Track current chat ID
     
     // WebSocket connection
     const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -54,9 +55,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function sendMessage() {
         const message = messageInput.value.trim();
         if (message && socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({
-                text: message
-            }));
+            const messageData = {
+                text: message,
+                timestamp: new Date().toISOString()
+            };
+            
+            // If we have a currentChatId, include it
+            if (currentChatId) {
+                messageData.chatId = currentChatId;
+            }
+            
+            socket.send(JSON.stringify(messageData));
             messageInput.value = '';
         }
     }
@@ -75,6 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateUsersList();
                 
                 addSystemMessage(data.data.message);
+                
+                // Load conversation history after connecting
+                loadConversations();
                 break;
                 
             case 'user-connected':
@@ -101,7 +113,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
                 
             case 'chat-message':
-                addChatMessage(data.data);
+                // Update currentChatId if not set yet
+                if (!currentChatId) {
+                    currentChatId = data.data.chatId;
+                }
+                
+                // Only add the message if it's for our current chat
+                if (data.data.chatId === currentChatId) {
+                    addChatMessage(data.data);
+                } else {
+                    // If it's not for our current chat, show a notification
+                    showMessageNotification(data.data);
+                }
                 break;
         }
     }
@@ -109,14 +132,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add chat message to the UI
     function addChatMessage(messageData) {
         const messageElement = document.createElement('div');
-        messageElement.className = `message ${messageData.id === userId ? 'my-message' : 'other-message'}`;
+        messageElement.className = `message ${messageData.senderId === userId ? 'my-message' : 'other-message'}`;
         
         const timestamp = new Date(messageData.timestamp).toLocaleTimeString();
         
         // Create message content
         messageElement.innerHTML = `
-            <div class="sender" style="color: ${messageData.color}">
-                ${messageData.id}
+            <div class="sender" style="color: ${messageData.color || '#000'}">
+                ${messageData.senderName || messageData.senderId}
                 <span class="time">${timestamp}</span>
             </div>
             <div class="text">${escapeHtml(messageData.text)}</div>
@@ -124,6 +147,22 @@ document.addEventListener('DOMContentLoaded', () => {
         
         messagesContainer.appendChild(messageElement);
         scrollToBottom();
+    }
+    
+    // Show notification for messages from other chats
+    function showMessageNotification(messageData) {
+        // Create a notification element
+        const notification = document.createElement('div');
+        notification.className = 'message-notification';
+        notification.textContent = `New message from ${messageData.senderName || messageData.senderId}`;
+        
+        // Add to body
+        document.body.appendChild(notification);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
     }
     
     // Add system message
@@ -171,5 +210,66 @@ document.addEventListener('DOMContentLoaded', () => {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    // Load user's conversations
+    async function loadConversations() {
+        try {
+            if (!userId) return;
+            
+            const response = await fetch(`/api/conversations/${userId}`);
+            if (!response.ok) throw new Error('Failed to fetch conversations');
+            
+            const conversations = await response.json();
+            
+            if (conversations.length > 0) {
+                // Use the first conversation by default
+                currentChatId = conversations[0].chatId;
+                
+                // Load messages for this conversation
+                loadMessages(currentChatId);
+            }
+        } catch (error) {
+            console.error('Error loading conversations:', error);
+            addSystemMessage('Failed to load conversations');
+        }
+    }
+    
+    // Load messages for a chat
+    async function loadMessages(chatId) {
+        try {
+            // Clear current messages
+            messagesContainer.innerHTML = '';
+            
+            // Show loading message
+            addSystemMessage('Loading messages...');
+            
+            const response = await fetch(`/api/messages/${chatId}`);
+            if (!response.ok) throw new Error('Failed to fetch messages');
+            
+            const messages = await response.json();
+            
+            // Remove loading message
+            messagesContainer.innerHTML = '';
+            
+            if (messages.length === 0) {
+                addSystemMessage('No messages yet. Start a conversation!');
+            } else {
+                // Display all messages
+                messages.forEach(message => {
+                    addChatMessage({
+                        senderId: message.senderId,
+                        senderName: message.senderName,
+                        text: message.text,
+                        timestamp: message.timestamp,
+                        color: connectedUsers.find(u => u.id === message.senderId)?.color || '#000'
+                    });
+                });
+            }
+        } catch (error) {
+            console.error('Error loading messages:', error);
+            messagesContainer.innerHTML = '';
+            addSystemMessage('Failed to load messages');
+        }
     }
 }); 

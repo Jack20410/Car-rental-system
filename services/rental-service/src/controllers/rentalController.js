@@ -29,6 +29,63 @@ const calculateRentalPrice = (start, end, vehicle) => {
   }
 };
 
+// Check vehicle availability for specified dates
+exports.checkAvailability = async (req, res) => {
+  try {
+    const { vehicleId, startDate, endDate } = req.query;
+    
+    if (!vehicleId || !startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vehicle ID, start date, and end date are required'
+      });
+    }
+
+    // Convert string dates to Date objects
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Find any overlapping rentals for the vehicle that are not cancelled or rejected
+    const overlappingRentals = await Rental.find({
+      vehicleId,
+      status: { $nin: ['cancelled', 'rejected'] },
+      $or: [
+        // Rental period overlaps with start date
+        { 
+          startDate: { $lte: start },
+          endDate: { $gte: start }
+        },
+        // Rental period overlaps with end date
+        {
+          startDate: { $lte: end },
+          endDate: { $gte: end }
+        },
+        // Rental period is inside requested period
+        {
+          startDate: { $gte: start },
+          endDate: { $lte: end }
+        }
+      ]
+    });
+
+    const isAvailable = overlappingRentals.length === 0;
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        isAvailable,
+        conflictingRentals: isAvailable ? [] : overlappingRentals
+      }
+    });
+  } catch (error) {
+    console.error('Error checking availability:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while checking availability'
+    });
+  }
+};
+
 // Create a new rental
 exports.createRental = async (req, res) => {
   console.log('Received rental creation request:', {
@@ -389,67 +446,83 @@ exports.updatePaymentStatus = async (req, res) => {
   }
 };
 
-// Check rental availability for a date range
-exports.checkAvailability = async (req, res) => {
+// Get all rentals
+exports.getAllRentals = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
-
-    // Convert dates to start of day and end of day
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);  // Set to start of day
-
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);  // Set to end of day
-
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid date format. Use YYYY-MM-DD format.'
-      });
-    }
-
-    if (start >= end) {
-      return res.status(400).json({
-        success: false,
-        message: 'End date must be after start date'
-      });
-    }
-
-    // Find rentals that overlap with the given date range
-    const overlappingRentals = await Rental.find({
-      $and: [
-        { status: { $nin: ['cancelled', 'rejected'] } },
-        {
-          $or: [
-            // Rental starts during the requested period
-            {
-              startDate: { $gte: start, $lt: end }
-            },
-            // Rental ends during the requested period
-            {
-              endDate: { $gt: start, $lte: end }
-            },
-            // Rental spans the entire requested period
-            {
-              startDate: { $lte: start },
-              endDate: { $gte: end }
-            }
-          ]
-        }
-      ]
-    });
-
+    const { status, paymentStatus, limit = 10, page = 1 } = req.query;
+    
+    // Build filter object
+    const filter = {};
+    if (status) filter.status = status;
+    if (paymentStatus) filter.paymentStatus = paymentStatus;
+    
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const rentals = await Rental.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
+    
+    const total = await Rental.countDocuments(filter);
+    
     return res.status(200).json({
       success: true,
-      message: 'Rental availability checked successfully',
-      data: overlappingRentals
+      message: 'Rentals retrieved successfully',
+      data: rentals,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
     });
   } catch (error) {
-    console.error('Error checking rental availability:', error);
+    console.error('Error retrieving all rentals:', error);
     return res.status(500).json({
       success: false,
-      message: 'An error occurred while checking rental availability',
-      error: error.message
+      message: 'An error occurred while retrieving rentals'
+    });
+  }
+};
+
+// Get all rentals for a provider
+exports.getProviderRentals = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { status, paymentStatus, limit = 10, page = 1 } = req.query;
+    
+    // Build filter object
+    const filter = { car_providerId: userId };
+    if (status) filter.status = status;
+    if (paymentStatus) filter.paymentStatus = paymentStatus;
+    
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const rentals = await Rental.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
+    
+    const total = await Rental.countDocuments(filter);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Provider rentals retrieved successfully',
+      data: rentals,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error retrieving provider rentals:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while retrieving provider rentals'
     });
   }
 };

@@ -113,6 +113,26 @@ services:
     networks:
       - car-rental-network
 
+  # Chat Service
+  chat-service:
+    build: ./services/chat-service
+    ports:
+      - "3005:3005"
+    environment:
+      - PORT=3005
+      - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/chat_service_db
+      - JWT_SECRET=ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt
+      - ALLOWED_ORIGINS=http://localhost:4000,http://host.docker.internal:4000,http://frontend:4000
+    volumes:
+      - ./services/chat-service:/app
+      - /app/node_modules
+    depends_on:
+      - user-service
+    networks:
+      - car-rental-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 networks:
   car-rental-network:
     driver: bridge

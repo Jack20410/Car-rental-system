@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { formatCurrency } from '../utils/formatCurrency';
 import { useChat } from '../context/ChatContext';
 import { toast } from 'react-toastify';
+import ChatWindow from '../components/ChatWindow';
 
 // Modal Component
 const Modal = ({ isOpen, onClose, children }) => {
@@ -33,6 +34,7 @@ const Modal = ({ isOpen, onClose, children }) => {
 const ManageCars = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [cars, setCars] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -63,16 +65,28 @@ const ManageCars = () => {
   const [imageError, setImageError] = useState('');
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [messageInput, setMessageInput] = useState('');
-  const { startChat, sendMessage, getCurrentChatMessages, currentChat, setCurrentChat, connectionError, clearChatHistory, reconnect, connected } = useChat();
-  const [activeChat, setActiveChat] = useState(null);
-  const messagesEndRef = useRef(null);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
-  const [chatMessages, setChatMessages] = useState([]);
   const [rentals, setRentals] = useState([]);
   const [isLoadingRentals, setIsLoadingRentals] = useState(false);
   const [rentalStatusFilter, setRentalStatusFilter] = useState('all');
   const [rentalVehicles, setRentalVehicles] = useState({});
+  const [chatMessages, setChatMessages] = useState([]);
+  const messagesEndRef = useRef(null);
+  const processedMessageIds = useRef(new Set());
+
+  // Chat context
+  const { 
+    connected, 
+    connectionError, 
+    sendMessage, 
+    currentChat, 
+    setCurrentChat, 
+    reconnect,
+    createChatId,
+    loadChatMessages,
+    unreadMessages,
+    markMessagesAsRead
+  } = useChat();
 
   // Check auth directly from session storage as a fallback
   useEffect(() => {
@@ -355,113 +369,33 @@ const ManageCars = () => {
     }
   };
 
-
-
-  // Function to format chat timestamp
-  const formatMessageTime = (timestamp) => {
-    if (!timestamp) return '';
+  // Handle customer selection for chat - defined as regular function
+  const handleCustomerSelect = (customer) => {
+    if (!customer || !user?._id) return;
     
-    const messageDate = new Date(timestamp);
-    return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  // Store messages in local state for better rendering
-  useEffect(() => {
-    if (!currentChat) return;
+    setSelectedCustomer(customer);
     
-    // Get current messages and update local state
-    const messages = getCurrentChatMessages();
-    console.log("Setting chat messages:", messages);
-    setChatMessages(messages || []);
-
-    // Subscribe to new messages
-    const handleNewMessage = (message) => {
-      console.log("New message received:", message);
-      setChatMessages(prev => [...(prev || []), message]);
-    };
-
-    // Add message listener using window events since WebSocket handling is done in ChatContext
-    window.addEventListener('chat-message', handleNewMessage);
-
-    // Cleanup
-    return () => {
-      window.removeEventListener('chat-message', handleNewMessage);
-    };
-  }, [currentChat]);
-
-  // Sync with getCurrentChatMessages when they change
-  useEffect(() => {
-    const messages = getCurrentChatMessages();
-    if (messages && messages.length > 0) {
-      setChatMessages(messages);
-    }
-  }, [getCurrentChatMessages]);
-
-  // Start or select a chat when customer is selected
-  useEffect(() => {
-    if (selectedCustomer) {
-      console.log("Starting chat with customer:", selectedCustomer);
-      startChat(selectedCustomer);
-      setActiveChat(selectedCustomer._id);
-    }
-  }, [selectedCustomer, startChat]);
-
-  // Debug current chat state
-  useEffect(() => {
-    console.log("Current chat state:", { currentChat, messages: chatMessages });
-  }, [currentChat, chatMessages]);
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'end',
-        inline: 'nearest'
+    try {
+      // Use the consistentChatId function from context to ensure the same ID is used both ways
+      const chatId = createChatId(user._id, customer._id);
+      console.log(`Setting up chat with ${customer.fullName}, chatId: ${chatId}`);
+      
+      // Set the current chat with the consistent ID
+      setCurrentChat({
+        id: chatId,
+        recipient: customer
       });
-    }
-    
-    // Prevent body scroll when viewing messages
-    return () => {
-      // Reset any scroll behavior when component unmounts
-      document.body.style.overflow = '';
-    };
-  }, [chatMessages]);
-
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!messageInput.trim() || !selectedCustomer || !connected) return;
-
-    const auth = JSON.parse(localStorage.getItem('auth'));
-    const providerId = auth?.user?._id;
-
-    if (providerId && selectedCustomer._id) {
-      // Use chat context to send message
-      const success = sendMessage({
-        content: messageInput,
-        recipientId: selectedCustomer._id
-      });
-
-      if (success) {
-        // Update local messages immediately for better UX
-        const newMessage = {
-          senderId: providerId,
-          text: messageInput,
-          timestamp: new Date().toISOString()
-        };
-        setChatMessages(prev => [...(prev || []), newMessage]);
-        setMessageInput('');
-        
-        // Scroll to bottom after a small delay to ensure the DOM has updated
-        setTimeout(() => {
-          if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
-          }
-        }, 100);
-      } else {
-        console.error('Failed to send message');
-        toast.error('Failed to send message. Please try again.');
-      }
+      
+      // Pre-load messages for this chat
+      loadChatMessages(chatId);
+      
+      // Mark messages as read
+      setTimeout(() => {
+        markMessagesAsRead(chatId);
+      }, 300);
+    } catch (error) {
+      console.error("Error setting up chat:", error);
+      toast.error("Failed to set up chat. Please try again.");
     }
   };
 
@@ -549,7 +483,7 @@ const ManageCars = () => {
                         fullName: user?.fullName || rental.customer?.fullName || 'Unknown Customer',
                         email: user?.email || rental.customer?.email || 'No email available'
                       });
-      } else {
+                    } else {
                       // Fallback to rental customer data
                       customersMap.set(rental.userId, {
                         _id: rental.userId,
@@ -580,6 +514,39 @@ const ManageCars = () => {
       const customersList = Array.from(customersMap.values());
       console.log("Extracted customers:", customersList);
       setCustomers(customersList);
+      
+      // Check if we should auto-select a customer with unread messages
+      if (customersList.length > 0) {
+        // Get unread messages status
+        const unreadMessages = JSON.parse(localStorage.getItem('unread_messages') || '{}');
+        
+        // Find a customer with unread messages
+        let customerWithUnread = null;
+        
+        // Look through unread message chats to find a customer
+        for (const chatId in unreadMessages) {
+          if (unreadMessages[chatId] > 0) {
+            // Chat IDs are formed as smaller_id_larger_id
+            const ids = chatId.split('_');
+            // Find which ID is the customer (not the current user/provider)
+            const customerId = ids.find(id => id !== providerId);
+            
+            if (customerId) {
+              // Find this customer in our list
+              customerWithUnread = customersList.find(c => c._id === customerId);
+              if (customerWithUnread) break;
+            }
+          }
+        }
+        
+        // Auto-select the first customer with unread messages or the first customer
+        // Only select if no customer is currently selected (to avoid overriding user selection)
+        if (!selectedCustomer) {
+          const customerToSelect = customerWithUnread || customersList[0];
+          setSelectedCustomer(customerToSelect);
+          handleCustomerSelect(customerToSelect);
+        }
+      }
     } catch (error) {
       console.error('Error fetching customers:', error);
       toast.error('Could not load customers. Please try again later.');
@@ -683,6 +650,110 @@ const ManageCars = () => {
       toast.error('Failed to update rental status');
     }
   };
+
+  // Effect to handle real-time chat updates
+  useEffect(() => {
+    if (!selectedCustomer || !user?._id) return;
+
+    // Create chat ID using both user IDs (sorted to maintain consistency)
+    const chatId = createChatId(user._id, selectedCustomer._id);
+    console.log(`Setting up chat with ${selectedCustomer.fullName}, chatId: ${chatId}`);
+
+    // Set the current chat with the consistent ID
+    setCurrentChat({
+      id: chatId,
+      recipient: selectedCustomer
+    });
+
+    // Pre-load messages for this chat
+    if (chatId) {
+      loadChatMessages(chatId);
+    }
+  }, [selectedCustomer, user, createChatId, loadChatMessages]);
+
+  // Handle new messages with useCallback to prevent issues with stale closures
+  const handleNewMessage = useCallback((event) => {
+    // Skip if not initialized yet
+    if (!user || !currentChat) return;
+    
+    console.log("Event received in ManageCars:", event);
+    
+    // Make sure we have the message data from the event
+    const message = event.detail;
+    if (!message) {
+      console.error("Message event received but no detail found:", event);
+      return;
+    }
+    
+    // Create a unique message identifier
+    const messageId = `${message.senderId}_${message.timestamp}_${message.text}`;
+    
+    // Skip if we've already processed this message
+    if (processedMessageIds.current.has(messageId)) {
+      console.log("Skipping already processed message:", messageId);
+      return;
+    }
+    
+    console.log("New message received in ManageCars:", message);
+    processedMessageIds.current.add(messageId);
+    
+    // Only add message to this chat if it belongs to the current conversation
+    if (currentChat && message.chatId === currentChat.id) {
+      // Update UI as needed - ChatWindow component handles this now
+      console.log("Message belongs to current chat:", currentChat.id);
+    }
+  }, [currentChat, user]);
+
+  // Clear processed messages when currentChat changes
+  useEffect(() => {
+    processedMessageIds.current.clear();
+  }, [currentChat]);
+
+  // Listen for new messages
+  useEffect(() => {
+    // Skip if component not fully initialized
+    if (!user) return;
+    
+    const messageHandler = (event) => {
+      handleNewMessage(event);
+    };
+    
+    window.addEventListener('chat-message', messageHandler);
+    
+    return () => {
+      window.removeEventListener('chat-message', messageHandler);
+    };
+  }, [handleNewMessage, user]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    // Only try to scroll if we have a current chat
+    if (!currentChat) return;
+    
+    // Use RequestAnimationFrame to ensure DOM is ready
+    const scrollTimeout = requestAnimationFrame(() => {
+      if (messagesEndRef.current) {
+        // Find the container element for this specific chat
+        const chatContainer = messagesEndRef.current.closest('.chat-message-container');
+        if (chatContainer) {
+          // Scroll the container instead of using scrollIntoView (which can affect page position)
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+      }
+    });
+    
+    return () => cancelAnimationFrame(scrollTimeout);
+  }, [currentChat]); // Only depend on currentChat, not on chatMessages which could cause extra renders
+
+  // Check for tab query parameter to set active tab automatically
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam === 'messages') {
+      setActiveTab('messages');
+      // This will trigger fetchCustomers() through the activeTab useEffect
+    }
+  }, [location]);
 
   return (
     <div className="container mx-auto px-4 pt-5 pb-10">
@@ -1356,12 +1427,13 @@ const ManageCars = () => {
         {activeTab === 'messages' && (
           <div className="bg-white shadow-md rounded-lg">
             <div className="p-6 border-b">
-              <h2 className="text-2xl font-bold text-gray-900">Customer Messages</h2>
+              <h1 className="text-2xl font-semibold text-gray-900">Customer Messages</h1>
+              <p className="mt-1 text-sm text-gray-500">Chat with customers about their rentals</p>
             </div>
 
             {/* Show connection error if there's a problem with WebSocket */}
             {connectionError && (
-              <div className="bg-red-50 p-4 rounded-md mb-6">
+              <div className="bg-red-50 p-4 m-4 rounded-md">
                 <div className="flex flex-col">
                   <div className="flex items-start">
                     <div className="flex-shrink-0">
@@ -1388,137 +1460,62 @@ const ManageCars = () => {
               </div>
             )}
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[600px]">
-              {/* Customers List */}
-              <div className="border rounded-lg overflow-hidden h-full">
-                <div className="bg-gray-50 p-3 border-b">
-                  <h3 className="font-medium text-gray-700">Customers</h3>
-                </div>
-                
-                <div className="h-[calc(100%-48px)] overflow-y-auto">
-                  {isLoadingCustomers ? (
-                    <div className="p-4 text-center">Loading customers...</div>
-                  ) : customers.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">No customers found</div>
-                  ) : (
-                    customers.map(customer => (
-                      <div 
-                        key={customer._id} 
-                        className={`p-3 hover:bg-gray-50 cursor-pointer flex items-center ${selectedCustomer?._id === customer._id ? 'bg-blue-50' : ''}`}
-                        onClick={() => setSelectedCustomer(customer)}
-                      >
-                        <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center mr-3">
-                          {customer.fullName ? customer.fullName.charAt(0).toUpperCase() : 'U'}
-                        </div>
-                        <div>
-                          <h4 className="font-medium">{customer.fullName || 'Unknown User'}</h4>
-                          <p className="text-sm text-gray-500">{customer.email}</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
+            <div className="grid grid-cols-4 h-[655px]">
+              {/* Customers list */}
+              <div className="col-span-1 border-r border-gray-200 overflow-y-auto">
+                <div className="p-4">
+                  <h2 className="text-lg font-semibold mb-4">Customers</h2>
+                  <div className="space-y-2">
+                    {isLoadingCustomers ? (
+                      <div className="text-center py-4">Loading customers...</div>
+                    ) : customers.length === 0 ? (
+                      <div className="text-center py-4 text-gray-500">No customers found</div>
+                    ) : (
+                      customers.map(customer => {
+                        // Check if this customer has unread messages
+                        const chatId = createChatId(user._id, customer._id);
+                        const hasUnread = unreadMessages[chatId] && unreadMessages[chatId] > 0;
+                        
+                        return (
+                          <button
+                            key={customer._id}
+                            onClick={() => handleCustomerSelect(customer)}
+                            className={`w-full p-3 rounded-lg text-left transition-colors relative ${
+                              selectedCustomer?._id === customer._id
+                                ? 'bg-blue-50 text-blue-700'
+                                : hasUnread
+                                  ? 'bg-yellow-50 hover:bg-yellow-100'
+                                  : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <div className="font-medium">{customer.fullName || 'Unknown User'}</div>
+                            <div className="text-sm text-gray-500">{customer.email || 'No email available'}</div>
+                            
+                            {/* Unread indicator */}
+                            {hasUnread && (
+                              <span className="absolute top-3 right-3 h-3 w-3 bg-red-500 rounded-full animate-pulse"></span>
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Chat Area */}
-              <div className="col-span-2 border rounded-lg flex flex-col h-full overflow-hidden chat-container">
-                {selectedCustomer ? (
-                  <>
-                    {/* Chat Header */}
-                    <div className="bg-gray-50 p-3 border-b flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center mr-3">
-                          {selectedCustomer.fullName ? selectedCustomer.fullName.charAt(0).toUpperCase() : 'C'}
-                        </div>
-                        <div>
-                          <h3 className="font-medium">{selectedCustomer.fullName || 'Unknown Customer'}</h3>
-                          <p className="text-xs text-gray-500">{selectedCustomer.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} 
-                          title={connected ? 'Connected' : 'Disconnected'}>
-                        </div>
-                        <button 
-                          onClick={() => clearChatHistory()} 
-                          className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-1 rounded transition-colors"
-                          title="Clear chat history"
-                        >
-                          Clear Chat
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Chat Messages Area - Improved Structure */}
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                      <div 
-                        className="chat-message-container"
-                        onClick={(e) => {
-                          // Prevent clicks inside chat from scrolling the page
-                          e.stopPropagation();
-                        }}
-                      >
-                        {chatMessages?.length === 0 ? (
-                          <div className="text-center text-gray-500 my-4">
-                            <p>No messages yet. Start a conversation!</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {chatMessages.map((msg, index) => {
-                              const isMyMessage = msg.senderId === user._id;
-                              return (
-                                <div 
-                                  key={`${msg.senderId}-${msg.timestamp}-${index}`}
-                                  className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
-                                >
-                                  <div 
-                                    className={`chat-bubble ${
-                                      isMyMessage ? 'chat-bubble-sent' : 'chat-bubble-received'
-                                    }`}
-                                  >
-                                    <div className="break-words overflow-hidden">
-                                      <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                                      <span className="text-xs text-gray-500 mt-1 block">
-                                        {formatMessageTime(msg.timestamp)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            <div ref={messagesEndRef} className="h-0 w-full"></div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Message Input */}
-                    <div className="chat-input-container">
-                      <form onSubmit={handleSendMessage} className="flex space-x-2">
-                        <input
-                          type="text"
-                          value={messageInput}
-                          onChange={(e) => setMessageInput(e.target.value)}
-                          placeholder="Type a message..."
-                          className="chat-input flex-1"
-                        />
-                        <button
-                          type="submit"
-                          disabled={!connected}
-                          className="chat-send-button"
-                        >
-                          Send
-                        </button>
-                      </form>
-                    </div>
-                  </>
+              {/* Chat window */}
+              <div className="col-span-3 p-4">
+                {currentChat && selectedCustomer ? (
+                  <div className="h-full chat-wrapper">
+                    <ChatWindow 
+                      key={currentChat.id}
+                      chatId={currentChat.id} 
+                      recipient={selectedCustomer}
+                    />
+                  </div>
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-gray-500">
-                    <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                    <h3 className="text-lg font-medium mb-1">No conversation selected</h3>
-                    <p className="max-w-xs">Select a customer from the list to start chatting</p>
+                  <div className="h-full flex items-center justify-center text-gray-500">
+                    Select a customer to start chatting
                   </div>
                 )}
               </div>

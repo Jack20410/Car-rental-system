@@ -4,55 +4,16 @@ import CarCard from '../components/CarCard';
 import { Link } from 'react-router-dom';
 import '../styles/Home.css';
 
-// Cache and rate limit configurations
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const MAX_REQUESTS_PER_MINUTE = 10;
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute in milliseconds
-
-// Rate limiter class
-class RateLimiter {
-  constructor(maxRequests, timeWindow) {
-    this.maxRequests = maxRequests;
-    this.timeWindow = timeWindow;
-    this.requests = [];
-  }
-
-  tryRequest() {
-    const now = Date.now();
-    // Remove expired timestamps
-    this.requests = this.requests.filter(timestamp => now - timestamp < this.timeWindow);
-    
-    if (this.requests.length >= this.maxRequests) {
-      const oldestRequest = this.requests[0];
-      const timeToWait = this.timeWindow - (now - oldestRequest);
-      return { allowed: false, timeToWait };
-    }
-
-    this.requests.push(now);
-    return { allowed: true, timeToWait: 0 };
-  }
-
-  getRemainingRequests() {
-    const now = Date.now();
-    this.requests = this.requests.filter(timestamp => now - timestamp < this.timeWindow);
-    return this.maxRequests - this.requests.length;
-  }
-}
-
 const Home = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [featuredCars, setFeaturedCars] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [rateLimitError, setRateLimitError] = useState(null);
   const sliderRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const autoScrollRef = useRef(null);
-  const abortControllerRef = useRef(null);
-  const rateLimiterRef = useRef(new RateLimiter(MAX_REQUESTS_PER_MINUTE, RATE_LIMIT_WINDOW));
-  
   const [popularLocations, setPopularLocations] = useState([
     {
       id: 1,
@@ -92,167 +53,62 @@ const Home = () => {
   ]);
   const touchTimeout = useRef(null);
 
-  // Cache management functions
-  const getCachedData = (key) => {
-    const cached = localStorage.getItem(key);
-    if (cached) {
-      const { data, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < CACHE_DURATION) {
-        return data;
-      }
-    }
-    return null;
-  };
-
-  const setCachedData = (key, data) => {
-    localStorage.setItem(key, JSON.stringify({
-      data,
-      timestamp: Date.now()
-    }));
-  };
-
-  // Rate-limited fetch function
-  const rateLimitedFetch = async (url, options = {}) => {
-    const rateLimitCheck = rateLimiterRef.current.tryRequest();
-    
-    if (!rateLimitCheck.allowed) {
-      const seconds = Math.ceil(rateLimitCheck.timeToWait / 1000);
-      throw new Error(`Rate limit exceeded. Please wait ${seconds} seconds before trying again.`);
-    }
-
-    try {
-      const response = await fetch(url, options);
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      return response;
-    } catch (error) {
-      if (error.message.includes('Rate limit exceeded')) {
-        throw error;
-      }
-      throw new Error(`Failed to fetch: ${error.message}`);
-    }
-  };
-
-  // Fetch car counts with rate limiting
+  // Fetch car counts for each location
   useEffect(() => {
     const fetchCarCounts = async () => {
-      setRateLimitError(null);
-      
-      // Check cache first
-      const cachedCounts = getCachedData('carCounts');
-      if (cachedCounts) {
-        setPopularLocations(prev => prev.map((location, index) => ({
-          ...location,
-          carCount: cachedCounts[index]
-        })));
-        return;
-      }
-
-      // Create new abort controller
-      abortControllerRef.current = new AbortController();
-
-      const fetchWithRetry = async (location, retries = 3) => {
-        for (let i = 0; i < retries; i++) {
-          try {
-            const response = await rateLimitedFetch(
-              `http://localhost:3000/vehicles?city=${encodeURIComponent(location.name)}`,
-              { signal: abortControllerRef.current.signal }
-            );
-            const data = await response.json();
-            const carCount = (data.data?.vehicles?.filter(car => car.status === 'Available').length) || 0;
-            return `${carCount} cars available`;
-          } catch (error) {
-            if (error.name === 'AbortError') throw error;
-            if (error.message.includes('Rate limit exceeded')) {
-              setRateLimitError(error.message);
-              throw error;
-            }
-            if (i === retries - 1) return 'No data available';
-            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-          }
-        }
-      };
-
       try {
-        const counts = await Promise.all(
-          popularLocations.map(location => fetchWithRetry(location))
+        const updatedLocations = await Promise.all(
+          popularLocations.map(async (location) => {
+            try {
+              const response = await fetch(`http://localhost:3000/vehicles?city=${encodeURIComponent(location.name)}`);
+              if (!response.ok) {
+                throw new Error(`Failed to fetch cars for ${location.name}`);
+              }
+              const data = await response.json();
+              const carCount = (data.data?.vehicles?.filter(car => car.status === 'Available').length) || 0;
+              return {
+                ...location,
+                carCount: `${carCount} cars available`
+              };
+            } catch (error) {
+              console.error(`Error fetching cars for ${location.name}:`, error);
+              return {
+                ...location,
+                carCount: 'No data available'
+              };
+            }
+          })
         );
-        
-        setCachedData('carCounts', counts);
-        
-        setPopularLocations(prev => prev.map((location, index) => ({
-          ...location,
-          carCount: counts[index]
-        })));
+        setPopularLocations(updatedLocations);
       } catch (error) {
-        if (error.name !== 'AbortError') {
-          console.error('Error fetching car counts:', error);
-          if (error.message.includes('Rate limit exceeded')) {
-            setRateLimitError(error.message);
-          }
-        }
+        console.error('Error fetching car counts:', error);
       }
     };
 
     fetchCarCounts();
-
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
   }, []);
 
-  // Fetch featured cars with rate limiting
+  // Fetch featured cars from API
   useEffect(() => {
-    const fetchFeaturedCars = async () => {
-      setRateLimitError(null);
-      
-      // Check cache first
-      const cachedCars = getCachedData('featuredCars');
-      if (cachedCars) {
-        setFeaturedCars(cachedCars);
-        setIsLoading(false);
-        return;
-      }
-
-      // Create new abort controller
-      abortControllerRef.current = new AbortController();
-
-      const fetchWithRetry = async (retries = 3) => {
-        for (let i = 0; i < retries; i++) {
-          try {
-            const response = await rateLimitedFetch('http://localhost:3000/vehicles', {
-              signal: abortControllerRef.current.signal
-            });
-            const result = await response.json();
-            
-            if (!result.data?.vehicles || !Array.isArray(result.data.vehicles)) {
-              throw new Error('Invalid response format');
-            }
-            
-            return result.data.vehicles;
-          } catch (error) {
-            if (error.name === 'AbortError') throw error;
-            if (error.message.includes('Rate limit exceeded')) {
-              setRateLimitError(error.message);
-              throw error;
-            }
-            if (i === retries - 1) throw error;
-            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-          }
-        }
-      };
-
+    const fetchCars = async () => {
       try {
         setIsLoading(true);
-        const vehicles = await fetchWithRetry();
+        const response = await fetch('http://localhost:3000/vehicles');
+        if (!response.ok) {
+          throw new Error('Failed to fetch cars');
+        }
+        const result = await response.json();
         
-        const availableVehicles = vehicles.filter(vehicle => {
+        if (!result.data?.vehicles || !Array.isArray(result.data.vehicles)) {
+          throw new Error('Invalid response format: vehicles array not found');
+        }
+        
+        // Filter out invalid vehicles and ensure required fields are present
+        const vehicles = result.data.vehicles.filter(vehicle => {
           if (!vehicle || typeof vehicle !== 'object') return false;
           if (!vehicle._id || !vehicle.name) return false;
           
+          // Ensure the vehicle has all required fields, use defaults if missing
           vehicle.brand = vehicle.brand || 'Unknown Brand';
           vehicle.name = vehicle.name || 'Unnamed Vehicle';
           vehicle.rentalPricePerDay = vehicle.rentalPricePerDay || vehicle.price || 0;
@@ -262,39 +118,33 @@ const Home = () => {
             vehicle.location = { city: vehicle.location };
           }
           
-          return vehicle.status === 'Available';
+          return true;
         });
-
+        
+        if (vehicles.length === 0) {
+          setError('No vehicles available');
+          return;
+        }
+        
+        // Lọc chỉ các xe Available
+        const availableVehicles = vehicles.filter(car => car.status === 'Available');
+        // Get random cars but ensure they have images
         const carsWithImages = availableVehicles.filter(car => car.images?.length > 0 || car.image);
         const randomCars = [...(carsWithImages.length > 0 ? carsWithImages : availableVehicles)]
           .sort(() => Math.random() - 0.5)
           .slice(0, Math.min(6, availableVehicles.length));
 
-        setCachedData('featuredCars', randomCars);
-        
+        console.log('Featured cars:', randomCars);
         setFeaturedCars(randomCars);
-        setError(null);
-      } catch (error) {
-        if (error.name !== 'AbortError') {
-          console.error('Error fetching cars:', error);
-          if (error.message.includes('Rate limit exceeded')) {
-            setRateLimitError(error.message);
-          } else {
-            setError(error.message);
-          }
-        }
+      } catch (err) {
+        console.error('Error fetching cars:', err);
+        setError(err.message);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchFeaturedCars();
-
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
+    fetchCars();
   }, []);
 
   const goToSlide = useCallback((index) => {
@@ -378,13 +228,6 @@ const Home = () => {
 
   return (
     <div>
-      {rateLimitError && (
-        <div className="fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50">
-          <strong className="font-bold">Error:</strong>
-          <span className="block sm:inline"> {rateLimitError}</span>
-        </div>
-      )}
-      
       {/* Hero Section with Search */}
       <div className="relative bg-gray-900 text-white">
         <div className="absolute inset-0">
@@ -393,7 +236,7 @@ const Home = () => {
             alt="Hero background"
             className="w-full h-full object-cover opacity-50"
             loading="eager"
-            fetchpriority="high"
+            fetchPriority="high"
           />
         </div>
         <div className="relative max-w-7xl mx-auto px-4 py-24 sm:px-6 lg:px-8">
