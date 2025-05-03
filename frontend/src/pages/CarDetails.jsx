@@ -9,7 +9,6 @@ import { FaCarSide } from 'react-icons/fa6';
 import { formatCurrency } from '../utils/formatCurrency';
 import L from 'leaflet';
 import { useAuth } from '../context/AuthContext';
-import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
 import api from '../utils/api';
 
@@ -123,47 +122,65 @@ const CarDetails = () => {
     fetchCarAndProviderDetails();
   }, [id, navigate]);
 
-  // Initialize socket connection
+  // Initialize WebSocket connection
   useEffect(() => {
-    const newSocket = io('http://localhost:3003');
-    setSocket(newSocket);
+    const ws = new WebSocket('ws://localhost:3003');
 
-    // Cleanup on component unmount
-    return () => newSocket.disconnect();
-  }, []);
+    ws.onopen = () => {
+      console.log('WebSocket Connected');
+      setSocket(ws);
+    };
 
-  // Listen for price updates
-  useEffect(() => {
-    if (!socket) return;
+    ws.onclose = () => {
+      console.log('WebSocket Disconnected');
+      setSocket(null);
+    };
 
-    socket.on('price_calculated', ({ totalPrice }) => {
-      setTotalPrice(totalPrice);
-    });
+    ws.onerror = (error) => {
+      console.error('WebSocket Error:', error);
+    };
 
-    socket.on('calculation_error', ({ message }) => {
-      console.error('Price calculation error:', message);
-      // Handle error (e.g., show toast notification)
-    });
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('Received message:', data);
+
+        if (data.type === 'price_calculated') {
+          setTotalPrice(data.totalPrice);
+        } else if (data.type === 'calculation_error') {
+          console.error('Price calculation error:', data.message);
+          toast.error('Error calculating price. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error processing message:', error);
+      }
+    };
 
     return () => {
-      socket.off('price_calculated');
-      socket.off('calculation_error');
+      if (ws) {
+        ws.close();
+      }
     };
-  }, [socket]);
+  }, []);
 
   // Calculate price when dates change
   useEffect(() => {
     if (!socket || !id || !pickupDate || !returnDate) return;
 
     const data = {
-      vehicleId: id,
-      startDate: pickupDate,
-      endDate: returnDate,
-      pickupTime: pickupTime,
-      returnTime: returnTime
+      type: 'calculate_price',
+      data: {
+        vehicleId: id,
+        startDate: pickupDate,
+        endDate: returnDate,
+        pickupTime: pickupTime,
+        returnTime: returnTime
+      }
     };
 
-    socket.emit('calculate_price', data);
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(data));
+    }
   }, [socket, id, pickupDate, returnDate, pickupTime, returnTime]);
 
   // Function to get coordinates from city name using OpenStreetMap Nominatim

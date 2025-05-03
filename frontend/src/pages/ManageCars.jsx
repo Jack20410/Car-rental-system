@@ -5,6 +5,7 @@ import { formatCurrency } from '../utils/formatCurrency';
 import { useChat } from '../context/ChatContext';
 import { toast } from 'react-toastify';
 import ChatWindow from '../components/ChatWindow';
+import { useRentalWebSocket } from '../context/RentalWebSocketContext';
 
 // Modal Component
 const Modal = ({ isOpen, onClose, children }) => {
@@ -87,6 +88,8 @@ const ManageCars = () => {
     unreadMessages,
     markMessagesAsRead
   } = useChat();
+
+  const { sendRentalUpdate } = useRentalWebSocket();
 
   // Check auth directly from session storage as a fallback
   useEffect(() => {
@@ -625,7 +628,24 @@ const ManageCars = () => {
     }
   }, [activeTab]);
 
-  // Add this function to handle rental status updates
+  // Add useEffect to listen for rental updates
+  useEffect(() => {
+    const handleRentalUpdate = (event) => {
+      const update = event.detail;
+      console.log('Received rental update in ManageCars:', update);
+      
+      // Nếu có cập nhật về rental, fetch lại danh sách
+      if (update.type === 'RENTAL_UPDATE') {
+        fetchRentals();
+      }
+    };
+
+    window.addEventListener('rentalStatusUpdate', handleRentalUpdate);
+    return () => {
+      window.removeEventListener('rentalStatusUpdate', handleRentalUpdate);
+    };
+  }, []);
+
   const handleRentalStatusChange = async (rentalId, newStatus) => {
     try {
       const auth = JSON.parse(localStorage.getItem('auth'));
@@ -640,13 +660,21 @@ const ManageCars = () => {
         body: JSON.stringify({ status: newStatus })
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        // Gửi thông báo qua WebSocket
+        sendRentalUpdate({
+          type: 'RENTAL_UPDATE',
+          rentalId,
+          newStatus,
+          updatedBy: user._id,
+          timestamp: new Date().toISOString()
+        });
+
+        fetchRentals();
+        toast.success('Rental status updated successfully');
+      } else {
         throw new Error('Failed to update rental status');
       }
-
-      // Refresh rentals after status update
-      fetchRentals();
-      toast.success('Rental status updated successfully');
     } catch (error) {
       console.error('Error updating rental status:', error);
       toast.error('Failed to update rental status');

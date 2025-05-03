@@ -7,6 +7,7 @@ import { toast } from 'react-toastify';
 import { useChat } from '../context/ChatContext';
 import ChatWindow from '../components/ChatWindow';
 import PaymentModal from '../components/PaymentModal';
+import { useRentalWebSocket } from '../context/RentalWebSocketContext';
 
 const RentalCard = ({ rental, onStatusChange, onPaymentClick }) => {
   const [provider, setProvider] = useState(null);
@@ -296,6 +297,9 @@ const Rentals = () => {
   const [chatMessages, setChatMessages] = useState([]);
   const processedMessageIds = useRef(new Set());
 
+  // Rental WebSocket context
+  const { sendRentalUpdate } = useRentalWebSocket();
+
   // Handle new messages with useCallback and prevent duplicate processing
   const handleNewMessage = useCallback((event) => {
     console.log("Event received in Rentals:", event);
@@ -522,22 +526,49 @@ const Rentals = () => {
     }
   }, [activeTab]);
 
+  // Add useEffect to listen for rental updates
+  useEffect(() => {
+    const handleRentalUpdate = (event) => {
+      const update = event.detail;
+      console.log('Received rental update:', update);
+      
+      // Nếu có cập nhật về rental, fetch lại danh sách
+      if (update.type === 'RENTAL_UPDATE') {
+        fetchRentals();
+      }
+    };
+
+    window.addEventListener('rentalStatusUpdate', handleRentalUpdate);
+    return () => {
+      window.removeEventListener('rentalStatusUpdate', handleRentalUpdate);
+    };
+  }, []);
+
   const handleRentalStatusChange = async (rentalId, newStatus) => {
     try {
       const response = await api.patch(`/rentals/${rentalId}/status`, {
         status: newStatus
       });
       
-      toast.success('Rental status updated successfully');
-      fetchRentals(); // Refresh the rentals list
+      if (response.data.success) {
+        // Gửi thông báo qua WebSocket
+        sendRentalUpdate({
+          type: 'RENTAL_UPDATE',
+          rentalId,
+          newStatus,
+          updatedBy: user._id,
+          timestamp: new Date().toISOString()
+        });
+        
+        toast.success('Rental status updated successfully');
+        fetchRentals();
+      }
     } catch (error) {
       console.error('Error updating rental status:', error);
       
-      // Get the error message from the backend response
       const errorMessage = error.response?.data?.message || 
                           'Failed to update rental status. Please try again.';
       
-      // Show specific error message
       if (errorMessage.includes('Cannot start rental until payment is completed')) {
         toast.error('Payment is required before starting the rental. Please complete the payment first.');
       } else if (errorMessage.includes('Not authorized')) {
