@@ -1,32 +1,37 @@
 const Rental = require('../models/rentalModel');
 const axios = require('axios');
+const { RENTAL_TYPES, HOURLY_RENTAL_OPTIONS } = require('../constants/rentalConstants');
 
-// Helper function to calculate rental price
-const calculateRentalPrice = (start, end, vehicle) => {
-  // Check if rental is within the same day
-  const isSameDay = start.toDateString() === end.toDateString();
-  
-  if (isSameDay) {
-    // Calculate hours for same-day rental
-    const hourDiff = (end - start) / (1000 * 60 * 60);
-    
-    // If rental is under 6 hours, charge 50% of daily rate
-    if (hourDiff = 6) {
-      return vehicle.rentalPricePerDay * 0.75;
-    }
-    // If rental is 6-12 hours, charge 75% of daily rate
-    else if (hourDiff = 12) {
-      return vehicle.rentalPricePerDay ;
-    }
-    // If over 12 hours, charge full day rate
-    else if (hourDiff = 20) {
-      return vehicle.rentalPricePerDay *1.25;
-    }
-  } else {
-    // Calculate number of days (rounded up)
-    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-    return days * vehicle.rentalPricePerDay;
+// Helper function to calculate rental price for daily rentals
+const calculateDailyRentalPrice = (start, end, vehicle) => {
+  const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+  return days * vehicle.rentalPricePerDay;
+};
+
+// Helper function to calculate rental price for hourly rentals
+const calculateHourlyRentalPrice = (hourlyDuration, vehicle) => {
+  let priceMultiplier;
+  switch (hourlyDuration) {
+    case 6:
+      priceMultiplier = HOURLY_RENTAL_OPTIONS.SIX_HOURS.priceMultiplier;
+      break;
+    case 8:
+      priceMultiplier = HOURLY_RENTAL_OPTIONS.EIGHT_HOURS.priceMultiplier;
+      break;
+    case 12:
+      priceMultiplier = HOURLY_RENTAL_OPTIONS.TWELVE_HOURS.priceMultiplier;
+      break;
+    default:
+      throw new Error('Invalid hourly duration');
   }
+  return vehicle.rentalPricePerDay * priceMultiplier;
+};
+
+// Helper function to calculate end date for hourly rentals
+const calculateHourlyEndDate = (startDate, hourlyDuration) => {
+  const endDate = new Date(startDate);
+  endDate.setHours(endDate.getHours() + hourlyDuration);
+  return endDate;
 };
 
 // Check vehicle availability for specified dates
@@ -88,54 +93,19 @@ exports.checkAvailability = async (req, res) => {
 
 // Create a new rental
 exports.createRental = async (req, res) => {
-  console.log('Received rental creation request:', {
-    body: req.body,
-    user: req.user,
-    headers: req.headers
-  });
   try {
-    const { vehicleId, startDate, endDate } = req.body;
+    const { vehicleId, startDate, endDate, rentalType, hourlyDuration } = req.body;
     const userId = req.user.userId;
 
-    // Convert string dates to Date objects
+    // Convert start date to Date object
     const start = new Date(startDate);
-    const end = new Date(endDate);
+    let end;
+    let totalPrice;
 
-    // Validate dates
-    if (start >= end) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'End date must be after start date' 
-      });
-    }
-
-    if (start < new Date()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Start date cannot be in the past' 
-      });
-    }
-
-    // Validate minimum rental duration (2 hours)
-    const minHours = 2;
-    const hourDiff = (end - start) / (1000 * 60 * 60);
-    if (hourDiff < minHours) {
-      return res.status(400).json({
-        success: false,
-        message: `Minimum rental duration is ${minHours} hours`
-      });
-    }
-    
     // Get vehicle details from vehicle service
     let vehicleResponse;
     try {
       const vehicleUrl = `${process.env.VEHICLE_SERVICE_URL}/vehicles/${vehicleId}`;
-      console.log('Attempting to fetch vehicle:', {
-        url: vehicleUrl,
-        headers: {
-          Authorization: req.headers.authorization
-        }
-      });
       vehicleResponse = await axios.get(
         vehicleUrl,
         { 
@@ -144,15 +114,8 @@ exports.createRental = async (req, res) => {
           }
         }
       );
-      console.log('Vehicle service response:', vehicleResponse.data);
     } catch (error) {
-      console.error('Vehicle service error:', {
-        message: error.message,
-        config: error.config,
-        response: error.response?.data,
-        status: error.response?.status,
-        stack: error.stack
-      });
+      console.error('Vehicle service error:', error);
       return res.status(404).json({
         success: false,
         message: 'Vehicle not found or service unavailable'
@@ -169,8 +132,18 @@ exports.createRental = async (req, res) => {
       });
     }
 
-    // Calculate total price using the new helper function
-    const totalPrice = calculateRentalPrice(start, end, vehicle);
+    // Handle rental based on type
+    if (rentalType === RENTAL_TYPES.HOURLY) {
+      // Calculate end date based on hourly duration
+      end = calculateHourlyEndDate(start, hourlyDuration);
+      
+      // Calculate price for hourly rental
+      totalPrice = calculateHourlyRentalPrice(hourlyDuration, vehicle);
+    } else {
+      end = new Date(endDate);
+      // Calculate price for daily rental
+      totalPrice = calculateDailyRentalPrice(start, end, vehicle);
+    }
 
     // Get car_providerId from vehicle data
     const car_providerId = vehicle.car_providerId;
@@ -182,11 +155,13 @@ exports.createRental = async (req, res) => {
       });
     }
 
-    // Create rental record with initial status history and car_providerId
+    // Create rental record
     const rental = new Rental({
       userId,
       vehicleId,
       car_providerId,
+      rentalType,
+      hourlyDuration: rentalType === RENTAL_TYPES.HOURLY ? hourlyDuration : undefined,
       startDate: start,
       endDate: end,
       totalPrice,

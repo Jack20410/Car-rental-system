@@ -23,11 +23,11 @@ const CarDetails = () => {
   const [error, setError] = useState(null);
   const [pickupDate, setPickupDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
-  const [numberOfDays, setNumberOfDays] = useState(0);
-  const [isHourlyRent, setIsHourlyRent] = useState(false);
   const [pickupTime, setPickupTime] = useState('');
   const [returnTime, setReturnTime] = useState('');
-  const [numberOfHours, setNumberOfHours] = useState(0);
+  const [rentalType, setRentalType] = useState('daily'); // default to daily
+  const [hourlyDuration, setHourlyDuration] = useState(6); // default to 6 hours
+  const [totalPrice, setTotalPrice] = useState(0);
   const mapRef = useRef(null);
   const [mapInstance, setMapInstance] = useState(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -36,11 +36,8 @@ const CarDetails = () => {
   const [reviews, setReviews] = useState([]);
   const { user } = useAuth();
   const [showReviews, setShowReviews] = useState(true);
-  const [totalPrice, setTotalPrice] = useState(0);
   const [socket, setSocket] = useState(null);
   const [sortBy, setSortBy] = useState('newest');
-
-
 
   // Fetch ratings from rating-service when carId changes
   useEffect(() => {
@@ -72,6 +69,7 @@ const CarDetails = () => {
 
     fetchRatings();
   }, [id]); // Only depend on id
+
   useEffect(() => {
     const fetchCarAndProviderDetails = async () => {
       try {
@@ -161,12 +159,12 @@ const CarDetails = () => {
       vehicleId: id,
       startDate: pickupDate,
       endDate: returnDate,
-      pickupTime: isHourlyRent ? pickupTime : null,
-      returnTime: isHourlyRent ? returnTime : null
+      pickupTime: pickupTime,
+      returnTime: returnTime
     };
 
     socket.emit('calculate_price', data);
-  }, [socket, id, pickupDate, returnDate, pickupTime, returnTime, isHourlyRent]);
+  }, [socket, id, pickupDate, returnDate, pickupTime, returnTime]);
 
   // Function to get coordinates from city name using OpenStreetMap Nominatim
   const getCoordinates = async (city) => {
@@ -308,56 +306,57 @@ const CarDetails = () => {
   const handleBooking = async (e) => {
     e.preventDefault();
     
-    if (isHourlyRent) {
+    if (rentalType === 'hourly') {
       // Validate thuê theo giờ
-      if (!pickupDate || !pickupTime || !returnTime) {
-        toast.error('Vui lòng chọn đầy đủ ngày, giờ lấy xe và giờ trả xe');
+      if (!pickupDate || !pickupTime) {
+        toast.error('Vui lòng chọn ngày và giờ lấy xe');
         return;
       }
+
       const startDateTime = new Date(`${pickupDate}T${pickupTime}`);
-      const endDateTime = new Date(`${pickupDate}T${returnTime}`);
       if (startDateTime < new Date()) {
-        toast.error('Giờ lấy xe không được ở quá khứ');
+        toast.error('Thời gian lấy xe không được ở quá khứ');
         return;
       }
-      if (endDateTime <= startDateTime) {
-        toast.error('Giờ trả xe phải sau giờ lấy xe');
-        return;
-      }
-      // Gửi dữ liệu cho thuê theo giờ (đúng múi giờ VN)
+
+      // Gửi dữ liệu thuê theo giờ
       await submitBooking({
         vehicleId: id,
-        startDate: toVNISOString(pickupDate, pickupTime),
-        endDate: toVNISOString(pickupDate, returnTime),
-        totalPrice: totalPrice || car.rentalPricePerDay
+        startDate: `${pickupDate}T${pickupTime}`,
+        rentalType: 'hourly',
+        hourlyDuration: hourlyDuration
       });
+
     } else {
       // Validate thuê theo ngày
       if (!pickupDate || !returnDate || !pickupTime || !returnTime) {
-        toast.error('Vui lòng chọn đầy đủ ngày, giờ lấy xe và ngày, giờ trả xe');
+        toast.error('Vui lòng chọn đầy đủ ngày và giờ lấy/trả xe');
         return;
       }
+
       const startDateTime = new Date(`${pickupDate}T${pickupTime}`);
       const endDateTime = new Date(`${returnDate}T${returnTime}`);
+
       if (startDateTime < new Date()) {
-        toast.error('Ngày/giờ lấy xe không được ở quá khứ');
+        toast.error('Thời gian lấy xe không được ở quá khứ');
         return;
       }
+
       if (endDateTime <= startDateTime) {
-        toast.error('Ngày/giờ trả xe phải sau ngày/giờ lấy xe');
+        toast.error('Thời gian trả xe phải sau thời gian lấy xe');
         return;
       }
-      // Gửi dữ liệu cho thuê theo ngày (đúng múi giờ VN)
+
+      // Gửi dữ liệu thuê theo ngày
       await submitBooking({
         vehicleId: id,
-        startDate: toVNISOString(pickupDate, pickupTime),
-        endDate: toVNISOString(returnDate, returnTime),
-        totalPrice: totalPrice || car.rentalPricePerDay
+        startDate: `${pickupDate}T${pickupTime}`,
+        endDate: `${returnDate}T${returnTime}`,
+        rentalType: 'daily'
       });
     }
   };
 
-  // Hàm submitBooking tách riêng để tái sử dụng
   const submitBooking = async (bookingData) => {
     try {
       // Get auth token
@@ -376,21 +375,9 @@ const CarDetails = () => {
 
       // Get car_providerId from provider data
       if (!provider?._id) {
-        toast.error('Provider information is missing. Please try again.');
+        toast.error('Thông tin chủ xe không hợp lệ. Vui lòng thử lại.');
         return;
       }
-
-      const bookingData = {
-        vehicleId: id,
-        car_providerId: provider._id,
-        startDate: isHourlyRent 
-          ? `${pickupDate}T${pickupTime}` 
-          : pickupDate,
-        endDate: isHourlyRent 
-          ? `${pickupDate}T${returnTime}` 
-          : returnDate,
-        totalPrice: totalPrice || car.rentalPricePerDay
-      };
 
       const response = await fetch('http://localhost:3000/rentals', {
         method: 'POST',
@@ -398,11 +385,15 @@ const CarDetails = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(bookingData)
+        body: JSON.stringify({
+          ...bookingData,
+          car_providerId: provider._id
+        })
       });
+
       const data = await response.json();
       if (data.success) {
-        toast.success('🚗 Booking successful! Check My Rentals for details', {
+        toast.success('🚗 Đặt xe thành công! Kiểm tra trong Đơn thuê của tôi', {
           onClose: () => navigate('/rentals')
         });
       } else {
@@ -642,19 +633,6 @@ const CarDetails = () => {
                 ))}
               </div>
             </div>
-
-            {/* Specifications */}
-            {/* <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Specifications</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {Object.entries(car.specifications).map(([key, value]) => (
-                  <div key={key} className="border-b border-gray-200 pb-2">
-                    <p className="text-sm text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-                    <p className="font-semibold">{value}</p>
-                  </div>
-                ))}
-              </div>
-            </div> */}
 
             {/* Location Section */}
             <div className="bg-white rounded-lg shadow-sm p-6 mt-8">
@@ -953,21 +931,22 @@ const CarDetails = () => {
               <div className="flex items-center justify-center mb-4">
                 <button
                   type="button"
-                  onClick={() => setIsHourlyRent(false)}
-                  className={`px-4 py-2 rounded-l-lg ${!isHourlyRent ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`}
+                  onClick={() => setRentalType('daily')}
+                  className={`px-4 py-2 rounded-l-lg ${rentalType === 'daily' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`}
                 >
                   Thuê theo ngày
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsHourlyRent(true)}
-                  className={`px-4 py-2 rounded-r-lg ${isHourlyRent ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`}
+                  onClick={() => setRentalType('hourly')}
+                  className={`px-4 py-2 rounded-r-lg ${rentalType === 'hourly' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`}
                 >
                   Thuê theo giờ
                 </button>
               </div>
 
               <form className="space-y-4" onSubmit={handleBooking}>
+                {/* Pickup Date & Time */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <FaCalendarAlt className="text-primary" />
@@ -980,32 +959,44 @@ const CarDetails = () => {
                     min={new Date().toISOString().split('T')[0]}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                   />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Giờ lấy xe</label>
-                      <input
-                        type="time"
-                        value={pickupTime}
-                        onChange={(e) => setPickupTime(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                        placeholder="Giờ lấy xe"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Giờ trả xe</label>
-                      <input
-                        type="time"
-                        value={returnTime}
-                        onChange={(e) => setReturnTime(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
-                        placeholder="Giờ trả xe"
-                      />
-                    </div>
+                  <div className="mt-2">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Giờ lấy xe</label>
+                    <input
+                      type="time"
+                      value={pickupTime}
+                      onChange={(e) => setPickupTime(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                    />
                   </div>
                 </div>
 
-                {/* Return Date Input - chỉ hiện khi thuê theo ngày */}
-                {!isHourlyRent && (
+                {/* Hourly Duration Selection - only show for hourly rentals */}
+                {rentalType === 'hourly' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Thời gian thuê
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[6, 8, 12].map((hours) => (
+                        <button
+                          key={hours}
+                          type="button"
+                          onClick={() => setHourlyDuration(hours)}
+                          className={`py-2 px-4 rounded-lg border ${
+                            hourlyDuration === hours
+                              ? 'border-primary bg-primary text-white'
+                              : 'border-gray-300 hover:border-primary'
+                          }`}
+                        >
+                          {hours} giờ
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Return Date & Time - only show for daily rentals */}
+                {rentalType === 'daily' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                       <FaCalendarAlt className="text-primary" />
@@ -1018,14 +1009,29 @@ const CarDetails = () => {
                       min={pickupDate || new Date().toISOString().split('T')[0]}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                     />
+                    <div className="mt-2">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Giờ trả xe</label>
+                      <input
+                        type="time"
+                        value={returnTime}
+                        onChange={(e) => setReturnTime(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
+                      />
+                    </div>
                   </div>
                 )}
 
+                {/* Price Display */}
                 <div className="border-t border-gray-200 pt-4">
                   <div className="flex justify-between font-bold text-lg">
                     <span>Tổng cộng</span>
                     <span>{formatCurrency(totalPrice || car.rentalPricePerDay)}</span>
                   </div>
+                  {rentalType === 'hourly' && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      ({hourlyDuration} giờ)
+                    </p>
+                  )}
                 </div>
 
                 <button

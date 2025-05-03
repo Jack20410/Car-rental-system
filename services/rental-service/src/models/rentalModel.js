@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { RENTAL_TYPES } = require('../constants/rentalConstants');
 
 const rentalSchema = new mongoose.Schema({
   userId: {
@@ -15,6 +16,18 @@ const rentalSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: 'User'
+  },
+  rentalType: {
+    type: String,
+    enum: Object.values(RENTAL_TYPES),
+    required: true
+  },
+  hourlyDuration: {
+    type: Number,
+    enum: [6, 8, 12],
+    required: function() {
+      return this.rentalType === RENTAL_TYPES.HOURLY;
+    }
   },
   startDate: {
     type: Date,

@@ -27,7 +27,7 @@ router.get('/availability', checkAvailability);
 router.post(
   '/',
   verifyToken,
-  requireRole('customer'),
+  requireRole(['customer', 'car_provider']),
   validateCreateRental,
   createRental
 );
