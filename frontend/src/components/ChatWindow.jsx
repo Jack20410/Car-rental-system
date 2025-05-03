@@ -5,7 +5,7 @@ import ChatRentalInfo from './ChatRentalInfo';
 import { useAuth } from '../context/AuthContext';
 import '../styles/chat.css';
 
-const ChatWindow = ({ chatId, recipient }) => {
+const ChatWindow = ({ chatId, recipient, isProvider: isProviderProp }) => {
   const { user } = useAuth();
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -17,8 +17,8 @@ const ChatWindow = ({ chatId, recipient }) => {
   const previousChatIdRef = useRef(null);
   const handledMessageIds = useRef(new Set());
   
-  // Determine if the current user is a provider
-  const isProvider = user?.role === 'car_provider';
+  // Determine if the current user is a provider - use prop if provided, otherwise detect from role
+  const isProvider = isProviderProp !== undefined ? isProviderProp : user?.role === 'car_provider';
   
   // Handle scroll events to determine if we're at the bottom
   const handleScroll = useCallback(() => {

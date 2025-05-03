@@ -302,7 +302,7 @@ const Rentals = () => {
 
   // Handle new messages with useCallback and prevent duplicate processing
   const handleNewMessage = useCallback((event) => {
-    console.log("Event received in Rentals:", event);
+    //console.log("Event received in Rentals:", event);
     
     // Make sure we have the message data from the event
     const message = event.detail;
@@ -316,11 +316,11 @@ const Rentals = () => {
     
     // Skip if we've already processed this message
     if (processedMessageIds.current.has(messageId)) {
-      console.log("Skipping already processed message:", messageId);
+      //console.log("Skipping already processed message:", messageId);
       return;
     }
     
-    console.log("New message received in Rentals:", message);
+    //console.log("New message received in Rentals:", message);
     processedMessageIds.current.add(messageId);
     
     // Only add message to this chat if it belongs to the current conversation
@@ -334,11 +334,11 @@ const Rentals = () => {
         );
         
         if (isDuplicate) {
-          console.log("Duplicate message detected, skipping update");
+          //console.log("Duplicate message detected, skipping update");
           return prev;
         }
         
-        console.log("Adding new message to chat:", message);
+        //console.log("Adding new message to chat:", message);
         return [...prev, message];
       });
     } else {
@@ -357,10 +357,10 @@ const Rentals = () => {
 
   const fetchRentals = async () => {
     try {
-      console.log('Fetching all rentals');
+      //console.log('Fetching all rentals');
       const response = await api.get('/rentals');
       const fetchedRentals = response.data.data || [];
-      console.log('Fetched rentals:', fetchedRentals);
+      //console.log('Fetched rentals:', fetchedRentals);
       setAllRentals(fetchedRentals);
     } catch (err) {
       setError('Failed to load your rental history. Please try again later.');
@@ -637,7 +637,7 @@ const Rentals = () => {
       
       // Use the consistent chatId function to ensure the same ID is used in both directions
       const chatId = createChatId(user._id, provider._id);
-      console.log(`Setting up chat with ${provider.fullName}, chatId: ${chatId}`);
+      //console.log(`Setting up chat with ${provider.fullName}`);
       
       // Set the current chat with the consistent ID
       setCurrentChat({
@@ -656,7 +656,7 @@ const Rentals = () => {
   // Start or select a chat when provider is selected
   useEffect(() => {
     if (selectedProvider) {
-      console.log("Starting chat with provider:", selectedProvider);
+      //console.log("Starting chat with provider:", selectedProvider);
       startChat(selectedProvider);
       setActiveChat(selectedProvider._id);
     }
@@ -676,7 +676,8 @@ const Rentals = () => {
   // Debug current chat state
   useEffect(() => {
     console.log("Current chat state:", { currentChat, messages: chatMessages });
-  }, [currentChat, chatMessages]);
+    console.log("User role check:", { isUser: user?.role, isProvider: user?.role === 'car_provider' });
+  }, [currentChat, chatMessages, user]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -701,11 +702,11 @@ const Rentals = () => {
     e.preventDefault();
     if (!messageInput.trim() || !selectedProvider || !connected) return;
     
-    console.log(`Sending message to ${selectedProvider.fullName} (${selectedProvider._id}): ${messageInput}`);
+    //console.log(`Sending message to ${selectedProvider.fullName} (${selectedProvider._id}): ${messageInput}`);
     
     // Make sure we have a current chat
     if (!currentChat) {
-      console.log("No current chat, starting a new one");
+      //console.log("No current chat, starting a new one");
       startChat(selectedProvider);
       
       // Save the message to send after chat is established
@@ -962,8 +963,10 @@ const Rentals = () => {
                 {currentChat ? (
                   <div className="h-full chat-wrapper">
                     <ChatWindow 
+                      key={currentChat.id}
                       chatId={currentChat.id} 
                       recipient={currentChat.recipient}
+                      isProvider={false}
                     />
                   </div>
                 ) : (
