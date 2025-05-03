@@ -50,27 +50,12 @@ exports.checkAvailability = async (req, res) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    // Find any overlapping rentals for the vehicle that are not cancelled or rejected
+    // Sửa điều kiện overlap ở đây
     const overlappingRentals = await Rental.find({
       vehicleId,
       status: { $nin: ['cancelled', 'rejected'] },
-      $or: [
-        // Rental period overlaps with start date
-        { 
-          startDate: { $lte: start },
-          endDate: { $gte: start }
-        },
-        // Rental period overlaps with end date
-        {
-          startDate: { $lte: end },
-          endDate: { $gte: end }
-        },
-        // Rental period is inside requested period
-        {
-          startDate: { $gte: start },
-          endDate: { $lte: end }
-        }
-      ]
+      startDate: { $lt: end },
+      endDate: { $gt: start }
     });
 
     const isAvailable = overlappingRentals.length === 0;
@@ -640,5 +625,5 @@ exports.getProviderRentals = async (req, res) => {
       error: error.message
     });
   }
-}; 
+};
 
