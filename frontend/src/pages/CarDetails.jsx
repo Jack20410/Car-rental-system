@@ -801,7 +801,7 @@ const CarDetails = () => {
             </div>
 
               {/* Leave a Review Form */}
-              <div className="mb-8">
+              {/* <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">Leave a Review</h3>
                 <form className="space-y-4" onSubmit={handleReviewSubmit}>
                   <div>
@@ -840,7 +840,7 @@ const CarDetails = () => {
                     Submit Review
                   </button>
                 </form>
-              </div>
+              </div> */}
 
               {/* Reviews List */}
               {showReviews && (

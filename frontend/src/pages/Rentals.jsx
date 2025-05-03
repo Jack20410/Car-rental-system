@@ -8,8 +8,10 @@ import { useChat } from '../context/ChatContext';
 import ChatWindow from '../components/ChatWindow';
 import PaymentModal from '../components/PaymentModal';
 import { useRentalWebSocket } from '../context/RentalWebSocketContext';
+import RatingModal from '../components/RatingModal'; // You'll create this component
 
-const RentalCard = ({ rental, onStatusChange, onPaymentClick }) => {
+// RentalCard
+const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) => {
   const [provider, setProvider] = useState(null);
   const [vehicle, setVehicle] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -255,6 +257,14 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick }) => {
                   Pay Now
                 </button>
               )}
+              {rental.status === 'completed' && (
+                <button
+                  onClick={() => onRatingClick(rental, vehicle)}
+                  className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                >
+                  Rating
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -279,6 +289,9 @@ const Rentals = () => {
   const [selectedRental, setSelectedRental] = useState(null);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [rentalStatusFilter, setRentalStatusFilter] = useState('all');
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedRentalForRating, setSelectedRentalForRating] = useState(null);
+  const [selectedVehicleForRating, setSelectedVehicleForRating] = useState(null);
   
   // Chat context
   const {
@@ -562,6 +575,14 @@ const Rentals = () => {
         
         toast.success('Rental status updated successfully');
         fetchRentals();
+        
+        // Show rating modal if completed
+        if (newStatus === 'completed') {
+          // Find the rental object to pass to the modal
+          const completedRental = rentals.find(r => r._id === rentalId);
+          setSelectedRentalForRating(completedRental);
+          setShowRatingModal(true);
+        }
       }
     } catch (error) {
       console.error('Error updating rental status:', error);
@@ -765,6 +786,13 @@ const Rentals = () => {
     }
   }, [location, fetchProviders]);
 
+  // Hàm mở modal đánh giá
+  const handleRatingClick = (rental, vehicle) => {
+    setSelectedRentalForRating(rental);
+    setSelectedVehicleForRating(vehicle);
+    setShowRatingModal(true);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -877,6 +905,7 @@ const Rentals = () => {
                     rental={rental}
                     onStatusChange={handleRentalStatusChange}
                     onPaymentClick={handlePaymentClick}
+                    onRatingClick={handleRatingClick}
                   />
                 ))}
               </div>
@@ -986,6 +1015,14 @@ const Rentals = () => {
           rental={selectedRental}
           vehicle={selectedVehicle}
           provider={selectedProvider}
+        />
+      )}
+      {showRatingModal && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={() => setShowRatingModal(false)}
+          rental={selectedRentalForRating}
+          vehicle={selectedVehicleForRating}
         />
       )}
     </div>
