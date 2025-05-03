@@ -266,6 +266,7 @@ const Rentals = () => {
   const { user } = useAuth();
   const location = useLocation();
   const [rentals, setRentals] = useState([]);
+  const [allRentals, setAllRentals] = useState([]);
   const [loading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('rentals');
@@ -276,6 +277,7 @@ const Rentals = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedRental, setSelectedRental] = useState(null);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [rentalStatusFilter, setRentalStatusFilter] = useState('all');
   
   // Chat context
   const {
@@ -351,8 +353,11 @@ const Rentals = () => {
 
   const fetchRentals = async () => {
     try {
+      console.log('Fetching all rentals');
       const response = await api.get('/rentals');
-      setRentals(response.data.data || []);
+      const fetchedRentals = response.data.data || [];
+      console.log('Fetched rentals:', fetchedRentals);
+      setAllRentals(fetchedRentals);
     } catch (err) {
       setError('Failed to load your rental history. Please try again later.');
       console.error('Error fetching rentals:', err);
@@ -360,6 +365,22 @@ const Rentals = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    // console.log('Applying filter:', rentalStatusFilter);
+    // console.log('Current all rentals:', allRentals);
+    
+    const filteredRentals = rentalStatusFilter === 'all'
+      ? allRentals
+      : allRentals.filter(rental => rental.status === rentalStatusFilter);
+    
+    // console.log('Filtered rentals:', filteredRentals);
+    setRentals(filteredRentals);
+  }, [rentalStatusFilter, allRentals]);
+
+  useEffect(() => {
+    fetchRentals();
+  }, []);
 
   const fetchProviders = useCallback(async () => {
     try {
@@ -496,10 +517,6 @@ const Rentals = () => {
   }, [user, createChatId]);
 
   useEffect(() => {
-    fetchRentals();
-  }, []);
-
-  useEffect(() => {
     if (activeTab === 'messages') {
       fetchProviders();
     }
@@ -507,14 +524,27 @@ const Rentals = () => {
 
   const handleRentalStatusChange = async (rentalId, newStatus) => {
     try {
-      await api.patch(`/rentals/${rentalId}/status`, {
+      const response = await api.patch(`/rentals/${rentalId}/status`, {
         status: newStatus
       });
+      
       toast.success('Rental status updated successfully');
       fetchRentals(); // Refresh the rentals list
     } catch (error) {
       console.error('Error updating rental status:', error);
-      toast.error('Failed to update rental status');
+      
+      // Get the error message from the backend response
+      const errorMessage = error.response?.data?.message || 
+                          'Failed to update rental status. Please try again.';
+      
+      // Show specific error message
+      if (errorMessage.includes('Cannot start rental until payment is completed')) {
+        toast.error('Payment is required before starting the rental. Please complete the payment first.');
+      } else if (errorMessage.includes('Not authorized')) {
+        toast.error('You are not authorized to perform this action.');
+      } else {
+        toast.error(errorMessage);
+      }
     }
   };
 
@@ -769,9 +799,29 @@ const Rentals = () => {
         {/* Rentals Tab Content */}
         {activeTab === 'rentals' && (
           <>
-            <div className="mb-6">
-              <h1 className="text-2xl font-semibold text-gray-900">My Rentals</h1>
-              <p className="mt-1 text-sm text-gray-500">Track your rental history and status changes</p>
+            <div className="mb-6 flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-semibold text-gray-900">My Rentals</h1>
+                <p className="mt-1 text-sm text-gray-500">Track your rental history and status changes</p>
+              </div>
+              <div className="flex items-center space-x-4">
+                <select
+                  className="bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  value={rentalStatusFilter}
+                  onChange={(e) => {
+                    // console.log('Changing filter to:', e.target.value);
+                    setRentalStatusFilter(e.target.value);
+                  }}
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="started">Started</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
             </div>
 
             {rentals.length === 0 ? (

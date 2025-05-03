@@ -295,7 +295,8 @@ exports.updateRentalStatus = async (req, res) => {
         approved: ['started']
       },
       car_provider: {
-        pending: ['approved', 'rejected'],
+        pending: ['cancelled', 'approved', 'rejected'], // car_provider can do what customer can
+        approved: ['started'],                         // and more
         started: ['completed']
       },
       admin: {
@@ -319,26 +320,27 @@ exports.updateRentalStatus = async (req, res) => {
       });
     }
 
-    // Additional validation for customer role
-    if (userRole === 'customer') {
-      // Verify if the user is the owner of the rental
-      if (rental.userId.toString() !== userId) {
+    // Additional validation for customer and car_provider roles
+    if (userRole === 'customer' || userRole === 'car_provider') {
+      // For customer: can only update their own rentals
+      // For car_provider: can update their own rentals OR rentals of their vehicles
+      if (rental.userId.toString() !== userId && 
+          (userRole === 'customer' || rental.car_providerId.toString() !== userId)) {
         return res.status(403).json({
           success: false,
-          message: 'You can only update your own rentals'
+          message: userRole === 'customer' 
+            ? 'You can only update your own rentals'
+            : 'You can only update rentals that you created or rentals for your vehicles'
         });
       }
     }
 
-    // Additional validation for car_provider role
-    if (userRole === 'car_provider') {
-      // Verify if the user is the provider of the rental
-      if (rental.car_providerId.toString() !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: 'You can only update rentals for your vehicles'
-        });
-      }
+    // Check payment status when transitioning from approved to started
+    if (rental.status === 'approved' && status === 'started' && rental.paymentStatus !== 'paid') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot start rental until payment is completed'
+      });
     }
 
     // Only update if status is actually changing
