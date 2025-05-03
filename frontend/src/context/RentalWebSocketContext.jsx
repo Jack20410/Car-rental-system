@@ -16,8 +16,8 @@ export const RentalWebSocketProvider = ({ children }) => {
   const [lastMessage, setLastMessage] = useState(null);
 
   useEffect(() => {
-    // Khởi tạo WebSocket connection
-    const ws = new WebSocket('ws://localhost:3003'); // Port của rental service
+    // Initialize WebSocket connection
+    const ws = new WebSocket('ws://localhost:3003');
 
     ws.onopen = () => {
       console.log('WebSocket Connected');
@@ -27,7 +27,7 @@ export const RentalWebSocketProvider = ({ children }) => {
     ws.onclose = () => {
       console.log('WebSocket Disconnected');
       setIsConnected(false);
-      // Thử kết nối lại sau 3 giây
+      // Try to reconnect after 3 seconds
       setTimeout(() => {
         setSocket(new WebSocket('ws://localhost:3003'));
       }, 3000);
@@ -42,7 +42,7 @@ export const RentalWebSocketProvider = ({ children }) => {
       console.log('Received WebSocket message:', message);
       setLastMessage(message);
       
-      // Dispatch custom event để các component có thể lắng nghe
+      // Dispatch custom event for components to listen
       const customEvent = new CustomEvent('rentalStatusUpdate', { 
         detail: message 
       });
@@ -51,7 +51,7 @@ export const RentalWebSocketProvider = ({ children }) => {
 
     setSocket(ws);
 
-    // Cleanup khi component unmount
+    // Cleanup on component unmount
     return () => {
       if (ws) {
         ws.close();
@@ -59,7 +59,7 @@ export const RentalWebSocketProvider = ({ children }) => {
     };
   }, []);
 
-  // Hàm gửi update qua WebSocket
+  // Function to send updates via WebSocket
   const sendRentalUpdate = (updateData) => {
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(updateData));

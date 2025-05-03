@@ -163,25 +163,57 @@ const CarDetails = () => {
     };
   }, []);
 
-  // Calculate price when dates change
+  // Calculate price when dates or rental type changes
   useEffect(() => {
-    if (!socket || !id || !pickupDate || !returnDate) return;
+    if (!socket || !id) return;
 
     const data = {
       type: 'calculate_price',
       data: {
         vehicleId: id,
-        startDate: pickupDate,
-        endDate: returnDate,
-        pickupTime: pickupTime,
-        returnTime: returnTime
+        rentalType,
+        ...(rentalType === 'hourly' 
+          ? {
+              startDate: pickupDate,
+              pickupTime,
+              hourlyDuration
+            }
+          : {
+              startDate: pickupDate,
+              endDate: returnDate,
+              pickupTime,
+              returnTime
+            }
+        )
       }
     };
 
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(data));
     }
-  }, [socket, id, pickupDate, returnDate, pickupTime, returnTime]);
+  }, [socket, id, pickupDate, returnDate, pickupTime, returnTime, rentalType, hourlyDuration]);
+
+  // Update WebSocket message handler
+  useEffect(() => {
+    if (!socket) return;
+
+    const ws = socket;
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('Received message:', data);
+
+        if (data.type === 'price_calculated') {
+          setTotalPrice(data.totalPrice);
+        } else if (data.type === 'calculation_error') {
+          console.error('Price calculation error:', data.message);
+          toast.error('Error calculating price. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error processing message:', error);
+      }
+    };
+  }, [socket]);
 
   // Function to get coordinates from city name using OpenStreetMap Nominatim
   const getCoordinates = async (city) => {
@@ -235,16 +267,6 @@ const CarDetails = () => {
     const diffTime = endDate - startDate;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays > 0 ? diffDays : 0;
-  };
-
-  // Calculate hours between two times
-  const calculateHours = (startDate, startTime, endDate, endTime) => {
-    if (!startDate || !endDate || !startTime || !endTime) return 0;
-    const start = new Date(`${startDate}T${startTime}`);
-    const end = new Date(`${endDate}T${endTime}`);
-    const diffTime = end - start;
-    const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
-    return diffHours > 0 ? diffHours : 0;
   };
 
   // Initialize map when car data is loaded
@@ -309,34 +331,23 @@ const CarDetails = () => {
     };
   }, [car]); // Only depend on car data changes
 
-  // Hàm chuyển ngày giờ sang ISO string với offset +07:00 (giờ Việt Nam)
-  function toVNISOString(dateStr, timeStr) {
-    if (!dateStr || !timeStr) return '';
-    // Tạo đối tượng Date từ local time
-    const date = new Date(`${dateStr}T${timeStr}`);
-    // Lấy timestamp + 7 tiếng (nếu trình duyệt đang ở múi giờ khác)
-    const vnDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000) + 7 * 60 * 60 * 1000);
-    // Trả về ISO string với offset +07:00
-    return vnDate.toISOString().replace('Z', '+07:00');
-  }
-
   const handleBooking = async (e) => {
     e.preventDefault();
     
     if (rentalType === 'hourly') {
-      // Validate thuê theo giờ
+      // Validate hourly rental
       if (!pickupDate || !pickupTime) {
-        toast.error('Vui lòng chọn ngày và giờ lấy xe');
+        toast.error('Please select pickup date and time');
         return;
       }
 
       const startDateTime = new Date(`${pickupDate}T${pickupTime}`);
       if (startDateTime < new Date()) {
-        toast.error('Thời gian lấy xe không được ở quá khứ');
+        toast.error('Pickup time cannot be in the past');
         return;
       }
 
-      // Gửi dữ liệu thuê theo giờ
+      // Send hourly rental data
       await submitBooking({
         vehicleId: id,
         startDate: `${pickupDate}T${pickupTime}`,
@@ -345,9 +356,9 @@ const CarDetails = () => {
       });
 
     } else {
-      // Validate thuê theo ngày
+      // Validate daily rental
       if (!pickupDate || !returnDate || !pickupTime || !returnTime) {
-        toast.error('Vui lòng chọn đầy đủ ngày và giờ lấy/trả xe');
+        toast.error('Please select both pickup and return date/time');
         return;
       }
 
@@ -355,16 +366,16 @@ const CarDetails = () => {
       const endDateTime = new Date(`${returnDate}T${returnTime}`);
 
       if (startDateTime < new Date()) {
-        toast.error('Thời gian lấy xe không được ở quá khứ');
+        toast.error('Pickup time cannot be in the past');
         return;
       }
 
       if (endDateTime <= startDateTime) {
-        toast.error('Thời gian trả xe phải sau thời gian lấy xe');
+        toast.error('Return time must be after pickup time');
         return;
       }
 
-      // Gửi dữ liệu thuê theo ngày
+      // Send daily rental data
       await submitBooking({
         vehicleId: id,
         startDate: `${pickupDate}T${pickupTime}`,
@@ -379,20 +390,20 @@ const CarDetails = () => {
       // Get auth token
       const auth = localStorage.getItem('auth');
       if (!auth) {
-        toast.error('Vui lòng đăng nhập để đặt xe');
+        toast.error('Please login to book a car');
         navigate('/login');
         return;
       }
       const { token } = JSON.parse(auth);
       if (!token) {
-        toast.error('Không tìm thấy token xác thực. Vui lòng đăng nhập lại');
+        toast.error('Authentication token not found. Please login again');
         navigate('/login');
         return;
       }
 
       // Get car_providerId from provider data
       if (!provider?._id) {
-        toast.error('Thông tin chủ xe không hợp lệ. Vui lòng thử lại.');
+        toast.error('Invalid car provider information. Please try again.');
         return;
       }
 
@@ -410,15 +421,15 @@ const CarDetails = () => {
 
       const data = await response.json();
       if (data.success) {
-        toast.success('🚗 Đặt xe thành công! Kiểm tra trong Đơn thuê của tôi', {
+        toast.success('🚗 Booking successful! Check your Rentals page', {
           onClose: () => navigate('/rentals')
         });
       } else {
-        throw new Error(data.message || 'Đặt xe thất bại');
+        throw new Error(data.message || 'Booking failed');
       }
     } catch (error) {
       console.error('Booking error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Đặt xe thất bại. Vui lòng thử lại.';
+      const errorMessage = error.response?.data?.message || error.message || 'Booking failed. Please try again.';
       toast.error(errorMessage);
     }
   };
@@ -568,6 +579,7 @@ const CarDetails = () => {
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
         {/* Car Images Gallery */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
           <div className="aspect-w-16 aspect-h-9 relative">
@@ -936,10 +948,11 @@ const CarDetails = () => {
           {/* Booking Card */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">
+              {/* Base Price Display */}
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                   <MdLocalOffer className="text-primary" />
-                  {formatCurrency(totalPrice || car.rentalPricePerDay)}
+                  {formatCurrency(car.rentalPricePerDay)}
                 </h2>
                 <span className="text-gray-600">per day</span>
               </div>
@@ -951,14 +964,14 @@ const CarDetails = () => {
                   onClick={() => setRentalType('daily')}
                   className={`px-4 py-2 rounded-l-lg ${rentalType === 'daily' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`}
                 >
-                  Thuê theo ngày
+                  Daily Rental
                 </button>
                 <button
                   type="button"
                   onClick={() => setRentalType('hourly')}
                   className={`px-4 py-2 rounded-r-lg ${rentalType === 'hourly' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700'}`}
                 >
-                  Thuê theo giờ
+                  Hourly Rental
                 </button>
               </div>
 
@@ -967,7 +980,7 @@ const CarDetails = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                     <FaCalendarAlt className="text-primary" />
-                    Ngày lấy xe
+                    Pickup Date
                   </label>
                   <input
                     type="date"
@@ -977,7 +990,7 @@ const CarDetails = () => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                   />
                   <div className="mt-2">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Giờ lấy xe</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Pickup Time</label>
                     <input
                       type="time"
                       value={pickupTime}
@@ -987,11 +1000,11 @@ const CarDetails = () => {
                   </div>
                 </div>
 
-                {/* Hourly Duration Selection - only show for hourly rentals */}
+                {/* Hourly Duration Selection */}
                 {rentalType === 'hourly' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Thời gian thuê
+                      Rental Duration
                     </label>
                     <div className="grid grid-cols-3 gap-2">
                       {[6, 8, 12].map((hours) => (
@@ -1005,19 +1018,19 @@ const CarDetails = () => {
                               : 'border-gray-300 hover:border-primary'
                           }`}
                         >
-                          {hours} giờ
+                          {hours} hours
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Return Date & Time - only show for daily rentals */}
+                {/* Return Date & Time */}
                 {rentalType === 'daily' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
                       <FaCalendarAlt className="text-primary" />
-                      Ngày trả xe
+                      Return Date
                     </label>
                     <input
                       type="date"
@@ -1027,7 +1040,7 @@ const CarDetails = () => {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary"
                     />
                     <div className="mt-2">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Giờ trả xe</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Return Time</label>
                       <input
                         type="time"
                         value={returnTime}
@@ -1040,22 +1053,40 @@ const CarDetails = () => {
 
                 {/* Price Display */}
                 <div className="border-t border-gray-200 pt-4">
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Tổng cộng</span>
-                    <span>{formatCurrency(totalPrice || car.rentalPricePerDay)}</span>
+                  <div className="flex flex-col gap-2">
+                    {/* Show hourly rate calculation if hourly rental */}
+                    {rentalType === 'hourly' && (
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span>Base rate ({hourlyDuration} hours)</span>
+                        <span>{formatCurrency(car.rentalPricePerDay)} × {
+                          hourlyDuration === 6 ? '50%' :
+                          hourlyDuration === 8 ? '65%' :
+                          '75%'
+                        }</span>
+                      </div>
+                    )}
+
+                    {/* Show daily rate calculation if daily rental */}
+                    {rentalType === 'daily' && pickupDate && returnDate && (
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span>Daily rate × {calculateDays(pickupDate, returnDate)} days</span>
+                        <span>{formatCurrency(car.rentalPricePerDay)} × {calculateDays(pickupDate, returnDate)}</span>
+                      </div>
+                    )}
+
+                    {/* Total Price */}
+                    <div className="flex justify-between font-bold text-lg pt-2">
+                      <span>Total Price</span>
+                      <span>{formatCurrency(totalPrice || car.rentalPricePerDay)}</span>
+                    </div>
                   </div>
-                  {rentalType === 'hourly' && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      ({hourlyDuration} giờ)
-                    </p>
-                  )}
                 </div>
 
                 <button
                   type="submit"
                   className="w-full bg-primary text-white py-3 rounded-lg hover:bg-secondary transition duration-150"
                 >
-                  Đặt xe ngay
+                  Book Now
                 </button>
               </form>
 
@@ -1066,7 +1097,7 @@ const CarDetails = () => {
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <MdCancel className="h-5 w-5 text-primary mr-2" />
-                  Miễn phí huỷ trước 24h nhận xe
+                  Free cancellation 24h before pickup
                 </div>
               </div>
             </div>

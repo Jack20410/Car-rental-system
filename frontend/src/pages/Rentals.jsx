@@ -551,7 +551,7 @@ const Rentals = () => {
       });
       
       if (response.data.success) {
-        // Gửi thông báo qua WebSocket
+        // Send notification via WebSocket
         sendRentalUpdate({
           type: 'RENTAL_UPDATE',
           rentalId,
@@ -560,7 +560,7 @@ const Rentals = () => {
           timestamp: new Date().toISOString()
         });
         
-        toast.success('Rental status updated successfully');
+        toast.success('Rental status has been updated successfully');
         fetchRentals();
       }
     } catch (error) {
@@ -586,11 +586,9 @@ const Rentals = () => {
     setShowPaymentModal(true);
   };
 
-  // Handler for closing the payment modal
   const handleClosePaymentModal = (result) => {
     setShowPaymentModal(false);
     
-    // If payment was successful, refresh the rentals list
     if (result === 'success') {
       fetchRentals();
     }
@@ -703,12 +701,10 @@ const Rentals = () => {
     
     console.log(`Sending message to ${selectedProvider.fullName} (${selectedProvider._id}): ${messageInput}`);
     
-    // Make sure we have a current chat
     if (!currentChat) {
       console.log("No current chat, starting a new one");
       startChat(selectedProvider);
       
-      // Save the message to send after chat is established
       setTimeout(() => {
         sendMessage({
           content: messageInput,
@@ -720,7 +716,6 @@ const Rentals = () => {
       return;
     }
     
-    // Use chat context to send message
     const success = sendMessage({
       content: messageInput,
       recipientId: selectedProvider._id,
@@ -728,7 +723,6 @@ const Rentals = () => {
     });
     
     if (success) {
-      // Update local messages immediately for better UX
       const newMessage = {
         senderId: user._id,
         text: messageInput,
@@ -738,7 +732,6 @@ const Rentals = () => {
       setChatMessages(prev => [...(prev || []), newMessage]);
       setMessageInput('');
       
-      // Request to scroll chat container to bottom after state update
       requestAnimationFrame(() => {
         if (messagesEndRef.current) {
           const chatContainer = messagesEndRef.current.closest('.chat-message-container');

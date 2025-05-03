@@ -381,20 +381,16 @@ const ManageCars = () => {
     setSelectedCustomer(customer);
     
     try {
-      // Use the consistentChatId function from context to ensure the same ID is used both ways
       const chatId = createChatId(user._id, customer._id);
       console.log(`Setting up chat with ${customer.fullName}, chatId: ${chatId}`);
       
-      // Set the current chat with the consistent ID
       setCurrentChat({
         id: chatId,
         recipient: customer
       });
       
-      // Pre-load messages for this chat
       loadChatMessages(chatId);
       
-      // Mark messages as read
       setTimeout(() => {
         markMessagesAsRead(chatId);
       }, 300);
@@ -661,7 +657,7 @@ const ManageCars = () => {
       });
 
       if (response.ok) {
-        // Gửi thông báo qua WebSocket
+        // Send notification via WebSocket
         sendRentalUpdate({
           type: 'RENTAL_UPDATE',
           rentalId,
@@ -671,13 +667,13 @@ const ManageCars = () => {
         });
 
         fetchRentals();
-        toast.success('Rental status updated successfully');
+        toast.success('Rental status has been updated successfully');
       } else {
         throw new Error('Failed to update rental status');
       }
     } catch (error) {
       console.error('Error updating rental status:', error);
-      toast.error('Failed to update rental status');
+      toast.error('Failed to update rental status. Please try again.');
     }
   };
 
@@ -699,10 +695,10 @@ const ManageCars = () => {
 
       // Refresh rentals after status update
       fetchRentals();
-      toast.success('Payment status updated successfully');
+      toast.success('Payment status has been updated successfully');
     } catch (error) {
       console.error('Error updating payment status:', error);
-      toast.error('Failed to update payment status');
+      toast.error('Failed to update payment status. Please try again.');
     }
   };
 

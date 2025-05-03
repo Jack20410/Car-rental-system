@@ -61,48 +61,56 @@ wss.on('connection', (ws) => {
 // Hàm xử lý tính toán giá
 async function handlePriceCalculation(ws, data) {
   try {
-    const { startDate, endDate, pickupTime, returnTime, vehicleId } = data;
+    const { startDate, endDate, pickupTime, returnTime, vehicleId, rentalType, hourlyDuration } = data;
     
-    // Tạo đối tượng Date từ startDate và endDate
-    const start = pickupTime 
-      ? new Date(`${startDate}T${pickupTime}`)
-      : new Date(startDate);
-    
-    const end = returnTime
-      ? new Date(`${endDate}T${returnTime}`)
-      : new Date(endDate);
-
     // Lấy thông tin vehicle
     const vehicleResponse = await axios.get(
       `${process.env.VEHICLE_SERVICE_URL}/vehicles/${vehicleId}`
     );
     const vehicle = vehicleResponse.data.data;
-
-    // Tính toán giá
-    const isSameDay = start.toDateString() === end.toDateString();
     let totalPrice = 0;
 
-    if (isSameDay && pickupTime && returnTime) {
-      // Tính số giờ thuê trong cùng một ngày
-      const hourDiff = (end - start) / (1000 * 60 * 60);
-      
-      if (hourDiff <= 6) {
-        totalPrice = vehicle.rentalPricePerDay * 0.5;
-      } else if (hourDiff <= 12) {
-        totalPrice = vehicle.rentalPricePerDay * 0.75;
-      } else {
-        totalPrice = vehicle.rentalPricePerDay;
+    if (rentalType === 'hourly') {
+      // Tính giá cho thuê theo giờ
+      switch (hourlyDuration) {
+        case 6:
+          totalPrice = vehicle.rentalPricePerDay * 0.5;
+          break;
+        case 8:
+          totalPrice = vehicle.rentalPricePerDay * 0.65;
+          break;
+        case 12:
+          totalPrice = vehicle.rentalPricePerDay * 0.75;
+          break;
+        default:
+          throw new Error('Invalid hourly duration');
       }
     } else {
-      // Tính số ngày thuê
-      const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-      totalPrice = days * vehicle.rentalPricePerDay;
+      // Tính giá cho thuê theo ngày
+      if (!startDate || !endDate) {
+        totalPrice = vehicle.rentalPricePerDay; // Default to 1 day if no dates selected
+      } else {
+        const start = pickupTime 
+          ? new Date(`${startDate}T${pickupTime}`)
+          : new Date(startDate);
+        
+        const end = returnTime
+          ? new Date(`${endDate}T${returnTime}`)
+          : new Date(endDate);
+
+        // Tính số ngày thuê
+        const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+        totalPrice = days * vehicle.rentalPricePerDay;
+      }
     }
 
     // Gửi kết quả về client
     ws.send(JSON.stringify({
       type: 'price_calculated',
-      totalPrice
+      totalPrice,
+      basePrice: vehicle.rentalPricePerDay,
+      rentalType,
+      duration: rentalType === 'hourly' ? hourlyDuration : null
     }));
   } catch (error) {
     console.error('Error calculating price:', error);
