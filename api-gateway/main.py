@@ -14,7 +14,8 @@ from routes import (
     vehicle_router,
     rental_router,
     health_router,
-    rating_router, 
+    rating_router,
+    payment_router,
 )
 
 # Import utility functions
@@ -83,7 +84,8 @@ app.include_router(health_router)
 app.include_router(user_router)
 app.include_router(vehicle_router)
 app.include_router(rental_router)
-app.include_router(rating_router)  # <-- Thêm dòng này
+app.include_router(rating_router)
+app.include_router(payment_router)
 
 @app.on_event("shutdown")
 async def shutdown_event():

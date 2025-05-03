@@ -3,7 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import { ChatProvider } from './context/ChatContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 
 // Components and Pages
@@ -18,6 +18,7 @@ import Profile from './pages/Profile';
 import Rentals from './pages/Rentals';
 import ManageCars from './pages/ManageCars';
 import OwnerProfile from './pages/OwnerProfile';
+import PaymentSuccess from './pages/PaymentSuccess';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Scroll restoration component
@@ -38,8 +39,10 @@ function App() {
         <ChatProvider>
           <div className="min-h-screen bg-gray-50 w-full overflow-x-hidden">
             <ScrollToTop />
-            <Navbar />
             <Routes>
+              {/* Special route for payment success to avoid toast issues */}
+              <Route path="/payment/success" element={<PaymentSuccess />} />
+              
               <Route path="/" element={<MainLayout />}>
                 <Route index element={<Home />} />
                 <Route path="cars" element={<Cars />} />

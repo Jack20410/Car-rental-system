@@ -17,6 +17,15 @@ router.patch('/payments/:id/confirm', paymentController.confirmPayment);
 // Yêu cầu hoàn tiền
 router.patch('/payments/:id/refund', paymentController.refundPayment);
 
+// Tạo thanh toán MOMO cho rental
+router.post('/payments/momo', paymentController.createMomoPayment);
+
+// Xử lý callback từ MOMO (IPN - Instant Payment Notification)
+router.post('/payments/momo/ipn', paymentController.handleMomoIPN);
+
+// Xử lý redirect sau khi thanh toán MOMO
+router.get('/payments/momo/success', paymentController.handleMomoSuccess);
+
 // Lấy chi tiết thanh toán theo Payment ID
 router.get('/payments/:id', paymentController.getPaymentById);
 

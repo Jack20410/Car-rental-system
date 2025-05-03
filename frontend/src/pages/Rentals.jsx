@@ -6,8 +6,9 @@ import { formatCurrency } from '../utils/formatCurrency';
 import { toast } from 'react-toastify';
 import { useChat } from '../context/ChatContext';
 import ChatWindow from '../components/ChatWindow';
+import PaymentModal from '../components/PaymentModal';
 
-const RentalCard = ({ rental, onStatusChange, onPaymentChange }) => {
+const RentalCard = ({ rental, onStatusChange, onPaymentClick }) => {
   const [provider, setProvider] = useState(null);
   const [vehicle, setVehicle] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -247,7 +248,7 @@ const RentalCard = ({ rental, onStatusChange, onPaymentChange }) => {
               {['approved', 'started', 'completed'].includes(rental.status) && 
                rental.paymentStatus === 'unpaid' && (
                 <button
-                  onClick={() => onPaymentChange(rental._id)}
+                  onClick={() => onPaymentClick(rental, vehicle, provider)}
                   className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
                   Pay Now
@@ -272,6 +273,9 @@ const Rentals = () => {
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [messageInput, setMessageInput] = useState('');
   const [isLoadingProviders, setIsLoadingProviders] = useState(true);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedRental, setSelectedRental] = useState(null);
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
   
   // Chat context
   const {
@@ -514,16 +518,20 @@ const Rentals = () => {
     }
   };
 
-  const handlePaymentStatusChange = async (rentalId) => {
-    try {
-      await api.patch(`/rentals/${rentalId}/payment`, {
-        paymentStatus: 'paid'
-      });
-      toast.success('Payment status updated successfully');
-      fetchRentals(); // Refresh the rentals list
-    } catch (error) {
-      console.error('Error updating payment status:', error);
-      toast.error('Failed to update payment status');
+  const handlePaymentClick = (rental, vehicle, provider) => {
+    setSelectedRental(rental);
+    setSelectedVehicle(vehicle);
+    setSelectedProvider(provider);
+    setShowPaymentModal(true);
+  };
+
+  // Handler for closing the payment modal
+  const handleClosePaymentModal = (result) => {
+    setShowPaymentModal(false);
+    
+    // If payment was successful, refresh the rentals list
+    if (result === 'success') {
+      fetchRentals();
     }
   };
 
@@ -786,7 +794,7 @@ const Rentals = () => {
                     key={rental._id}
                     rental={rental}
                     onStatusChange={handleRentalStatusChange}
-                    onPaymentChange={handlePaymentStatusChange}
+                    onPaymentClick={handlePaymentClick}
                   />
                 ))}
               </div>
@@ -887,6 +895,15 @@ const Rentals = () => {
           </div>
         )}
       </div>
+      {showPaymentModal && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={handleClosePaymentModal}
+          rental={selectedRental}
+          vehicle={selectedVehicle}
+          provider={selectedProvider}
+        />
+      )}
     </div>
   );
 };

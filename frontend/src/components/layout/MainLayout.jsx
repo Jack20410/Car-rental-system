@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { Link, Outlet } from 'react-router-dom';
+import Navbar from '../Navbar';
 
 const MainLayout = () => {
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Add Navbar */}
+      <Navbar />
+      
       {/* Main content */}
       <main className="flex-grow pt-16 px-4 sm:px-6 lg:px-8">
         <Outlet />

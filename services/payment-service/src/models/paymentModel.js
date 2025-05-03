@@ -21,7 +21,7 @@ const paymentSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['Credit Card', 'Paypal', 'Bank Transfer', 'Cash'],
+    enum: ['Credit Card', 'Paypal', 'Bank Transfer', 'Cash', 'MOMO'],
     required: true
   },
   paymentStatus: {
@@ -37,6 +37,10 @@ const paymentSchema = new mongoose.Schema({
   },
   paymentDetails: {
     type: Object
+  },
+  userToken: {
+    type: String,
+    select: false // Don't include in query results by default for security
   }
 }, { timestamps: true }); // createdAt, updatedAt tự động
 
