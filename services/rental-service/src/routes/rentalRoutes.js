@@ -12,14 +12,13 @@ const {
 } = require('../controllers/rentalController');
 const { 
   verifyToken, 
-  requireCustomer,
-  requireCarProvider,
-  requireRole 
+  requireRole
 } = require('../middleware/authMiddleware');
 const { validateCreateRental } = require('../middleware/rentalValidation');
 
 // Public routes
 router.get('/all', getAllRentals);
+
 // GET - Check rental availability
 router.get('/availability', checkAvailability);
 
@@ -28,6 +27,7 @@ router.get('/availability', checkAvailability);
 router.post(
   '/',
   verifyToken,
+  requireRole('customer'),
   validateCreateRental,
   createRental
 );
@@ -37,6 +37,7 @@ router.post(
 router.get(
   '/',
   verifyToken,
+  requireRole(['customer', 'car_provider']),
   getUserRentals
 );
 
@@ -44,7 +45,7 @@ router.get(
 router.get(
   '/provider',
   verifyToken,
-  requireCarProvider,
+  requireRole('car_provider'),
   getProviderRentals
 );
 
@@ -64,10 +65,11 @@ router.patch(
 );
 
 // Payment status updates
+// Hien tai chi co the cap nhat thu cong
 router.patch(
   '/:id/payment',
   verifyToken,
-  requireRole(['admin', 'system']),
+  requireRole(['admin', 'customer', 'car_provider']),
   updatePaymentStatus
 );
 

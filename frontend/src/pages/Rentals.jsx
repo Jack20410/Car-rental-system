@@ -7,7 +7,7 @@ import { toast } from 'react-toastify';
 import { useChat } from '../context/ChatContext';
 import ChatWindow from '../components/ChatWindow';
 
-const RentalCard = ({ rental, onCancel }) => {
+const RentalCard = ({ rental, onStatusChange, onPaymentChange }) => {
   const [provider, setProvider] = useState(null);
   const [vehicle, setVehicle] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -164,21 +164,49 @@ const RentalCard = ({ rental, onCancel }) => {
             </div>
           </div>
 
-          {/* Status History Timeline */}
-          <div className="mb-4">
-            <h4 className="text-sm font-medium text-gray-500 mb-2">Status History</h4>
-            <div className="space-y-2">
-              {rental.statusHistory.map((history, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <div className="h-2 w-2 rounded-full bg-primary"></div>
-                  <span className={`text-xs font-semibold rounded-full px-2 py-1 ${getStatusColor(history.status)}`}>
-                    {history.status}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {formatDate(history.changedAt)}
-                  </span>
-                </div>
-              ))}
+          {/* History Timelines - Side by Side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {/* Status History Timeline */}
+            <div>
+              <h4 className="text-sm font-medium text-gray-500 mb-2">Status History</h4>
+              <div className="space-y-2">
+                {rental.statusHistory.map((history, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <div className="h-2 w-2 rounded-full bg-primary"></div>
+                    <span className={`text-xs font-semibold rounded-full px-2 py-1 ${getStatusColor(history.status)}`}>
+                      {history.status}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {formatDate(history.changedAt)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Payment History Timeline */}
+            <div>
+              <h4 className="text-sm font-medium text-gray-500 mb-2">Payment History</h4>
+              <div className="space-y-2">
+                {rental.paymentHistory?.map((history, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                    <span className={`text-xs font-semibold rounded-full px-2 py-1 ${
+                      history.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {history.status.charAt(0).toUpperCase() + history.status.slice(1)}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {formatDate(history.changedAt)}
+                    </span>
+                    {history.amount && (
+                      <span className="text-xs font-medium text-gray-700">
+                        {formatCurrency(history.amount)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -194,28 +222,38 @@ const RentalCard = ({ rental, onCancel }) => {
               </span>
               <span className={`ml-4 px-2 py-1 text-xs font-semibold rounded-full ${
                 rental.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
-                rental.paymentStatus === 'refunded' ? 'bg-yellow-100 text-yellow-800' :
                 'bg-red-100 text-red-800'
               }`}>
                 {rental.paymentStatus}
               </span>
             </div>
-            {rental.status === 'pending' && (
-              <button
-                onClick={() => onCancel(rental._id)}
-                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              >
-                Cancel Rental
-              </button>
-            )}
-            {rental.status === 'approved' && (
-              <button
-                onClick={() => onCancel(rental._id)}
-                className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                Start Rental
-              </button>
-            )}
+            <div className="flex gap-2">
+              {rental.status === 'pending' && (
+                <button
+                  onClick={() => onStatusChange(rental._id, 'cancelled')}
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  Cancel Rental
+                </button>
+              )}
+              {rental.status === 'approved' && (
+                <button
+                  onClick={() => onStatusChange(rental._id, 'started')}
+                  className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  Start Rental
+                </button>
+              )}
+              {['approved', 'started', 'completed'].includes(rental.status) && 
+               rental.paymentStatus === 'unpaid' && (
+                <button
+                  onClick={() => onPaymentChange(rental._id)}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Pay Now
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -473,6 +511,19 @@ const Rentals = () => {
     } catch (error) {
       console.error('Error updating rental status:', error);
       toast.error('Failed to update rental status');
+    }
+  };
+
+  const handlePaymentStatusChange = async (rentalId) => {
+    try {
+      await api.patch(`/rentals/${rentalId}/payment`, {
+        paymentStatus: 'paid'
+      });
+      toast.success('Payment status updated successfully');
+      fetchRentals(); // Refresh the rentals list
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      toast.error('Failed to update payment status');
     }
   };
 
@@ -734,7 +785,8 @@ const Rentals = () => {
                   <RentalCard
                     key={rental._id}
                     rental={rental}
-                    onCancel={handleRentalStatusChange}
+                    onStatusChange={handleRentalStatusChange}
+                    onPaymentChange={handlePaymentStatusChange}
                   />
                 ))}
               </div>

@@ -409,11 +409,10 @@ exports.updatePaymentStatus = async (req, res) => {
     const userId = req.user.userId;
     
     // Validate payment status
-    const validPaymentStatuses = ['unpaid', 'paid', 'refunded'];
-    if (!validPaymentStatuses.includes(paymentStatus)) {
+    if (paymentStatus !== 'paid') {
       return res.status(400).json({
         success: false,
-        message: `Invalid payment status. Must be one of: ${validPaymentStatuses.join(', ')}`
+        message: 'Invalid payment status. Only "paid" status is allowed.'
       });
     }
     
@@ -434,26 +433,25 @@ exports.updatePaymentStatus = async (req, res) => {
       });
     }
 
-    // Validate payment status transition
-    const validTransitions = {
-      'unpaid': ['paid'],
-      'paid': ['refunded'],
-      'refunded': []
-    };
-
-    if (!validTransitions[rental.paymentStatus].includes(paymentStatus)) {
+    // Check if rental is in a valid status for payment
+    const validRentalStatuses = ['approved', 'started', 'completed'];
+    if (!validRentalStatuses.includes(rental.status)) {
       return res.status(400).json({
         success: false,
-        message: `Cannot transition from ${rental.paymentStatus} to ${paymentStatus}`
+        message: 'Cannot update payment status. Rental must be approved, started, or completed.'
+      });
+    }
+
+    // Check current payment status
+    if (rental.paymentStatus !== 'unpaid') {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment status can only be updated from unpaid to paid'
       });
     }
     
-    // Update payment status and add to history
-    rental.paymentStatus = paymentStatus;
-    rental.paymentHistory.push({
-      status: paymentStatus,
-      changedAt: new Date()
-    });
+    // Update payment status only - let the pre-save middleware handle the history
+    rental.paymentStatus = 'paid';
 
     await rental.save();
     

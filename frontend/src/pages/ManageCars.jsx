@@ -653,6 +653,31 @@ const ManageCars = () => {
     }
   };
 
+  // Add this function near handleRentalStatusChange
+  const handlePaymentStatusChange = async (rentalId) => {
+    try {
+      const response = await fetch(`http://localhost:3000/rentals/${rentalId}/payment`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${JSON.parse(localStorage.getItem('auth'))?.token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ paymentStatus: 'paid' })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update payment status');
+      }
+
+      // Refresh rentals after status update
+      fetchRentals();
+      toast.success('Payment status updated successfully');
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      toast.error('Failed to update payment status');
+    }
+  };
+
   // Effect to handle real-time chat updates
   useEffect(() => {
     if (!selectedCustomer || !user?._id) return;
@@ -1359,9 +1384,6 @@ const ManageCars = () => {
                                 }`}>
                                   {rental.status.charAt(0).toUpperCase() + rental.status.slice(1)}
                                 </span>
-                                <span className="text-sm text-gray-500 mt-1">
-                                  Payment: {rental.paymentStatus.charAt(0).toUpperCase() + rental.paymentStatus.slice(1)}
-                                </span>
                               </div>
                             </div>
 
@@ -1376,9 +1398,69 @@ const ManageCars = () => {
                               </div>
                             </div>
 
+                            {/* History Timelines - Side by Side */}
+                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Status History Timeline */}
+                              <div>
+                                <h4 className="text-sm font-medium text-gray-500 mb-2">Status History</h4>
+                                <div className="space-y-2">
+                                  {rental.statusHistory?.map((history, index) => (
+                                    <div key={index} className="flex items-center space-x-2">
+                                      <div className="h-2 w-2 rounded-full bg-primary"></div>
+                                      <span className={`text-xs font-semibold rounded-full px-2 py-1 ${
+                                        history.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                        history.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                                        history.status === 'started' ? 'bg-green-100 text-green-800' :
+                                        history.status === 'completed' ? 'bg-gray-100 text-gray-800' :
+                                        history.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                        history.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
+                                      }`}>
+                                        {history.status.charAt(0).toUpperCase() + history.status.slice(1)}
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        {new Date(history.changedAt).toLocaleString()}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Payment History Timeline */}
+                              <div>
+                                <h4 className="text-sm font-medium text-gray-500 mb-2">Payment History</h4>
+                                <div className="space-y-2">
+                                  {rental.paymentHistory?.map((history, index) => (
+                                    <div key={index} className="flex items-center space-x-2">
+                                      <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                                      <span className={`text-xs font-semibold rounded-full px-2 py-1 ${
+                                        history.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                      }`}>
+                                        {history.status.charAt(0).toUpperCase() + history.status.slice(1)}
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        {new Date(history.changedAt).toLocaleString()}
+                                      </span>
+                                      {history.amount && (
+                                        <span className="text-xs font-medium text-gray-700">
+                                          {formatCurrency(history.amount)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+
                             <div className="mt-4 flex justify-between items-center">
                               <div className="text-lg font-semibold text-primary">
                                 {formatCurrency(rental.totalPrice)}
+                                <span className={`ml-4 px-2 py-1 text-xs font-semibold rounded-full ${
+                                  rental.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {rental.paymentStatus.charAt(0).toUpperCase() + rental.paymentStatus.slice(1)}
+                                </span>
                               </div>
                               
                               {/* Status Actions */}
