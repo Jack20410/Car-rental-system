@@ -43,7 +43,8 @@ const updateRentalPaymentStatus = async (rentalId, token) => {
       }
     } catch (err) {
       console.error('Error checking rental payment status:', err.message);
-      // Continue with the update attempt even if check fails
+      // Return false to avoid continuing with the update attempt if check fails
+      return false;
     }
     
     // Call the rental service to update payment status
@@ -457,6 +458,12 @@ exports.handleMomoIPN = async (req, res) => {
       return res.status(404).json({ message: 'Payment not found' });
     }
 
+    // Check if payment is already marked as paid, to prevent updating multiple times
+    if (payment.paymentStatus === 'paid') {
+      console.log(`Payment ${paymentId} is already marked as paid, skipping update`);
+      return res.status(200).json({ message: 'Payment already processed successfully' });
+    }
+
     payment.paymentStatus = 'paid';
     payment.transactionTime = new Date(responseTime);
     payment.providerPaymentId = transId;
@@ -506,13 +513,40 @@ exports.handleMomoSuccess = async (req, res) => {
           payment.transactionTime = new Date();
           await payment.save();
           
-          // Try to update the rental service payment status with the stored token
+          // Only try to update the rental service if it's a new payment update
           if (payment.userToken) {
             console.log('Using stored token to update rental payment status');
-            await updateRentalPaymentStatus(rentalId, payment.userToken);
+            
+            // Check rental payment status first
+            try {
+              const checkUrl = `${RENTAL_SERVICE_URL}/rentals/${rentalId}`;
+              const checkResponse = await axios.get(
+                checkUrl,
+                { 
+                  headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': payment.userToken
+                  } 
+                }
+              );
+              
+              const rentalData = checkResponse.data.data || checkResponse.data;
+              
+              // If already paid, don't update again
+              if (rentalData && rentalData.paymentStatus === 'paid') {
+                console.log(`Rental ${rentalId} payment status is already paid, skipping update from success callback`);
+              } else {
+                // Only update if not already paid
+                await updateRentalPaymentStatus(rentalId, payment.userToken);
+              }
+            } catch (err) {
+              console.error('Error checking rental status:', err.message);
+            }
           } else {
             console.warn('No stored token available for payment update');
           }
+        } else if (payment) {
+          console.log(`Payment ${paymentId} is already marked as paid, skipping update`);
         }
         
         // Payment exists, return success response

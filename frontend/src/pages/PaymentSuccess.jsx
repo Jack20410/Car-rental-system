@@ -33,9 +33,10 @@ const PaymentSuccess = () => {
         const decodedData = JSON.parse(atob(extraData));
         rentalId = decodedData.rentalId;
         
-        // If we have a rentalId, update the payment status
+        // If we have a rentalId, check the payment status first
+        // instead of immediately updating it
         if (rentalId) {
-          updateRentalPaymentStatus(rentalId);
+          checkAndUpdateRentalPaymentStatus(rentalId);
         }
       } catch (e) {
         console.error('Failed to decode extraData:', e);
@@ -55,26 +56,26 @@ const PaymentSuccess = () => {
     }
   }, [location]);
 
-  // Function to update the rental payment status
-  const updateRentalPaymentStatus = async (rentalId) => {
+  // Function to check and then update the rental payment status
+  const checkAndUpdateRentalPaymentStatus = async (rentalId) => {
     try {
-      // First check if the rental's payment status is already paid
+      // First check if the rental exists and get its payment status
       const rentalResponse = await api.get(`/rentals/${rentalId}`);
       const rental = rentalResponse.data.data;
       
       // If already paid, don't update again
       if (rental && rental.paymentStatus === 'paid') {
-        console.log('Rental payment status is already paid, skipping update');
+        console.log('Rental payment status is already paid, skipping frontend update');
         setLoading(false);
         return;
       }
       
-      // Call the rental service to update payment status
+      // Only proceed with the update if we confirmed it's not already paid
       const response = await api.patch(`/rentals/${rentalId}/payment`, {
         paymentStatus: 'paid'
       });
       
-      console.log('Payment status updated successfully:', response.data);
+      console.log('Payment status updated successfully from frontend:', response.data);
     } catch (error) {
       console.error('Error updating rental payment status:', error);
     } finally {
