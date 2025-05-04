@@ -6,6 +6,8 @@ import { useChat } from '../context/ChatContext';
 import { toast } from 'react-toastify';
 import ChatWindow from '../components/ChatWindow';
 import { useRentalWebSocket } from '../context/RentalWebSocketContext';
+import { MdVerified, MdEmail } from 'react-icons/md';
+import { FaPhoneAlt } from 'react-icons/fa';
 
 // Modal Component
 const Modal = ({ isOpen, onClose, children }) => {
@@ -74,6 +76,7 @@ const ManageCars = () => {
   const [chatMessages, setChatMessages] = useState([]);
   const messagesEndRef = useRef(null);
   const processedMessageIds = useRef(new Set());
+  const [rentalCustomers, setRentalCustomers] = useState({});
 
   // Chat context
   const { 
@@ -563,7 +566,7 @@ const ManageCars = () => {
     }
   }, [activeTab]);
 
-  // Add this function to fetch rentals
+  // Update the fetchRentals function
   const fetchRentals = async () => {
     try {
       setIsLoadingRentals(true);
@@ -588,10 +591,14 @@ const ManageCars = () => {
       const data = await response.json();
       const rentalsData = data.data.rentals;
 
-      // Fetch vehicle details for each rental
+      // Create objects to store vehicle and customer details
       const vehicleDetails = {};
+      const customerDetails = {};
+
+      // Fetch details for each rental
       for (const rental of rentalsData) {
         try {
+          // Fetch vehicle details
           const vehicleResponse = await fetch(`http://localhost:3000/vehicles/${rental.vehicleId}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -602,12 +609,25 @@ const ManageCars = () => {
             const vehicleData = await vehicleResponse.json();
             vehicleDetails[rental.vehicleId] = vehicleData.data;
           }
+
+          // Fetch customer details
+          const customerResponse = await fetch(`http://localhost:3000/users/${rental.userId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (customerResponse.ok) {
+            const customerData = await customerResponse.json();
+            customerDetails[rental.userId] = customerData.data;
+          }
         } catch (error) {
-          console.error(`Error fetching vehicle details for ${rental.vehicleId}:`, error);
+          console.error(`Error fetching details for rental ${rental._id}:`, error);
         }
       }
 
       setRentalVehicles(vehicleDetails);
+      setRentalCustomers(customerDetails);
       setRentals(rentalsData);
     } catch (error) {
       console.error('Error fetching rentals:', error);
@@ -1371,6 +1391,7 @@ const ManageCars = () => {
                   .filter(rental => rentalStatusFilter === 'all' || rental.status === rentalStatusFilter)
                   .map(rental => {
                     const vehicle = rentalVehicles[rental.vehicleId];
+                    const customer = rentalCustomers[rental.userId];
                     return (
                       <div key={rental._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div className="flex items-start gap-4">
@@ -1391,10 +1412,24 @@ const ManageCars = () => {
 
                           {/* Rental Details */}
                           <div className="flex-1">
+                            {/* Vehicle Info and Customer Info */}
                             <div className="flex justify-between items-start">
                               <div>
                                 <h3 className="text-lg font-semibold">{vehicle?.name || 'Unknown Vehicle'}</h3>
-                                <p className="text-gray-600">{vehicle?.brand} • {vehicle?.modelYear}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <p className="text-gray-600">{vehicle?.brand} • {vehicle?.modelYear}</p>
+                                  <span className="text-gray-400">|</span>
+                                  <div className="flex items-center gap-2 text-gray-600">
+                                    <img
+                                      src={customer?.avatar 
+                                        ? `http://localhost:3001${customer.avatar.replace('/uploads', '')}` 
+                                        : "http://localhost:3001/avatar/user.png"}
+                                      alt={customer?.fullName || 'Customer'}
+                                      className="w-5 h-5 rounded-full object-cover"
+                                    />
+                                    <span>{customer?.fullName || 'Unknown Customer'}</span>
+                                  </div>
+                                </div>
                               </div>
                               <div className="flex flex-col items-end">
                                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
@@ -1411,7 +1446,8 @@ const ManageCars = () => {
                               </div>
                             </div>
 
-                            <div className="mt-2 grid grid-cols-2 gap-4">
+                            {/* Dates and History */}
+                            <div className="mt-4 grid grid-cols-2 gap-4">
                               <div>
                                 <p className="text-sm text-gray-500">Start Date</p>
                                 <p className="font-medium">{new Date(rental.startDate).toLocaleDateString()}</p>
@@ -1422,7 +1458,7 @@ const ManageCars = () => {
                               </div>
                             </div>
 
-                            {/* History Timelines - Side by Side */}
+                            {/* History Timelines */}
                             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                               {/* Status History Timeline */}
                               <div>
@@ -1476,6 +1512,7 @@ const ManageCars = () => {
                               </div>
                             </div>
 
+                            {/* Price and Actions */}
                             <div className="mt-4 flex justify-between items-center">
                               <div className="text-lg font-semibold text-primary">
                                 {formatCurrency(rental.totalPrice)}
