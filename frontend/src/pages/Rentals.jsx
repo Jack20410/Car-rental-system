@@ -8,8 +8,10 @@ import { useChat } from '../context/ChatContext';
 import ChatWindow from '../components/ChatWindow';
 import PaymentModal from '../components/PaymentModal';
 import { useRentalWebSocket } from '../context/RentalWebSocketContext';
+import RatingModal from '../components/RatingModal'; // You'll create this component
 
-const RentalCard = ({ rental, onStatusChange, onPaymentClick }) => {
+// RentalCard
+const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) => {
   const [provider, setProvider] = useState(null);
   const [vehicle, setVehicle] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -255,6 +257,14 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick }) => {
                   Pay Now
                 </button>
               )}
+              {rental.status === 'completed' && (
+                <button
+                  onClick={() => onRatingClick(rental, vehicle)}
+                  className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                >
+                  Rating
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -279,6 +289,9 @@ const Rentals = () => {
   const [selectedRental, setSelectedRental] = useState(null);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [rentalStatusFilter, setRentalStatusFilter] = useState('all');
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedRentalForRating, setSelectedRentalForRating] = useState(null);
+  const [selectedVehicleForRating, setSelectedVehicleForRating] = useState(null);
   
   // Chat context
   const {
@@ -302,7 +315,7 @@ const Rentals = () => {
 
   // Handle new messages with useCallback and prevent duplicate processing
   const handleNewMessage = useCallback((event) => {
-    console.log("Event received in Rentals:", event);
+    //console.log("Event received in Rentals:", event);
     
     // Make sure we have the message data from the event
     const message = event.detail;
@@ -316,11 +329,11 @@ const Rentals = () => {
     
     // Skip if we've already processed this message
     if (processedMessageIds.current.has(messageId)) {
-      console.log("Skipping already processed message:", messageId);
+      //console.log("Skipping already processed message:", messageId);
       return;
     }
     
-    console.log("New message received in Rentals:", message);
+    //console.log("New message received in Rentals:", message);
     processedMessageIds.current.add(messageId);
     
     // Only add message to this chat if it belongs to the current conversation
@@ -334,11 +347,11 @@ const Rentals = () => {
         );
         
         if (isDuplicate) {
-          console.log("Duplicate message detected, skipping update");
+          //console.log("Duplicate message detected, skipping update");
           return prev;
         }
         
-        console.log("Adding new message to chat:", message);
+        //console.log("Adding new message to chat:", message);
         return [...prev, message];
       });
     } else {
@@ -357,10 +370,10 @@ const Rentals = () => {
 
   const fetchRentals = async () => {
     try {
-      console.log('Fetching all rentals');
+      //console.log('Fetching all rentals');
       const response = await api.get('/rentals');
       const fetchedRentals = response.data.data || [];
-      console.log('Fetched rentals:', fetchedRentals);
+      //console.log('Fetched rentals:', fetchedRentals);
       setAllRentals(fetchedRentals);
     } catch (err) {
       setError('Failed to load your rental history. Please try again later.');
@@ -562,6 +575,14 @@ const Rentals = () => {
         
         toast.success('Rental status has been updated successfully');
         fetchRentals();
+        
+        // Show rating modal if completed
+        if (newStatus === 'completed') {
+          // Find the rental object to pass to the modal
+          const completedRental = rentals.find(r => r._id === rentalId);
+          setSelectedRentalForRating(completedRental);
+          setShowRatingModal(true);
+        }
       }
     } catch (error) {
       console.error('Error updating rental status:', error);
@@ -635,7 +656,7 @@ const Rentals = () => {
       
       // Use the consistent chatId function to ensure the same ID is used in both directions
       const chatId = createChatId(user._id, provider._id);
-      console.log(`Setting up chat with ${provider.fullName}, chatId: ${chatId}`);
+      //console.log(`Setting up chat with ${provider.fullName}`);
       
       // Set the current chat with the consistent ID
       setCurrentChat({
@@ -654,7 +675,7 @@ const Rentals = () => {
   // Start or select a chat when provider is selected
   useEffect(() => {
     if (selectedProvider) {
-      console.log("Starting chat with provider:", selectedProvider);
+      //console.log("Starting chat with provider:", selectedProvider);
       startChat(selectedProvider);
       setActiveChat(selectedProvider._id);
     }
@@ -674,7 +695,8 @@ const Rentals = () => {
   // Debug current chat state
   useEffect(() => {
     console.log("Current chat state:", { currentChat, messages: chatMessages });
-  }, [currentChat, chatMessages]);
+    console.log("User role check:", { isUser: user?.role, isProvider: user?.role === 'car_provider' });
+  }, [currentChat, chatMessages, user]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -699,10 +721,10 @@ const Rentals = () => {
     e.preventDefault();
     if (!messageInput.trim() || !selectedProvider || !connected) return;
     
-    console.log(`Sending message to ${selectedProvider.fullName} (${selectedProvider._id}): ${messageInput}`);
+    //console.log(`Sending message to ${selectedProvider.fullName} (${selectedProvider._id}): ${messageInput}`);
     
     if (!currentChat) {
-      console.log("No current chat, starting a new one");
+      //console.log("No current chat, starting a new one");
       startChat(selectedProvider);
       
       setTimeout(() => {
@@ -756,6 +778,13 @@ const Rentals = () => {
       fetchProviders();
     }
   }, [location, fetchProviders]);
+
+  // Hàm mở modal đánh giá
+  const handleRatingClick = (rental, vehicle) => {
+    setSelectedRentalForRating(rental);
+    setSelectedVehicleForRating(vehicle);
+    setShowRatingModal(true);
+  };
 
   if (loading) {
     return (
@@ -869,6 +898,7 @@ const Rentals = () => {
                     rental={rental}
                     onStatusChange={handleRentalStatusChange}
                     onPaymentClick={handlePaymentClick}
+                    onRatingClick={handleRatingClick}
                   />
                 ))}
               </div>
@@ -955,8 +985,10 @@ const Rentals = () => {
                 {currentChat ? (
                   <div className="h-full chat-wrapper">
                     <ChatWindow 
+                      key={currentChat.id}
                       chatId={currentChat.id} 
                       recipient={currentChat.recipient}
+                      isProvider={false}
                     />
                   </div>
                 ) : (
@@ -976,6 +1008,14 @@ const Rentals = () => {
           rental={selectedRental}
           vehicle={selectedVehicle}
           provider={selectedProvider}
+        />
+      )}
+      {showRatingModal && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={() => setShowRatingModal(false)}
+          rental={selectedRentalForRating}
+          vehicle={selectedVehicleForRating}
         />
       )}
     </div>

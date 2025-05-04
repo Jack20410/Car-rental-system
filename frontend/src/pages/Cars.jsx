@@ -27,60 +27,59 @@ const Cars = () => {
         setLoading(true);
         setError(null);
 
+        // Kiểm tra nếu có đủ tham số search (city, startDate, endDate) thì lấy từ sessionStorage
         const city = searchParams.get('city');
-        
-        // Construct the URL - if city is provided use it as parameter, otherwise fetch all cars
+        const startDate = searchParams.get('startDate');
+        const endDate = searchParams.get('endDate');
+
+        if (city && startDate && endDate) {
+          const searchResults = sessionStorage.getItem('searchResults');
+          if (searchResults) {
+            const parsed = JSON.parse(searchResults);
+            if (Array.isArray(parsed.vehicles) && parsed.vehicles.length > 0) {
+              setCars(parsed.vehicles);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
+        // Nếu không có search params, hoặc không có kết quả search, fetch tất cả xe
         const url = city 
           ? `http://localhost:3000/vehicles?city=${encodeURIComponent(city)}`
           : 'http://localhost:3000/vehicles';
-        console.log('Fetching cars from:', url);
-
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error('Failed to fetch cars');
         }
-
         const result = await response.json();
-        console.log('API Response:', result);
-
         if (!result.success) {
           throw new Error(result.message || 'Error fetching cars');
         }
-
         const vehicles = Array.isArray(result.data?.vehicles) 
           ? result.data.vehicles 
           : result.data || [];
-
         if (vehicles.length === 0) {
           setError(city ? `No cars available in ${city}` : 'No cars available');
           setCars([]);
         } else {
-          // Process and validate each vehicle
           const validVehicles = vehicles.filter(vehicle => {
             if (!vehicle || typeof vehicle !== 'object') return false;
             if (!vehicle._id) return false;
-
-            // Ensure required fields have default values
             vehicle.brand = vehicle.brand || 'Unknown Brand';
             vehicle.name = vehicle.name || 'Unnamed Vehicle';
             vehicle.rentalPricePerDay = vehicle.rentalPricePerDay || vehicle.price || 0;
             vehicle.status = vehicle.status || 'Available';
-            
-            // Normalize location data
             if (typeof vehicle.location === 'string') {
               vehicle.location = { city: vehicle.location };
             } else if (!vehicle.location || typeof vehicle.location !== 'object') {
               vehicle.location = { city: city || 'Location not specified' };
             }
-
             return true;
           });
-
-          console.log('Valid vehicles:', validVehicles);
           setCars(validVehicles);
         }
       } catch (err) {
-        console.error('Error fetching cars:', err);
         setError(err.message);
         setCars([]);
       } finally {
@@ -99,6 +98,11 @@ const Cars = () => {
 
     return cars.filter(car => {
       if (!car) return false;
+
+      // Hide cars with status 'Unavailable'
+      if (car.status && car.status.toLowerCase() === 'unavailable') {
+        return false;
+      }
 
       // Price Range Filter
       if (filters.priceRange) {
@@ -164,13 +168,14 @@ const Cars = () => {
   }, [filteredCars, sortBy]);
 
   // Lọc chỉ các xe Available
-  const availableCars = sortedCars.filter(car => car.status === 'Available');
-
+  // const availableCars = sortedCars.filter(car => car.status === 'Available');
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 9;
-  const totalPages = Math.ceil(availableCars.length / pageSize);
-  const paginatedCars = availableCars.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  // const totalPages = Math.ceil(availableCars.length / pageSize);
+  // const paginatedCars = availableCars.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.ceil(sortedCars.length / pageSize);
+  const paginatedCars = sortedCars.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   // Reset to page 1 when filters or sort changes
   React.useEffect(() => {
@@ -411,7 +416,7 @@ const Cars = () => {
             <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
               <div className="flex flex-col sm:flex-row justify-between items-center">
                 <p className="text-gray-600 mb-4 sm:mb-0">
-                  {availableCars.length} cars found
+                  {sortedCars.length} cars found
                 </p>
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-700">Sort by:</span>

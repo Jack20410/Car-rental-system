@@ -40,11 +40,11 @@ export const ChatProvider = ({ children }) => {
         
         if (timeDiff <= 2) {
           reconnectAttempts.current = attemptCount;
-          console.log(`Loaded persisted reconnect attempts: ${attemptCount}`);
+          //console.log(`Loaded persisted reconnect attempts: ${attemptCount}`);
         } else {
           // Reset if last attempt was more than 2 minutes ago
           reconnectAttempts.current = 0;
-          console.log('Resetting reconnect attempts due to time elapsed');
+          //console.log('Resetting reconnect attempts due to time elapsed');
           localStorage.removeItem('chat_connection_state');
         }
       }
@@ -88,7 +88,7 @@ export const ChatProvider = ({ children }) => {
     
     // Don't try to connect if already connecting
     if (isConnecting.current) {
-      console.log('Already attempting to connect, skipping duplicate connection attempt');
+      //console.log('Already attempting to connect, skipping duplicate connection attempt');
       return;
     }
     
@@ -110,7 +110,7 @@ export const ChatProvider = ({ children }) => {
     
     // Set a timeout to reset connecting state if connection attempt hangs
     connectingTimeout.current = setTimeout(() => {
-      console.log('Connection attempt timed out');
+      //console.log('Connection attempt timed out');
       isConnecting.current = false;
     }, 10000); // 10 second timeout
     
@@ -127,7 +127,7 @@ export const ChatProvider = ({ children }) => {
       
       const wsUrl = `${protocol}//${host}:${port}?userId=${userId}&name=${userName}&role=${userRole}`;
       
-      console.log('Connecting to chat server:', wsUrl);
+      //console.log('Connecting to chat server:', wsUrl);
       
       // Close any existing connection first
       if (wsInstance.current && wsInstance.current.readyState !== WebSocket.CLOSED) {
@@ -175,7 +175,7 @@ export const ChatProvider = ({ children }) => {
         // Only attempt to reconnect if we haven't exceeded max attempts and
         // if the close wasn't initiated by the user (e.g., navigating away)
         if (reconnectAttempts.current < maxReconnectAttempts) {
-          console.log(`Reconnecting, attempt ${reconnectAttempts.current + 1} of ${maxReconnectAttempts}...`);
+          //console.log(`Reconnecting, attempt ${reconnectAttempts.current + 1} of ${maxReconnectAttempts}...`);
           reconnectAttempts.current++;
           
           // Persist updated attempt count
@@ -199,7 +199,7 @@ export const ChatProvider = ({ children }) => {
           
           // Allow the user to try again in 30 seconds
           reconnectTimeout.current = setTimeout(() => {
-            console.log('Auto-resetting reconnect attempts after timeout');
+            //console.log('Auto-resetting reconnect attempts after timeout');
             reconnectAttempts.current = 0;
             // Clear persisted state after timeout
             try {
@@ -275,7 +275,7 @@ export const ChatProvider = ({ children }) => {
     if (!user || !user._id || conversationsLoaded) return;
     
     try {
-      console.log('Loading conversations for user:', user._id);
+      //console.log('Loading conversations for user:', user._id);
       const host = import.meta.env.VITE_CHAT_SERVICE_URL || window.location.hostname;
       const port = import.meta.env.VITE_CHAT_SERVICE_PORT || '3005';
       const response = await fetch(`http://${host}:${port}/api/conversations/${user._id}`);
@@ -285,7 +285,7 @@ export const ChatProvider = ({ children }) => {
       }
       
       const conversations = await response.json();
-      console.log('Loaded conversations:', conversations);
+      //console.log('Loaded conversations:', conversations);
       
       // Initialize local message state with conversation data
       if (conversations && conversations.length > 0) {

@@ -1650,6 +1650,7 @@ const ManageCars = () => {
                       key={currentChat.id}
                       chatId={currentChat.id} 
                       recipient={selectedCustomer}
+                      isProvider={true} 
                     />
                   </div>
                 ) : (

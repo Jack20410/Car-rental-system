@@ -139,77 +139,65 @@ const SearchBar = () => {
       alert('Please fill in all fields');
       return;
     }
-    
-    // First check availability for the selected dates
-    fetch(`http://localhost:3000/rentals/availability?startDate=${selectedDates.pickup.date}&endDate=${selectedDates.return.date}`)
+
+    // Convert city name to lowercase and remove spaces for API
+    const formattedCity = location.toLowerCase().replace(/\s+/g, '');
+
+    // Lấy danh sách xe theo thành phố
+    fetch(`http://localhost:3000/vehicles?city=${formattedCity}`)
       .then(response => {
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
         return response.json();
       })
-      .then(availabilityResponse => {
-        console.log('Availability response:', availabilityResponse);
-        
-        if (!availabilityResponse.success) {
-          throw new Error(availabilityResponse.message || 'Error checking availability');
+      .then(async vehiclesResponse => {
+        if (!vehiclesResponse.success) {
+          throw new Error(vehiclesResponse.message || 'Error fetching vehicles');
         }
 
-        // Get the available vehicle IDs from the data array
-        const availableIds = new Set((availabilityResponse.data || []).map(item => item.vehicleId));
+        // Lấy danh sách xe
+        const vehicles = Array.isArray(vehiclesResponse.data) 
+          ? vehiclesResponse.data 
+          : vehiclesResponse.data?.vehicles || [];
 
-        // Convert city name to lowercase and remove spaces for API
-        const formattedCity = location.toLowerCase().replace(/\s+/g, '');
-        return fetch(`http://localhost:3000/vehicles?city=${formattedCity}`)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error('Network response was not ok');
-            }
-            return response.json();
-          })
-          .then(vehiclesResponse => {
-            console.log('Vehicles response:', vehiclesResponse);
-
-            if (!vehiclesResponse.success) {
-              throw new Error(vehiclesResponse.message || 'Error fetching vehicles');
-            }
-
-            // Extract vehicles from the response
-            const vehicles = Array.isArray(vehiclesResponse.data) 
-              ? vehiclesResponse.data 
-              : vehiclesResponse.data?.vehicles || [];
-            
-            console.log('Extracted vehicles:', vehicles);
-
-            // Filter vehicles based on availability
-            const filteredVehicles = vehicles.filter(
-              vehicle => vehicle !== null && vehicle.status === 'Available'
+        // Kiểm tra availability cho từng xe trong khoảng ngày đã chọn
+        const availableVehicles = [];
+        for (const vehicle of vehicles) {
+          if (!vehicle || vehicle.status !== 'Available') continue;
+          try {
+            const res = await fetch(
+              `http://localhost:3000/rentals/availability?vehicleId=${vehicle._id}&startDate=${selectedDates.pickup.date}&endDate=${selectedDates.return.date}`
             );
-            
-            console.log('Filtered vehicles:', filteredVehicles);
-            
-            // Store the filtered results in sessionStorage
-            const searchResults = {
-              vehicles: filteredVehicles,
-              searchCriteria: {
-                city: location,
-                startDate: selectedDates.pickup.date,
-                endDate: selectedDates.return.date
-              }
-            };
-            
-            console.log('Storing search results:', searchResults);
-            sessionStorage.setItem('searchResults', JSON.stringify(searchResults));
+            if (!res.ok) continue;
+            const avail = await res.json();
+            // Đảm bảo chỉ push xe nếu avail.data.isAvailable === true
+            if (avail.success && avail.data?.isAvailable === true) {
+              availableVehicles.push(vehicle);
+            }
+          } catch (err) {
+            continue;
+          }
+        }
 
-            // Navigate to cars page with search parameters
-            const queryParams = new URLSearchParams({
-              city: location,
-              startDate: selectedDates.pickup.date,
-              endDate: selectedDates.return.date
-            }).toString();
-            
-            navigate(`/cars?${queryParams}`);
-          });
+        // Lưu kết quả vào sessionStorage
+        const searchResults = {
+          vehicles: availableVehicles,
+          searchCriteria: {
+            city: location,
+            startDate: selectedDates.pickup.date,
+            endDate: selectedDates.return.date
+          }
+        };
+        sessionStorage.setItem('searchResults', JSON.stringify(searchResults));
+
+        // Điều hướng sang trang cars với tham số tìm kiếm
+        const queryParams = new URLSearchParams({
+          city: location,
+          startDate: selectedDates.pickup.date,
+          endDate: selectedDates.return.date
+        }).toString();
+        navigate(`/cars?${queryParams}`);
       })
       .catch(error => {
         console.error('Error during search:', error);
@@ -444,4 +432,4 @@ const SearchBar = () => {
   );
 };
 
-export default React.memo(SearchBar); 
+export default React.memo(SearchBar);
