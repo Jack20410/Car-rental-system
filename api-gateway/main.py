@@ -14,7 +14,8 @@ from routes import (
     vehicle_router,
     rental_router,
     health_router,
-    rating_router, 
+    rating_router,
+    payment_router,
 )
 
 # Import utility functions
@@ -35,22 +36,37 @@ app = FastAPI(
 )
 
 # Configure CORS
-origins = [os.getenv("FRONTEND_URL", "http://frontend:4000")]
+origins = [
+    "http://localhost:4000",
+    "http://127.0.0.1:4000",
+    os.getenv("FRONTEND_URL", "http://frontend:4000")
+]
+
 if "ADDITIONAL_CORS_ORIGINS" in os.environ:
-    origins.extend(os.getenv("ADDITIONAL_CORS_ORIGINS").split(","))
+    additional_origins = os.getenv("ADDITIONAL_CORS_ORIGINS").split(",")
+    origins.extend([origin.strip() for origin in additional_origins])
+
+# Log configured origins for debugging
+logger.info(f"Configured CORS origins: {origins}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for static files
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "Origin", "X-Requested-With"],
+    expose_headers=["Content-Length"],
+    max_age=600,  # Cache preflight requests for 10 minutes
 )
 
 # Add custom middleware
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(AuthMiddleware)
-app.add_middleware(RateLimitMiddleware, max_requests=100, window_size=60)
+app.add_middleware(
+    RateLimitMiddleware, 
+    max_requests=int(os.getenv("RATE_LIMIT_MAX_REQUESTS", 300)), 
+    window_size=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", 60))
+)
 
 # Check if uploads directory exists
 uploads_dir = "/app/uploads"
@@ -68,7 +84,8 @@ app.include_router(health_router)
 app.include_router(user_router)
 app.include_router(vehicle_router)
 app.include_router(rental_router)
-app.include_router(rating_router)  # <-- Thêm dòng này
+app.include_router(rating_router)
+app.include_router(payment_router)
 
 @app.on_event("shutdown")
 async def shutdown_event():

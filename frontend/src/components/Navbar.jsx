@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useChat } from '../context/ChatContext';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const { totalUnread } = useChat();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [providerRole, setProviderRole] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
   const navigate = useNavigate();
   
   // Direct URL to the vehicle service for static files
@@ -33,6 +36,22 @@ const Navbar = () => {
     setIsProfileOpen(false);
     setMobileMenuOpen(false);
     navigate('/');
+  };
+
+  // Function to navigate to messages
+  const handleNotificationClick = () => {
+    // Close any open menus
+    setIsProfileOpen(false);
+    setNotificationOpen(false);
+    
+    // Check if user is a car provider to navigate to the appropriate page
+    if (user?.role === 'car_provider' || providerRole) {
+      // Navigate to manage-cars page with tab=messages for car providers
+      navigate('/manage-cars?tab=messages');
+    } else {
+      // Navigate to rentals page with tab=messages for regular users
+      navigate('/rentals?tab=messages');
+    }
   };
 
   // Simple component for rendering avatars
@@ -124,65 +143,98 @@ const Navbar = () => {
           
           <div className="hidden md:flex items-center">
             {user ? (
-              <div className="ml-3 relative">
-                <div>
+              <div className="flex items-center">
+                {/* Notification Bell */}
+                <div className="relative mr-4">
                   <button
-                    onClick={() => setIsProfileOpen(!isProfileOpen)}
-                    className="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                    onClick={handleNotificationClick}
+                    className="text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                   >
-                    <span className="mr-2 text-sm font-medium text-gray-700">{user.name}</span>
-                    <Avatar className="h-8 w-8" />
+                    <span className="sr-only">View notifications</span>
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      className="h-6 w-6" 
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth="2" 
+                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" 
+                      />
+                    </svg>
+                    
+                    {/* Notification Badge */}
+                    {totalUnread > 0 && (
+                      <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">
+                        {totalUnread > 99 ? '99+' : totalUnread}
+                      </span>
+                    )}
                   </button>
                 </div>
-                {isProfileOpen && (
-                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
-                    <div className="px-4 py-2 text-sm text-gray-700">
-                      <div className="flex items-center mb-2">
-                        <Avatar className="h-8 w-8 mr-2" />
-                        <p className="font-medium">{user.name}</p>
-                      </div>
-                      <p className="text-sm text-gray-500">{user.email}</p>
-                    </div>
-                    <Link
-                      to="/profile"
-                      onClick={() => setIsProfileOpen(false)}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Your Profile
-                    </Link>
-                    <Link
-                      to="/rentals"
-                      onClick={() => setIsProfileOpen(false)}
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      My Rentals
-                    </Link>
-                    {(user.role === 'admin' || user?.role === 'admin') && (
-                      <Link
-                        to="/admin"
-                        onClick={() => setIsProfileOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        Admin Dashboard
-                      </Link>
-                    )}
-                    {(user.role === 'car_provider' || providerRole) && (
-                      <Link
-                        to="/manage-cars"
-                        onClick={() => setIsProfileOpen(false)}
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        Manage Rental Cars
-                      </Link>
-                    )}
+                
+                <div className="ml-3 relative">
+                  <div>
                     <button
-                      onClick={handleLogout}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setIsProfileOpen(!isProfileOpen)}
+                      className="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                     >
-                      Sign out
+                      <span className="mr-2 text-sm font-medium text-gray-700">{user.name}</span>
+                      <Avatar className="h-8 w-8" />
                     </button>
                   </div>
-                )}
+                  {isProfileOpen && (
+                    <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                      <div className="px-4 py-2 text-sm text-gray-700">
+                        <div className="flex items-center mb-2">
+                          <Avatar className="h-8 w-8 mr-2" />
+                          <p className="font-medium">{user.name}</p>
+                        </div>
+                        <p className="text-sm text-gray-500">{user.email}</p>
+                      </div>
+                      <Link
+                        to="/profile"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Your Profile
+                      </Link>
+                      <Link
+                        to="/rentals"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        My Rentals
+                      </Link>
+                      {(user.role === 'admin' || user?.role === 'admin') && (
+                        <Link
+                          to="/admin"
+                          onClick={() => setIsProfileOpen(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          Admin Dashboard
+                        </Link>
+                      )}
+                      {(user.role === 'car_provider' || providerRole) && (
+                        <Link
+                          to="/manage-cars"
+                          onClick={() => setIsProfileOpen(false)}
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          Manage Rental Cars
+                        </Link>
+                      )}
+                      <button
+                        onClick={handleLogout}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        Sign out
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="flex space-x-4">
@@ -273,6 +325,39 @@ const Navbar = () => {
                 <div className="text-base font-medium text-gray-800">{user.name}</div>
                 <div className="text-sm font-medium text-gray-500">{user.email}</div>
               </div>
+              
+              {/* Mobile Notification Icon */}
+              {user && (
+                <div className="ml-auto">
+                  <button
+                    onClick={handleNotificationClick}
+                    className="flex-shrink-0 p-1 rounded-full text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                  >
+                    <span className="sr-only">View notifications</span>
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      className="h-6 w-6" 
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth="2" 
+                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" 
+                      />
+                    </svg>
+                    
+                    {/* Mobile Notification Badge */}
+                    {totalUnread > 0 && (
+                      <span className="absolute top-2 right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                        {totalUnread > 99 ? '99+' : totalUnread}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
             <div className="mt-3 space-y-1">
               <Link

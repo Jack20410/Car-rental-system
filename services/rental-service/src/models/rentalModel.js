@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { RENTAL_TYPES } = require('../constants/rentalConstants');
 
 const rentalSchema = new mongoose.Schema({
   userId: {
@@ -16,6 +17,18 @@ const rentalSchema = new mongoose.Schema({
     required: true,
     ref: 'User'
   },
+  rentalType: {
+    type: String,
+    enum: Object.values(RENTAL_TYPES),
+    required: true
+  },
+  hourlyDuration: {
+    type: Number,
+    enum: [6, 8, 12],
+    required: function() {
+      return this.rentalType === RENTAL_TYPES.HOURLY;
+    }
+  },
   startDate: {
     type: Date,
     required: true
@@ -30,12 +43,12 @@ const rentalSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'cancelled', 'approved', 'rejected', 'active', 'completed'],
+    enum: ['pending', 'cancelled', 'rejected', 'approved', 'started', 'completed'],
     default: 'pending'
   },
   paymentStatus: {
     type: String,
-    enum: ['unpaid', 'paid', 'refunded'],
+    enum: ['unpaid', 'paid'],
     default: 'unpaid'
   },
   paymentId: {
@@ -45,7 +58,7 @@ const rentalSchema = new mongoose.Schema({
   statusHistory: [{
     status: {
       type: String,
-      enum: ['pending', 'cancelled', 'approved', 'rejected', 'active', 'completed']
+      enum: ['pending', 'cancelled', 'rejected', 'approved', 'started', 'completed']
     },
     changedAt: {
       type: Date,
@@ -55,7 +68,7 @@ const rentalSchema = new mongoose.Schema({
   paymentHistory: [{
     status: {
       type: String,
-      enum: ['unpaid', 'paid', 'refunded']
+      enum: ['unpaid', 'paid']
     },
     changedAt: {
       type: Date,

@@ -27,9 +27,19 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             window_size: Time window in seconds
         """
         super().__init__(app)
-        # Use env vars if available, otherwise use defaults or passed values
-        self.max_requests = max_requests or int(os.getenv("RATE_LIMIT_MAX_REQUESTS", 100))
-        self.window_size = window_size or int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", 60))
+        
+        # Check if we're in development mode
+        self.is_development = os.getenv("ENVIRONMENT", "development").lower() == "development"
+        
+        # Use much higher limits in development mode
+        if self.is_development:
+            self.max_requests = max_requests or int(os.getenv("RATE_LIMIT_MAX_REQUESTS", 300))
+            self.window_size = window_size or int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", 60))
+            logger.info(f"Running in DEVELOPMENT mode with increased rate limits")
+        else:
+            # Production limits
+            self.max_requests = max_requests or int(os.getenv("RATE_LIMIT_MAX_REQUESTS", 100))
+            self.window_size = window_size or int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", 60))
         
         logger.info(f"Rate limit configured: {self.max_requests} requests per {self.window_size} seconds")
         
@@ -42,9 +52,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Skip rate limiting for certain paths, like health checks
         if request.url.path in ["/api/health", "/"]:
             return await call_next(request)
+        
+        # Skip OPTIONS requests to prevent CORS preflight issues
+        if request.method == "OPTIONS":
+            return await call_next(request)
             
         # Get client IP
         client_ip = request.client.host if request.client else "unknown"
+        
+        # In development, don't rate limit localhost
+        if self.is_development and client_ip in ["127.0.0.1", "localhost", "::1"]:
+            return await call_next(request)
         
         # Get current time
         now = datetime.now()
