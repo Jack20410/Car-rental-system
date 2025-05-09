@@ -31,6 +31,7 @@ services:
       - user-service
       - vehicle-service
       - payment-service
+      - admin-service
     volumes:
       - ./api-gateway:/app
     networks:
@@ -42,6 +43,24 @@ services:
       retries: 3
       start_period: 10s
 
+  # Admin Service
+  admin-service:
+    build: ./services/admin-service
+    ports:
+      - "3006:3006"
+    environment:
+      - PORT=3006
+      - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/admin_service_db
+      - JWT_SECRET=ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt
+      - NODE_ENV=development
+      - FRONTEND_URL=http://localhost:4000
+      - CORS_ORIGINS=http://localhost:4000,http://localhost:3000
+    volumes:
+      - ./services/admin-service:/app
+      - /app/node_modules
+    networks:
+      - car-rental-network
+
   # User Service
   user-service:
     build: ./services/user-service
@@ -51,6 +70,7 @@ services:
       - PORT=3001
       - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/user_service_db
       - JWT_SECRET=ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt
+      - ADMIN_SERVICE_URL=http://admin-service:3006
     volumes:
       - ./services/user-service:/app
       - /app/node_modules
@@ -69,6 +89,7 @@ services:
       - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/vehicle_service_db
       - USER_SERVICE_URL=http://user-service:3001
       - JWT_SECRET=ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt
+      - ADMIN_SERVICE_URL=http://admin-service:3006
     volumes:
       - ./services/vehicle-service:/app
       - /app/node_modules
@@ -87,6 +108,7 @@ services:
       - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/rental_service_db
       - VEHICLE_SERVICE_URL=http://vehicle-service:3002
       - JWT_SECRET=ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt
+      - ADMIN_SERVICE_URL=http://admin-service:3006
     volumes:
       - ./services/rental-service:/app
       - /app/node_modules
@@ -103,6 +125,7 @@ services:
       - PORT=3008
       - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/rating_service_db
       - JWT_SECRET=ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt
+      - ADMIN_SERVICE_URL=http://admin-service:3006
     volumes:
       - ./services/rating-service:/app
       - /app/node_modules
@@ -111,6 +134,7 @@ services:
       - user-service
       - vehicle-service
       - rental-service
+      - admin-service
     networks:
       - car-rental-network
 
@@ -124,11 +148,13 @@ services:
       - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/chat_service_db
       - JWT_SECRET=ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt
       - ALLOWED_ORIGINS=http://localhost:4000,http://host.docker.internal:4000,http://frontend:4000
+      - ADMIN_SERVICE_URL=http://admin-service:3006
     volumes:
       - ./services/chat-service:/app
       - /app/node_modules
     depends_on:
       - user-service
+      - admin-service
     networks:
       - car-rental-network
     extra_hosts:
@@ -144,11 +170,13 @@ services:
       - MONGODB_URI=mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/payment_service_db
       - JWT_SECRET=ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt
       - RENTAL_SERVICE_URL=http://rental-service:3003
+      - ADMIN_SERVICE_URL=http://admin-service:3006
     volumes:
       - ./services/payment-service:/app
       - /app/node_modules
     depends_on:
       - rental-service
+      - admin-service
     networks:
       - car-rental-network
 

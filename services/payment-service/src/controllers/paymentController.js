@@ -2,6 +2,7 @@ const Payment = require('../models/paymentModel');
 const mongoose = require('mongoose');
 const axios = require('axios');
 const crypto = require('crypto');
+const { logPaymentActivity } = require('../utils/activityLogger');
 
 const RENTAL_SERVICE_URL = process.env.RENTAL_SERVICE_URL || 'http://localhost:3003';
 const FRONTEND_URL = process.env.FRONTEND_URL || '/';
@@ -185,6 +186,22 @@ exports.createPayment = async (req, res) => {
     });
 
     await payment.save();
+
+    // Log the payment creation activity
+    await logPaymentActivity(
+      userId,
+      'customer',
+      'MAKE_PAYMENT',
+      {
+        paymentId: payment._id,
+        rentalId: payment.rentalId,
+        amount: payment.amount,
+        currency: payment.currency,
+        paymentMethod: payment.paymentMethod,
+        status: payment.paymentStatus
+      }
+    );
+
     res.status(201).json(payment);
   } catch (error) {
     console.error('Create payment error:', error);
@@ -197,15 +214,39 @@ exports.confirmPayment = async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id);
     if (!payment) return res.status(404).json({ message: 'Payment not found' });
+    
     payment.paymentStatus = 'paid';
-    payment.transactionTime = new Date();
-    if (req.body.providerPaymentId) payment.providerPaymentId = req.body.providerPaymentId;
-    if (req.body.paymentDetails) payment.paymentDetails = req.body.paymentDetails;
     await payment.save();
-    // Gọi sang rental-service để cập nhật paymentStatus cho rental
-    await updateRentalPaymentStatus(payment.rentalId, req.headers.authorization);
+
+    // Log the payment confirmation activity
+    await logPaymentActivity(
+      payment.userId,
+      'customer',
+      'MAKE_PAYMENT',
+      {
+        paymentId: payment._id,
+        rentalId: payment.rentalId,
+        amount: payment.amount,
+        currency: payment.currency,
+        paymentMethod: payment.paymentMethod,
+        status: payment.paymentStatus,
+        confirmedAt: new Date()
+      }
+    );
+
+    // Update rental payment status
+    const rentalUpdateSuccess = await updateRentalPaymentStatus(
+      payment.rentalId,
+      req.headers.authorization
+    );
+
+    if (!rentalUpdateSuccess) {
+      console.warn(`Failed to update rental ${payment.rentalId} payment status`);
+    }
+
     res.json(payment);
   } catch (error) {
+    console.error('Confirm payment error:', error);
     res.status(500).json({ message: 'Error confirming payment', error: error.message });
   }
 };
@@ -220,6 +261,23 @@ exports.refundPayment = async (req, res) => {
     }
     payment.paymentStatus = 'refunded';
     await payment.save();
+
+    // Log refund activity
+    await logPaymentActivity(
+      payment.userId,
+      'customer',
+      'REFUND_PAYMENT',
+      {
+        paymentId: payment._id,
+        rentalId: payment.rentalId,
+        amount: payment.amount,
+        currency: payment.currency,
+        paymentMethod: payment.paymentMethod,
+        status: 'refunded',
+        refundedAt: new Date()
+      }
+    );
+
     // Gọi sang rental-service để cập nhật paymentStatus cho rental
     try {
       await axios.patch(
@@ -328,6 +386,21 @@ exports.createMomoPayment = async (req, res) => {
 
     await payment.save();
     console.log('Payment created with ID:', payment._id);
+
+    // Log MoMo payment creation activity
+    await logPaymentActivity(
+      userId,
+      'customer',
+      'MAKE_PAYMENT',
+      {
+        paymentId: payment._id,
+        rentalId: payment.rentalId,
+        amount: payment.amount,
+        currency: payment.currency,
+        paymentMethod: 'MOMO',
+        status: payment.paymentStatus
+      }
+    );
 
     // MOMO Payment Parameters
     const partnerCode = process.env.MOMO_PARTNER_CODE || "MOMO";
@@ -476,6 +549,23 @@ exports.handleMomoIPN = async (req, res) => {
     
     await payment.save();
     console.log(`Payment ${paymentId} updated to 'paid' status`);
+
+    // Log MoMo payment confirmation activity
+    await logPaymentActivity(
+      payment.userId,
+      'customer',
+      'MAKE_PAYMENT',
+      {
+        paymentId: payment._id,
+        rentalId: payment.rentalId,
+        amount: payment.amount,
+        currency: payment.currency,
+        paymentMethod: 'MOMO',
+        status: 'paid',
+        transactionId: transId,
+        confirmedAt: new Date(responseTime)
+      }
+    );
 
     // Try to update the rental payment status using our helper function with the stored token
     await updateRentalPaymentStatus(rentalId, payment.userToken);

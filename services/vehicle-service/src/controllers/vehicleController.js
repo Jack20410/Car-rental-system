@@ -1,5 +1,6 @@
 const Vehicle = require('../models/vehicleModel');
 const axios = require('axios');
+const { logVehicleActivity } = require('../utils/activityLogger');
 
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL || 'http://localhost:3001';
 
@@ -54,6 +55,19 @@ const createVehicle = async (req, res) => {
 
     const vehicle = new Vehicle(vehicleData);
     await vehicle.save();
+
+    // Log vehicle addition
+    await logVehicleActivity(
+      req.user._id,
+      'car_provider',
+      'ADD_CAR',
+      {
+        vehicleId: vehicle._id,
+        make: vehicle.brand,
+        model: vehicle.model,
+        addedAt: new Date()
+      }
+    );
 
     res.status(201).json({
       message: 'Vehicle created successfully',
@@ -167,6 +181,17 @@ const updateVehicle = async (req, res) => {
       { new: true, runValidators: true }
     );
 
+    // Log vehicle update
+    await logVehicleActivity(
+      req.user._id,
+      'car_provider',
+      'UPDATE_CAR',
+      {
+        vehicleId: vehicle._id,
+        updatedAt: new Date()
+      }
+    );
+
     res.status(200).json({
       message: 'Vehicle updated successfully',
       data: updatedVehicle
@@ -218,6 +243,18 @@ const updateVehicleStatus = async (req, res) => {
       id,
       { status },
       { new: true, runValidators: true }
+    );
+
+    // Log status update
+    await logVehicleActivity(
+      req.user._id,
+      'car_provider',
+      'UPDATE_CAR_STATUS',
+      {
+        vehicleId: vehicle._id,
+        newStatus: req.body.status,
+        updatedAt: new Date()
+      }
     );
 
     res.status(200).json({

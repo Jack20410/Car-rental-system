@@ -1,10 +1,25 @@
 const Rating = require('../models/Rating');
+const { logRatingActivity } = require('../utils/activityLogger');
 
 // POST / - Submit new rating
 exports.createRating = async (req, res) => {
   try {
-    const { vehicleId, userId, rating, comment, userName} = req.body; // Add userName, userAvatar
-    const newRating = await Rating.create({ vehicleId, userId, rating, comment, userName}); // Save them
+    const { vehicleId, userId, rating, comment, userName } = req.body;
+    const newRating = await Rating.create({ vehicleId, userId, rating, comment, userName });
+
+    // Log rating creation activity
+    await logRatingActivity(
+      userId,
+      'customer',
+      'ADD_RATING',
+      {
+        ratingId: newRating._id,
+        vehicleId: newRating.vehicleId,
+        rating: newRating.rating,
+        hasComment: !!newRating.comment
+      }
+    );
+
     res.status(201).json(newRating);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -40,8 +55,23 @@ exports.getAverageRating = async (req, res) => {
 // DELETE /:id - Delete a rating
 exports.deleteRating = async (req, res) => {
   try {
-    const deleted = await Rating.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Rating not found' });
+    const rating = await Rating.findById(req.params.id);
+    if (!rating) return res.status(404).json({ error: 'Rating not found' });
+
+    await Rating.findByIdAndDelete(req.params.id);
+
+    // Log rating deletion activity
+    await logRatingActivity(
+      rating.userId,
+      'customer',
+      'DELETE_RATING',
+      {
+        ratingId: rating._id,
+        vehicleId: rating.vehicleId,
+        deletedAt: new Date()
+      }
+    );
+
     res.json({ message: 'Rating deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });

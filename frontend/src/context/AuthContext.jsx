@@ -98,7 +98,9 @@ export const AuthProvider = ({ children }) => {
       };
       localStorage.setItem('auth', JSON.stringify(authData));
       setUser(userData);
-      return userData;
+      
+      // Return the response data for role-based redirection
+      return { user: userData, token };
     } catch (error) {
       console.error('Login error details:', {
         message: error.message,
@@ -125,6 +127,12 @@ export const AuthProvider = ({ children }) => {
     };
   };
 
+  // Check if user is admin
+  const isAdmin = () => {
+    const auth = getStoredAuth();
+    return auth?.user?.role === 'admin';
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -132,6 +140,7 @@ export const AuthProvider = ({ children }) => {
       logout, 
       loading,
       getAuthState,
+      isAdmin,
       isAuthenticated: !!getStoredAuth()?.token
     }}>
       {children}

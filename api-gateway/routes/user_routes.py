@@ -21,7 +21,7 @@ async def get_user_profile(request: Request):
     return await proxy_request(request, f"{USER_SERVICE_URL}/users/profile")
 
 # User Routes
-@router.api_route("/users/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+@router.api_route("/users/{path:path}", methods=["GET", "POST", "PATCH", "DELETE"])
 async def user_service_routes(request: Request, path: str):
     """
     Proxy all user-related requests to the user service.
@@ -53,16 +53,8 @@ async def auth_register(request: Request):
     logger.info("Routing register request to user service")
     return await proxy_request(request, f"{USER_SERVICE_URL}/users/register")
 
-@router.post("/auth/forgot-password")
-async def auth_forgot_password(request: Request):
-    """
-    Route forgot-password requests to the user service endpoint.
-    """
-    logger.info("Routing forgot-password request to user service")
-    return await proxy_request(request, f"{USER_SERVICE_URL}/users/forgot-password")
-
 # Fallback for other auth routes
-@router.api_route("/auth/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+@router.api_route("/auth/{path:path}", methods=["GET", "POST", "PATCH", "DELETE"])
 async def auth_routes(request: Request, path: str):
     """
     Proxy all other authentication-related requests to the user service.

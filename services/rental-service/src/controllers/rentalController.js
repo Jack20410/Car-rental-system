@@ -1,6 +1,7 @@
 const Rental = require('../models/rentalModel');
 const axios = require('axios');
 const { RENTAL_TYPES, HOURLY_RENTAL_OPTIONS } = require('../constants/rentalConstants');
+const { logRentalActivity } = require('../utils/activityLogger');
 
 // Helper function to calculate rental price for daily rentals
 const calculateDailyRentalPrice = (start, end, vehicle) => {
@@ -157,6 +158,21 @@ exports.createRental = async (req, res) => {
     });
 
     await rental.save();
+
+    // Log rental creation activity
+    await logRentalActivity(
+      userId,
+      req.user.role,
+      'CREATE_RENTAL_ORDER',
+      {
+        rentalId: rental._id,
+        vehicleId: rental.vehicleId,
+        startDate: rental.startDate,
+        endDate: rental.endDate,
+        totalPrice: rental.totalPrice,
+        rentalType: rental.rentalType
+      }
+    );
 
     // Mark vehicle as unavailable
     try {
@@ -335,6 +351,20 @@ exports.updateRentalStatus = async (req, res) => {
       
       await rental.save();
       
+      // Log rental status update activity
+      await logRentalActivity(
+        req.user.userId,
+        req.user.role,
+        'UPDATE_RENTAL_ORDER',
+        {
+          rentalId: rental._id,
+          vehicleId: rental.vehicleId,
+          oldStatus: rental.status,
+          newStatus: status,
+          updatedAt: new Date()
+        }
+      );
+      
       // Update vehicle status based on rental status
       if (['cancelled', 'completed', 'rejected'].includes(status)) {
         try {
@@ -416,6 +446,19 @@ exports.updatePaymentStatus = async (req, res) => {
     rental.paymentStatus = 'paid';
 
     await rental.save();
+
+    // Log payment status update activity
+    await logRentalActivity(
+      userId,
+      req.user.role,
+      'UPDATE_RENTAL_ORDER',
+      {
+        rentalId: rental._id,
+        vehicleId: rental.vehicleId,
+        paymentStatus: 'paid',
+        updatedAt: new Date()
+      }
+    );
     
     return res.status(200).json({
       success: true,

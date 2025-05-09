@@ -26,8 +26,13 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await login(formData);
-      navigate('/'); // Redirect to home page after successful login
+      const response = await login(formData);
+      // Check user role from response and redirect accordingly
+      if (response.user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/'); // Regular users go to home page
+      }
     } catch (error) {
       setError(error.response?.data?.message || 'An error occurred during login');
     } finally {

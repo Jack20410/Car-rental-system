@@ -16,6 +16,7 @@ from routes import (
     health_router,
     rating_router,
     payment_router,
+    admin_router,
 )
 
 # Import utility functions
@@ -86,6 +87,7 @@ app.include_router(vehicle_router)
 app.include_router(rental_router)
 app.include_router(rating_router)
 app.include_router(payment_router)
+app.include_router(admin_router)
 
 @app.on_event("shutdown")
 async def shutdown_event():

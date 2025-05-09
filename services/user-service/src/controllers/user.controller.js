@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
+const { logUserActivity } = require('../utils/activityLogger');
+
 exports.register = async (req, res) => {
   try {
     const { name, email, password, phoneNumber, role } = req.body;
@@ -29,6 +31,17 @@ exports.register = async (req, res) => {
     });
 
     await user.save();
+
+    // Log registration activity
+    await logUserActivity(
+      user._id,
+      user.role,
+      'REGISTER',
+      {
+        email: user.email,
+        registrationTime: new Date()
+      }
+    );
 
     // Return success response without password
     const userResponse = user.toObject();
@@ -167,6 +180,18 @@ exports.login = async (req, res) => {
         message: 'Invalid email or password'
       });
     }
+
+    // Log login activity
+    await logUserActivity(
+      user._id,
+      user.role,
+      'LOGIN',
+      {
+        email: user.email,
+        loginTime: new Date(),
+        ipAddress: req.ip
+      }
+    );
 
     // Generate JWT token
     const token = jwt.sign(

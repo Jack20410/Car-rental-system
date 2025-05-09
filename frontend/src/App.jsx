@@ -3,13 +3,15 @@ import { AuthProvider } from './context/AuthContext';
 import { ChatProvider } from './context/ChatContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { RentalWebSocketProvider } from './context/RentalWebSocketContext';
 
 // Components and Pages
 import Navbar from './components/Navbar';
 import MainLayout from './components/layout/MainLayout';
+import AdminLayout from './components/layout/AdminLayout';
+import AdminRoute from './components/layout/AdminRoute';
 import Home from './pages/Home';
 import Cars from './pages/Cars';
 import CarDetails from './pages/CarDetails';
@@ -20,6 +22,7 @@ import Rentals from './pages/Rentals';
 import ManageCars from './pages/ManageCars';
 import OwnerProfile from './pages/OwnerProfile';
 import PaymentSuccess from './pages/PaymentSuccess';
+import DashBoard from './pages/admin/DashBoard';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Scroll restoration component
@@ -44,6 +47,12 @@ function App() {
               <Routes>
                 {/* Special route for payment success to avoid toast issues */}
                 <Route path="/payment/success" element={<PaymentSuccess />} />
+                
+                {/* Admin Routes */}
+                <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
+                  <Route index element={<DashBoard />} />
+                  <Route path="dashboard" element={<DashBoard />} />
+                </Route>
                 
                 <Route path="/" element={<MainLayout />}>
                   <Route index element={<Home />} />
