@@ -27,6 +27,9 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import ActivityList from '../../components/admin/ActivityList';
 import DashboardStats from '../../components/admin/DashboardStats';
+import UserManagement from '../../components/admin/UserManagement';
+import { useNavigate } from 'react-router-dom';
+import Button from '@mui/material/Button';
 
 const drawerWidth = 240;
 
@@ -68,12 +71,18 @@ const menuItems = [
 ];
 
 const DashBoard = () => {
-  const { getAuthState } = useAuth();
+  const { getAuthState, logout } = useAuth();
   const [open, setOpen] = useState(true);
   const [selectedItem, setSelectedItem] = useState('Dashboard');
+  const navigate = useNavigate();
 
   const handleDrawerToggle = () => {
     setOpen(!open);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   const renderContent = () => {
@@ -83,7 +92,7 @@ const DashBoard = () => {
       case 'Activity':
         return <ActivityList />;
       case 'Users':
-        return <Typography>Users content goes here</Typography>;
+        return <UserManagement />;
       case 'Vehicles':
         return <Typography>Vehicles content goes here</Typography>;
       case 'Payments':
@@ -110,9 +119,12 @@ const DashBoard = () => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div">
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Admin Dashboard
           </Typography>
+          <Button color="inherit" onClick={handleLogout}>
+            Log Out
+          </Button>
         </Toolbar>
       </AppBar>
       <Drawer

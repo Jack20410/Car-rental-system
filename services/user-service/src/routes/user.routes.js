@@ -9,7 +9,8 @@ getUsersByRole,
 deleteUser,
 deleteUsers,
 updateUser,
-getCurrentUser
+getCurrentUser,
+getUserByIdAll
 } = require('../controllers/user.controller');
 const { validateRegistration, validateLogin } = require('../middleware/userValidation');
 const { verifyToken } = require('../middleware/auth');
@@ -33,6 +34,9 @@ router.get('/role/:role', verifyToken, getUsersByRole);
 
 // DELETE /users/all - Delete multiple users
 router.delete('/all', verifyToken, deleteUsers);
+
+// GET /users/:id/all - Get complete user information by ID (Protected admin route)
+router.get('/:id/all', verifyToken, getUserByIdAll);
 
 // GET /users/:id - Get user by ID (Public route for provider details)
 router.get('/:id', getUserById);

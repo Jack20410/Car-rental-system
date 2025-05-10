@@ -336,8 +336,6 @@ exports.updateUser = async (req, res) => {
     // Password should be updated through a separate endpoint with proper validation
     delete updates.password;
 
-    // Prevent role modification through this endpoint for security
-    delete updates.role;
 
     // If no avatar is provided, don't update it
     if (!updates.avatar) {
@@ -369,6 +367,45 @@ exports.updateUser = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating user',
+      error: error.message
+    });
+  }
+};
+
+// Get user by ID (Complete information - Admin only)
+exports.getUserByIdAll = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if the requester is an admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Admin privileges required.'
+      });
+    }
+    
+    // Find the user by ID with all fields (except password)
+    const user = await User.findById(id).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Complete user data retrieved successfully',
+      data: user
+    });
+
+  } catch (error) {
+    console.error('Error fetching complete user data:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching complete user data',
       error: error.message
     });
   }

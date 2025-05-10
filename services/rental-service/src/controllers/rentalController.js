@@ -231,6 +231,7 @@ exports.getRentalById = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.userId;
+    const userRole = req.user.role;
     
     const rental = await Rental.findById(id);
     
@@ -241,8 +242,8 @@ exports.getRentalById = async (req, res) => {
       });
     }
     
-    // Check if the user is the owner of the rental
-    if (rental.userId.toString() !== userId) {
+    // Check if the user is the owner of the rental or an admin
+    if (rental.userId.toString() !== userId && userRole !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to view this rental'
@@ -666,6 +667,44 @@ exports.getProviderRentals = async (req, res) => {
       success: false,
       message: 'An error occurred while retrieving provider rentals',
       error: error.message
+    });
+  }
+};
+
+// Get all present/active rentals
+exports.getPresentRentals = async (req, res) => {
+  try {
+    const { limit = 10, page = 1 } = req.query;
+    
+    // Present rentals are all except cancelled and rejected
+    const filter = { status: { $nin: ['cancelled', 'rejected'] } };
+    
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const rentals = await Rental.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
+    
+    const total = await Rental.countDocuments(filter);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Present rentals retrieved successfully',
+      data: rentals,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error retrieving present rentals:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'An error occurred while retrieving present rentals'
     });
   }
 };

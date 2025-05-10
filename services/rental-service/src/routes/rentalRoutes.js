@@ -8,7 +8,8 @@ const {
   updatePaymentStatus,
   checkAvailability,
   getAllRentals,
-  getProviderRentals
+  getProviderRentals,
+  getPresentRentals
 } = require('../controllers/rentalController');
 const { 
   verifyToken, 
@@ -21,6 +22,9 @@ router.get('/all', getAllRentals);
 
 // GET - Check rental availability
 router.get('/availability', checkAvailability);
+
+// GET - Get all present/active rentals
+router.get('/present', verifyToken, requireRole(['admin']), getPresentRentals);
 
 // Customer routes
 // POST - Create a new rental (customer only)
@@ -37,7 +41,7 @@ router.post(
 router.get(
   '/',
   verifyToken,
-  requireRole(['customer', 'car_provider']),
+  requireRole(['customer', 'car_provider', 'admin']),
   getUserRentals
 );
 

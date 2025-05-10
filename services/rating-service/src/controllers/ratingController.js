@@ -98,3 +98,15 @@ exports.getRatingsByProvider = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// GET /user/:userId - Get all ratings submitted by a user
+exports.getRatingsByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const ratings = await Rating.find({ userId }).sort({ createdAt: -1 });
+    
+    res.json(ratings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

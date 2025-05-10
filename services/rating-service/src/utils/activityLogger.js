@@ -4,7 +4,7 @@ const ADMIN_SERVICE_URL = process.env.ADMIN_SERVICE_URL || 'http://admin-service
 
 const logActivity = async (data) => {
   try {
-    const response = await axios.post(`${ADMIN_SERVICE_URL}/api/activities/service-log`, data);
+    const response = await axios.post(`${ADMIN_SERVICE_URL}/api/admin/activities/service-log`, data);
     console.log('Activity logged successfully:', response.data);
     return response.data;
   } catch (error) {

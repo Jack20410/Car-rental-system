@@ -13,6 +13,15 @@ import {
   InputLabel,
   Tabs,
   Tab,
+  Avatar,
+  Divider,
+  Badge,
+  Grid,
+  Card,
+  CardContent,
+  Stack,
+  alpha,
+  useTheme,
 } from '@mui/material';
 import {
   Timeline as ActivityIcon,
@@ -24,23 +33,28 @@ import {
   Star as RatingsIcon,
   Build as UpdateIcon,
   Delete as DeleteIcon,
+  AccessTime as TimeIcon,
+  Person as PersonIcon,
+  EventNote as EventIcon,
+  FilterList as FilterIcon,
 } from '@mui/icons-material';
 import api from '../../utils/api';
 import ActivityDetail from './ActivityDetail';
 
-const activityTypeColors = {
-  LOGIN: 'primary',
-  LOGOUT: 'secondary',
-  CREATE_RENTAL_ORDER: 'success',
-  UPDATE_RENTAL_ORDER: 'info',
-  CANCEL_RENTAL_ORDER: 'error',
-  UPDATE_CAR_STATUS: 'warning',
-  ADD_CAR: 'success',
-  UPDATE_CAR: 'info',
-  DELETE_CAR: 'error',
-  MAKE_PAYMENT: 'success',
-  ADD_RATING: 'info',
-  ADD_REVIEW: 'info',
+// Activity type configuration with colors and icons
+const activityTypeConfig = {
+  LOGIN: { color: 'primary', icon: <LoginIcon fontSize="small" /> },
+  LOGOUT: { color: 'secondary', icon: <LogoutIcon fontSize="small" /> },
+  CREATE_RENTAL_ORDER: { color: 'success', icon: <EventIcon fontSize="small" /> },
+  UPDATE_RENTAL_ORDER: { color: 'info', icon: <EventIcon fontSize="small" /> },
+  CANCEL_RENTAL_ORDER: { color: 'error', icon: <EventIcon fontSize="small" /> },
+  UPDATE_CAR_STATUS: { color: 'warning', icon: <VehiclesIcon fontSize="small" /> },
+  ADD_CAR: { color: 'success', icon: <VehiclesIcon fontSize="small" /> },
+  UPDATE_CAR: { color: 'info', icon: <VehiclesIcon fontSize="small" /> },
+  DELETE_CAR: { color: 'error', icon: <VehiclesIcon fontSize="small" /> },
+  MAKE_PAYMENT: { color: 'success', icon: <PaymentsIcon fontSize="small" /> },
+  ADD_RATING: { color: 'info', icon: <RatingsIcon fontSize="small" /> },
+  ADD_REVIEW: { color: 'info', icon: <RatingsIcon fontSize="small" /> },
 };
 
 const activityTypeGroups = {
@@ -51,7 +65,126 @@ const activityTypeGroups = {
   feedback: ['ADD_RATING', 'ADD_REVIEW'],
 };
 
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return 'Unknown time';
+  try {
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
+    // Format to readable date and time
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  } catch (error) {
+    return 'Invalid date';
+  }
+};
+
+// Activity card component for individual activity items
+const ActivityCard = ({ activity, onClick }) => {
+  const config = activityTypeConfig[activity.activityType] || { color: 'default', icon: <ActivityIcon /> };
+  
+  // Extract user role for styling
+  const userRole = activity.userRole || 'unknown';
+  
+  // Format timestamp
+  const timestamp = formatTimestamp(activity.timestamp || activity.createdAt);
+  
+  return (
+    <Card 
+      elevation={1}
+      sx={{
+        mb: 2,
+        cursor: 'pointer',
+        transition: 'all 0.2s',
+        borderLeft: 3,
+        borderColor: `${config.color}.main`,
+        '&:hover': {
+          boxShadow: 3,
+          transform: 'translateY(-2px)',
+        }
+      }}
+      onClick={onClick}
+    >
+      <CardContent sx={{ p: 2 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item>
+            <Avatar 
+              sx={{ 
+                bgcolor: `${config.color}.light`, 
+                color: `${config.color}.main`,
+                width: 40,
+                height: 40,
+              }}
+            >
+              {React.cloneElement(config.icon, { fontSize: 'small' })}
+            </Avatar>
+          </Grid>
+          
+          <Grid item xs>
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
+                  {activity.activityType 
+                    ? activity.activityType.replace(/_/g, ' ') 
+                    : 'Unknown Activity'}
+                </Typography>
+                <Chip
+                  label={activity.activityType ? activity.activityType.replace(/_/g, ' ') : 'Unknown'}
+                  size="small"
+                  color={config.color}
+                  sx={{ fontWeight: 500 }}
+                />
+              </Box>
+              
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {activity.details && typeof activity.details === 'object'
+                  ? (() => {
+                      const entries = Object.entries(activity.details).slice(0, 2);
+                      return '{ ' + entries.map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v).substring(0, 30) : String(v).substring(0, 30)}`).join(', ') + (Object.keys(activity.details).length > 2 ? ', ...' : '') + ' }';
+                    })()
+                  : String(activity.details || '')}
+              </Typography>
+            </Box>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <TimeIcon fontSize="small" color="action" sx={{ mr: 0.5 }} />
+                <Typography variant="caption" color="text.secondary">
+                  {timestamp}
+                </Typography>
+              </Box>
+              
+              <Divider orientation="vertical" flexItem sx={{ height: 16, my: 'auto' }} />
+              
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <PersonIcon fontSize="small" color="action" sx={{ mr: 0.5 }} />
+                <Chip
+                  label={userRole}
+                  size="small"
+                  variant="outlined"
+                  color={userRole === 'admin' ? 'error' : userRole === 'car_provider' ? 'info' : 'primary'}
+                />
+              </Box>
+              
+              <Typography variant="caption" color="text.secondary">
+                ID: {String(activity.userId || '').substring(0, 8)}...
+              </Typography>
+            </Box>
+          </Grid>
+        </Grid>
+      </CardContent>
+    </Card>
+  );
+};
+
 const ActivityList = () => {
+  const theme = useTheme();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -162,44 +295,138 @@ const ActivityList = () => {
     setSelectedActivity(null);
   };
 
-  if (loading && activities.length === 0) {
-    return (
-      <Box display="flex" justifyContent="center" my={4}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error && activities.length === 0) {
-    return (
-      <Alert severity="error" sx={{ my: 2 }}>
-        {error}
-      </Alert>
-    );
-  }
+  // Get count of activities per tab for badges
+  const getCategoryCount = (category) => {
+    if (!Array.isArray(activities)) return 0;
+    
+    if (category === 'all') return activities.length;
+    
+    const types = activityTypeGroups[category] || [];
+    return activities.filter(a => a && a.activityType && types.includes(a.activityType)).length;
+  };
 
   const filteredActivities = getFilteredActivities();
 
   return (
     <>
-      <Paper sx={{ mb: 3 }}>
+      {/* Main Header */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" fontWeight="bold" gutterBottom>
+          Activity Log
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Monitor and review all system activities in real-time
+        </Typography>
+      </Box>
+      
+      {/* Activity Tabs */}
+      <Paper 
+        elevation={2} 
+        sx={{ 
+          mb: 3, 
+          borderRadius: 2,
+          overflow: 'hidden'
+        }}
+      >
         <Tabs
           value={activityTab}
           onChange={handleActivityTabChange}
           variant="scrollable"
           scrollButtons="auto"
           aria-label="activity categories"
+          sx={{
+            '& .MuiTab-root': {
+              minHeight: 64,
+              fontWeight: 500,
+            },
+            '& .Mui-selected': {
+              fontWeight: 600,
+            },
+            borderBottom: 1,
+            borderColor: 'divider',
+          }}
         >
-          <Tab label="All Activities" value="all" icon={<ActivityIcon />} iconPosition="start" />
-          <Tab label="Authentication" value="authentication" icon={<LoginIcon />} iconPosition="start" />
-          <Tab label="Rentals" value="rental" icon={<PurchaseIcon />} iconPosition="start" />
-          <Tab label="Vehicles" value="vehicle" icon={<VehiclesIcon />} iconPosition="start" />
-          <Tab label="Payments" value="payment" icon={<PaymentsIcon />} iconPosition="start" />
-          <Tab label="Feedback" value="feedback" icon={<RatingsIcon />} iconPosition="start" />
+          <Tab 
+            label="All Activities" 
+            value="all" 
+            icon={
+              <Badge badgeContent={getCategoryCount('all')} color="primary" max={99}>
+                <ActivityIcon />
+              </Badge>
+            } 
+            iconPosition="start" 
+          />
+          <Tab 
+            label="Authentication" 
+            value="authentication" 
+            icon={
+              <Badge badgeContent={getCategoryCount('authentication')} color="primary" max={99}>
+                <LoginIcon />
+              </Badge>
+            } 
+            iconPosition="start" 
+          />
+          <Tab 
+            label="Rentals" 
+            value="rental" 
+            icon={
+              <Badge badgeContent={getCategoryCount('rental')} color="primary" max={99}>
+                <PurchaseIcon />
+              </Badge>
+            } 
+            iconPosition="start" 
+          />
+          <Tab 
+            label="Vehicles" 
+            value="vehicle" 
+            icon={
+              <Badge badgeContent={getCategoryCount('vehicle')} color="primary" max={99}>
+                <VehiclesIcon />
+              </Badge>
+            } 
+            iconPosition="start" 
+          />
+          <Tab 
+            label="Payments" 
+            value="payment" 
+            icon={
+              <Badge badgeContent={getCategoryCount('payment')} color="primary" max={99}>
+                <PaymentsIcon />
+              </Badge>
+            } 
+            iconPosition="start" 
+          />
+          <Tab 
+            label="Feedback" 
+            value="feedback" 
+            icon={
+              <Badge badgeContent={getCategoryCount('feedback')} color="primary" max={99}>
+                <RatingsIcon />
+              </Badge>
+            } 
+            iconPosition="start" 
+          />
         </Tabs>
       </Paper>
 
-      <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
+      {/* Filters */}
+      <Paper 
+        elevation={2} 
+        sx={{ 
+          mb: 3, 
+          p: 2, 
+          borderRadius: 2,
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2
+        }}
+      >
+        <Box display="flex" alignItems="center">
+          <FilterIcon color="primary" sx={{ mr: 1 }} />
+          <Typography variant="subtitle1" fontWeight="medium">Filters</Typography>
+        </Box>
+        
         <FormControl size="small" sx={{ minWidth: 200 }}>
           <InputLabel>Activity Type</InputLabel>
           <Select
@@ -209,14 +436,26 @@ const ActivityList = () => {
           >
             <MenuItem value="all">All Activities</MenuItem>
             {activityTab === 'all' 
-              ? Object.keys(activityTypeColors).map((type) => (
+              ? Object.keys(activityTypeConfig).map((type) => (
                   <MenuItem key={type} value={type}>
-                    {type.replace(/_/g, ' ')}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {React.cloneElement(activityTypeConfig[type].icon, { 
+                        fontSize: 'small',
+                        color: activityTypeConfig[type].color
+                      })}
+                      {type.replace(/_/g, ' ')}
+                    </Box>
                   </MenuItem>
                 ))
               : activityTypeGroups[activityTab].map((type) => (
                   <MenuItem key={type} value={type}>
-                    {type.replace(/_/g, ' ')}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {React.cloneElement(activityTypeConfig[type].icon, { 
+                        fontSize: 'small',
+                        color: activityTypeConfig[type].color
+                      })}
+                      {type.replace(/_/g, ' ')}
+                    </Box>
                   </MenuItem>
                 ))
             }
@@ -230,88 +469,96 @@ const ActivityList = () => {
             onChange={(e) => setUserRoleFilter(e.target.value)}
           >
             <MenuItem value="all">All Roles</MenuItem>
-            <MenuItem value="customer">Customer</MenuItem>
-            <MenuItem value="car_provider">Car Provider</MenuItem>
+            <MenuItem value="customer">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <PersonIcon fontSize="small" color="primary" />
+                Customer
+              </Box>
+            </MenuItem>
+            <MenuItem value="car_provider">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <VehiclesIcon fontSize="small" color="info" />
+                Car Provider
+              </Box>
+            </MenuItem>
           </Select>
         </FormControl>
-      </Box>
+      </Paper>
       
-      {filteredActivities.length === 0 ? (
-        <Alert severity="info" sx={{ my: 2 }}>
-          No activities found with the selected filters.
+      {/* Loading and Error States */}
+      {loading && activities.length === 0 ? (
+        <Box display="flex" justifyContent="center" my={4} p={4}>
+          <CircularProgress />
+        </Box>
+      ) : error && activities.length === 0 ? (
+        <Alert 
+          severity="error" 
+          sx={{ 
+            my: 2, 
+            borderRadius: 2,
+            boxShadow: 1
+          }}
+        >
+          {error}
         </Alert>
+      ) : filteredActivities.length === 0 ? (
+        <Paper 
+          elevation={1} 
+          sx={{ 
+            p: 4, 
+            my: 2, 
+            borderRadius: 2, 
+            textAlign: 'center',
+            bgcolor: alpha(theme.palette.info.light, 0.1)
+          }}
+        >
+          <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+            No activities found
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Try changing your filters or check back later
+          </Typography>
+        </Paper>
       ) : (
+        // Activity List
         <Box sx={{ mt: 2 }}>
           {filteredActivities.map((activity, index) => (
-            <Paper
-              key={index}
-              sx={{
-                p: 2,
-                mb: 2,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                '&:hover': {
-                  boxShadow: 3,
-                  bgcolor: 'rgba(0, 0, 0, 0.02)'
-                }
-              }}
-              onClick={() => handleActivityClick(activity)}
-            >
-              {activity.activityType && activity.activityType.includes('LOGIN') ? (
-                <LoginIcon color={activityTypeColors[activity.activityType] || 'primary'} />
-              ) : activity.activityType && activity.activityType.includes('LOGOUT') ? (
-                <LogoutIcon color={activityTypeColors[activity.activityType] || 'secondary'} />
-              ) : activity.activityType && activity.activityType.includes('ADD') ? (
-                <PurchaseIcon color={activityTypeColors[activity.activityType] || 'success'} />
-              ) : activity.activityType && activity.activityType.includes('UPDATE') ? (
-                <UpdateIcon color={activityTypeColors[activity.activityType] || 'info'} />
-              ) : activity.activityType && (activity.activityType.includes('DELETE') || activity.activityType.includes('CANCEL')) ? (
-                <DeleteIcon color={activityTypeColors[activity.activityType] || 'error'} />
-              ) : (
-                <ActivityIcon color={activity.activityType ? activityTypeColors[activity.activityType] || 'primary' : 'primary'} />
-              )}
-              <Box sx={{ flexGrow: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                  <Typography variant="body1">
-                    {String(activity.details || '')}
-                  </Typography>
-                  <Chip
-                    label={activity.activityType ? activity.activityType.replace(/_/g, ' ') : 'Unknown'}
-                    size="small"
-                    color={activity.activityType ? activityTypeColors[activity.activityType] || 'default' : 'default'}
-                  />
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    {activity.timestamp ? new Date(activity.timestamp).toLocaleString() : 'Unknown time'}
-                  </Typography>
-                  <Chip
-                    label={activity.userRole}
-                    size="small"
-                    variant="outlined"
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    User ID: {String(activity.userId || '')}
-                  </Typography>
-                </Box>
-              </Box>
-            </Paper>
+            <ActivityCard 
+              key={index} 
+              activity={activity} 
+              onClick={() => handleActivityClick(activity)} 
+            />
           ))}
         </Box>
       )}
       
-      <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-        <Pagination
-          count={totalPages}
-          page={page}
-          onChange={handlePageChange}
-          color="primary"
-        />
-      </Box>
+      {/* Pagination */}
+      {filteredActivities.length > 0 && (
+        <Box 
+          sx={{ 
+            mt: 3, 
+            mb: 4,
+            display: 'flex', 
+            justifyContent: 'center',
+            '& .MuiPaginationItem-root': {
+              fontWeight: 500
+            }
+          }}
+        >
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={handlePageChange}
+            color="primary"
+            size="large"
+            shape="rounded"
+            showFirstButton
+            showLastButton
+          />
+        </Box>
+      )}
 
+      {/* Activity Detail Modal */}
       {selectedActivity && (
         <ActivityDetail 
           activity={selectedActivity} 

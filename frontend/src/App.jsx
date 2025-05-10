@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { RentalWebSocketProvider } from './context/RentalWebSocketContext';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Components and Pages
 import Navbar from './components/Navbar';
@@ -38,56 +39,58 @@ function ScrollToTop() {
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <ChatProvider>
-          <RentalWebSocketProvider>
-            <div className="min-h-screen bg-gray-50 w-full overflow-x-hidden">
-              <ScrollToTop />
-              <Routes>
-                {/* Special route for payment success to avoid toast issues */}
-                <Route path="/payment/success" element={<PaymentSuccess />} />
-                
-                {/* Admin Routes */}
-                <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-                  <Route index element={<DashBoard />} />
-                  <Route path="dashboard" element={<DashBoard />} />
-                </Route>
-                
-                <Route path="/" element={<MainLayout />}>
-                  <Route index element={<Home />} />
-                  <Route path="cars" element={<Cars />} />
-                  <Route path="cars/:id" element={<CarDetails />} />
-                  <Route path="login" element={<Login />} />
-                  <Route path="register" element={<Register />} />
-                  <Route path="owner-profile/:id" element={<OwnerProfile />} />
+    <ErrorBoundary>
+      <Router>
+        <AuthProvider>
+          <ChatProvider>
+            <RentalWebSocketProvider>
+              <div className="min-h-screen bg-gray-50 w-full overflow-x-hidden">
+                <ScrollToTop />
+                <Routes>
+                  {/* Special route for payment success to avoid toast issues */}
+                  <Route path="/payment/success" element={<PaymentSuccess />} />
                   
-                  {/* Protected routes */}
-                  <Route element={<ProtectedRoute />}>
-                    <Route path="profile" element={<Profile />} />
-                    <Route path="rentals" element={<Rentals />} />
-                    <Route path="manage-cars" element={<ManageCars />} />
+                  {/* Admin Routes */}
+                  <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
+                    <Route index element={<DashBoard />} />
+                    <Route path="dashboard" element={<DashBoard />} />
                   </Route>
-                </Route>
-              </Routes>
-              <ToastContainer
-                position="top-right"
-                autoClose={3000}
-                hideProgressBar={false}
-                newestOnTop
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="light"
-                style={{ zIndex: 9999 }}
-              />
-            </div>
-          </RentalWebSocketProvider>
-        </ChatProvider>
-      </AuthProvider>
-    </Router>
+                  
+                  <Route path="/" element={<MainLayout />}>
+                    <Route index element={<Home />} />
+                    <Route path="cars" element={<Cars />} />
+                    <Route path="cars/:id" element={<CarDetails />} />
+                    <Route path="login" element={<Login />} />
+                    <Route path="register" element={<Register />} />
+                    <Route path="owner-profile/:id" element={<OwnerProfile />} />
+                    
+                    {/* Protected routes */}
+                    <Route element={<ProtectedRoute />}>
+                      <Route path="profile" element={<Profile />} />
+                      <Route path="rentals" element={<Rentals />} />
+                      <Route path="manage-cars" element={<ManageCars />} />
+                    </Route>
+                  </Route>
+                </Routes>
+                <ToastContainer
+                  position="top-right"
+                  autoClose={3000}
+                  hideProgressBar={false}
+                  newestOnTop
+                  closeOnClick
+                  rtl={false}
+                  pauseOnFocusLoss
+                  draggable
+                  pauseOnHover
+                  theme="light"
+                  style={{ zIndex: 9999 }}
+                />
+              </div>
+            </RentalWebSocketProvider>
+          </ChatProvider>
+        </AuthProvider>
+      </Router>
+    </ErrorBoundary>
   );
 }
 
