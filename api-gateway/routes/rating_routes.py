@@ -21,6 +21,7 @@ async def rating_service_user_ratings(request: Request, user_id: str):
     return await proxy_request(request, f"{RATING_SERVICE_URL}/user/{user_id}")
 
 @router.api_route("/ratings/{path:path}", methods=["GET", "DELETE"])
+@router.api_route("/ratings/{path:path}", methods=["GET", "PUT", "DELETE"])
 async def rating_service_routes(request: Request, path: str):
     logger.info(f"Routing rating request to: {path}")
     return await proxy_request(request, f"{RATING_SERVICE_URL}/{path}")

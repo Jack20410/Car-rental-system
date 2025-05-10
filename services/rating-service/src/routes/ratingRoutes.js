@@ -5,11 +5,17 @@ const ratingController = require('../controllers/ratingController');
 // POST / - Submit new rating
 router.post('/', ratingController.createRating);
 
+// PUT /:id - Update a rating
+router.put('/:id', ratingController.updateRating);
+
 // GET /user/:userId - Get all ratings submitted by a user
 router.get('/user/:userId', ratingController.getRatingsByUser);
 
 // GET /by-provider/:providerId - Get all ratings for a provider
 router.get('/by-provider/:providerId', ratingController.getRatingsByProvider);
+
+// GET /by-rental/:rentalId - Get rating for a specific rental
+router.get('/by-rental/:rentalId', ratingController.getRatingByRental);
 
 // GET /:carId/average - Get average rating for a car
 router.get('/:carId/average', ratingController.getAverageRating);
@@ -19,5 +25,6 @@ router.get('/:carId', ratingController.getRatingsByCar);
 
 // DELETE /:id - Delete a rating
 router.delete('/:id', ratingController.deleteRating);
+
 
 module.exports = router;

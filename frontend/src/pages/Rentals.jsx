@@ -15,6 +15,7 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) =
   const [provider, setProvider] = useState(null);
   const [vehicle, setVehicle] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [ratingInfo, setRatingInfo] = useState({ hasRating: false, updateCount: 0 });
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -46,6 +47,19 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) =
             setProvider(null);
           }
         }
+
+        // Fetch rating info
+        try {
+          const ratingResponse = await api.get(`/ratings/by-rental/${rental._id}`);
+          if (ratingResponse.data) {
+            setRatingInfo({
+              hasRating: true,
+              updateCount: ratingResponse.data.updateCount || 0
+            });
+          }
+        } catch (error) {
+          console.error('Failed to fetch rating:', error.message);
+        }
       } catch (error) {
         console.error('Failed to fetch vehicle:', error.message);
         toast.error('Could not load vehicle details');
@@ -55,7 +69,7 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) =
     };
 
     fetchDetails();
-  }, [rental.vehicleId]);
+  }, [rental.vehicleId, rental._id]);
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -81,6 +95,10 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) =
       rejected: 'bg-red-100 text-red-800'
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const handleRatingUpdate = (newRatingInfo) => {
+    setRatingInfo(newRatingInfo);
   };
 
   if (loading) {
@@ -259,10 +277,10 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) =
               )}
               {rental.status === 'completed' && (
                 <button
-                  onClick={() => onRatingClick(rental, vehicle)}
+                  onClick={() => onRatingClick(rental, vehicle, handleRatingUpdate)}
                   className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                 >
-                  Rating
+                  {ratingInfo.hasRating ? (ratingInfo.updateCount > 0 ? 'Check Your Review' : 'Edit Review') : 'Rate Now'}
                 </button>
               )}
             </div>
@@ -292,6 +310,7 @@ const Rentals = () => {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedRentalForRating, setSelectedRentalForRating] = useState(null);
   const [selectedVehicleForRating, setSelectedVehicleForRating] = useState(null);
+  const [ratingUpdateCallback, setRatingUpdateCallback] = useState(null);
   
   // Chat context
   const {
@@ -780,9 +799,10 @@ const Rentals = () => {
   }, [location, fetchProviders]);
 
   // Hàm mở modal đánh giá
-  const handleRatingClick = (rental, vehicle) => {
+  const handleRatingClick = (rental, vehicle, onRatingUpdate) => {
     setSelectedRentalForRating(rental);
     setSelectedVehicleForRating(vehicle);
+    setRatingUpdateCallback(() => onRatingUpdate);
     setShowRatingModal(true);
   };
 
@@ -1016,6 +1036,7 @@ const Rentals = () => {
           onClose={() => setShowRatingModal(false)}
           rental={selectedRentalForRating}
           vehicle={selectedVehicleForRating}
+          onRatingUpdate={ratingUpdateCallback}
         />
       )}
     </div>
