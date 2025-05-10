@@ -61,7 +61,7 @@ export const endpoints = {
   user: {
     profile: '/users/profile',
     details: (id) => `/users/${id}`,
-    update: '/users/update',
+    update: (id) => `/users/${id}`,
   },
   vehicles: {
     list: '/vehicles',

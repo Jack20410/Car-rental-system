@@ -21,7 +21,7 @@ async def get_user_profile(request: Request):
     return await proxy_request(request, f"{USER_SERVICE_URL}/users/profile")
 
 # User Routes
-@router.api_route("/users/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+@router.api_route("/users/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def user_service_routes(request: Request, path: str):
     """
     Proxy all user-related requests to the user service.

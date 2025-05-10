@@ -41,7 +41,8 @@ const storage = multer.diskStorage({
     cb(null, uploadsPath)
   },
   filename: function (req, file, cb) {
-    const userId = req.params.userId;
+    // Lấy userId từ req.params.id (route /users/:id) hoặc req.params.userId (route /:userId/avatar)
+    const userId = req.params.id || req.params.userId;
     const ext = path.extname(file.originalname);
     cb(null, `user_${userId}${ext}`);
   }

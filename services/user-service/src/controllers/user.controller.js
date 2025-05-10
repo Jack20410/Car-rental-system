@@ -307,19 +307,18 @@ exports.updateUser = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
+    // Nếu có file avatar upload, cập nhật đường dẫn avatar
+    if (req.file) {
+      updates.avatar = `/uploads/avatars/${req.file.filename}`;
+    }
+
     // Remove password from updates if it exists
-    // Password should be updated through a separate endpoint with proper validation
     delete updates.password;
-
-    // Prevent role modification through this endpoint for security
     delete updates.role;
-
-    // If no avatar is provided, don't update it
     if (!updates.avatar) {
       delete updates.avatar;
     }
 
-    // Find user and update
     const updatedUser = await User.findByIdAndUpdate(
       id,
       { $set: updates },

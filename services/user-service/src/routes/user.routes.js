@@ -13,6 +13,7 @@ getCurrentUser
 } = require('../controllers/user.controller');
 const { validateRegistration, validateLogin } = require('../middleware/userValidation');
 const { verifyToken } = require('../middleware/auth');
+const { upload } = require('../middleware/uploadMiddleware');
 
 // Public routes
 // POST /users/register - Register a new user
@@ -40,7 +41,7 @@ router.get('/:id', getUserById);
 // DELETE /users/:id - Delete a single user
 router.delete('/:id', verifyToken, deleteUser);
 
-// PATCH /users/:id - Update user
-router.patch('/:id', verifyToken, updateUser);
+// PATCH /users/:id - Update user (with avatar upload)
+router.patch('/:id', verifyToken, upload.single('avatar'), updateUser);
 
 module.exports = router; 
