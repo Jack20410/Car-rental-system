@@ -506,7 +506,7 @@ const CarDetails = () => {
     }
   };
 
-  const DEFAULT_AVATAR = "http://localhost:3001/avatar/user.png";
+  const DEFAULT_AVATAR = "http://localhost:3001/uploads/avatars/user.png";
   function ReviewAvatar({ avatar, name, className }) {
     return avatar ? (
       <img
@@ -732,7 +732,9 @@ const CarDetails = () => {
                 <div className="flex items-start gap-6">
                   <div className="relative">
                     <img
-                      src={provider?.avatar ? `http://localhost:3001${provider.avatar.replace('/uploads', '')}` : "http://localhost:3001/avatar/user.png"}
+                      src={provider?.avatar 
+                        ? `http://localhost:3001${provider.avatar.replace('/uploads', '')}` 
+                        : "http://localhost:3001/uploads/avatars/user.png"}
                       alt={provider?.fullName || 'Car Provider'}
                       className="w-20 h-20 rounded-full object-cover border-2 border-primary"
                     />

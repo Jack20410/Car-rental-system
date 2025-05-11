@@ -75,7 +75,11 @@ const rentalSchema = new mongoose.Schema({
       default: Date.now
     }
   }]
-}, { timestamps: true });
+}, { 
+  timestamps: {
+    currentTime: () => new Date(new Date().getTime() + (7 * 60 * 60 * 1000))
+  }
+});
 
 // Pre-save middleware to track status changes
 rentalSchema.pre('save', function(next) {
