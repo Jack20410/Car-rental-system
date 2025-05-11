@@ -34,14 +34,14 @@ const MainLayout = () => {
             <div>
               <h3 className="text-lg font-semibold mb-4">Contact Info</h3>
               <ul className="space-y-2 text-gray-300">
-                <li>Email: info@carrental.com</li>
-                <li>Phone: (123) 456-7890</li>
-                <li>Address: 123 Car Street, City</li>
+                <li>Email: carrental@tdt.edu.vn</li>
+                <li>Phone: 0909090909</li>
+                <li>Address: Nguyen Huu Tho, District 7, HCM</li>
               </ul>
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-gray-700 text-center text-gray-300">
-            <p>&copy; {new Date().getFullYear()} CarRental. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} TDTU. All rights reserved.</p>
           </div>
         </div>
       </footer>
