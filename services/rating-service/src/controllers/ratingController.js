@@ -1,6 +1,16 @@
 const Rating = require('../models/Rating');
 const { logRatingActivity } = require('../utils/activityLogger');
 
+// GET / - Get all ratings
+exports.getAllRatings = async (req, res) => {
+  try {
+    const ratings = await Rating.find().sort({ createdAt: -1 });
+    res.json(ratings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // POST / - Submit new rating
 exports.createRating = async (req, res) => {
   try {

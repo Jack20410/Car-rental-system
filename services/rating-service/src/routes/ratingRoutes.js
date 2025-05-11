@@ -5,6 +5,12 @@ const ratingController = require('../controllers/ratingController');
 // POST / - Submit new rating
 router.post('/', ratingController.createRating);
 
+// GET / - Get all ratings
+router.get('/', ratingController.getAllRatings);
+
+// GET /all-ratings - Alternative endpoint for getting all ratings
+router.get('/all-ratings', ratingController.getAllRatings);
+
 // PUT /:id - Update a rating
 router.put('/:id', ratingController.updateRating);
 

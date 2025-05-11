@@ -29,6 +29,7 @@ import ActivityList from '../../components/admin/ActivityList';
 import DashboardStats from '../../components/admin/DashboardStats';
 import UserManagement from '../../components/admin/UserManagement';
 import VehicleManagement from '../../components/admin/VehicleManagement';
+import RatingManagement from '../../components/admin/RatingManagement';
 import { useNavigate } from 'react-router-dom';
 import Button from '@mui/material/Button';
 
@@ -95,7 +96,7 @@ const DashBoard = () => {
       case 'Vehicles':
         return <VehicleManagement />;
       case 'Ratings':
-        return <Typography>Ratings content goes here</Typography>;
+        return <RatingManagement />;
       default:
         return <DashboardStats />;
     }

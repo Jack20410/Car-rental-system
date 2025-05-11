@@ -81,6 +81,15 @@ export const endpoints = {
     list: '/payments',
     details: (id) => `/payments/${id}`,
   },
+  ratings: {
+    list: '/ratings',
+    byUser: (userId) => `/ratings/user/${userId}`,
+    byVehicle: (vehicleId) => `/ratings/${vehicleId}`,
+    byProvider: (providerId) => `/ratings/by-provider/${providerId}`,
+    byRental: (rentalId) => `/ratings/by-rental/${rentalId}`,
+    average: (vehicleId) => `/ratings/${vehicleId}/average`,
+    delete: (id) => `/ratings/${id}`,
+  },
 };
 
 export default api; 
