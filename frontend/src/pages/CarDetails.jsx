@@ -756,7 +756,7 @@ const CarDetails = () => {
                   <div className="relative">
                     <img
                       src={provider?.avatar 
-                        ? `http://localhost:3001${provider.avatar.replace('/uploads', '')}` 
+                        ? `http://localhost:3001${provider.avatar}` 
                         : "http://localhost:3001/uploads/avatars/user.png"}
                       alt={provider?.fullName || 'Car Provider'}
                       className="w-20 h-20 rounded-full object-cover border-2 border-primary"
