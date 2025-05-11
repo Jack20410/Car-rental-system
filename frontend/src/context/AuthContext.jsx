@@ -117,7 +117,21 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Get current auth state
-  const getAuthState = async () => {
+  const getAuthState = async (forceRefresh = false) => {
+    // First get the stored auth data
+    const auth = getStoredAuth();
+    
+    // If no force refresh and we have stored data, return it immediately
+    if (!forceRefresh && auth?.user) {
+      return {
+        isAuthenticated: !!auth?.token,
+        user: auth?.user || null,
+        token: auth?.token || null,
+        loginTime: auth?.loginTime || null
+      };
+    }
+
+    // If force refresh or no stored user data, fetch from API
     try {
       console.log('Fetching current user profile...');
       const response = await api.get(endpoints.user.profile);
@@ -126,7 +140,6 @@ export const AuthProvider = ({ children }) => {
       console.log('Received user data:', userData);
       
       // Update local storage and state
-      const auth = getStoredAuth();
       if (auth) {
         const updatedAuth = {
           ...auth,
@@ -145,6 +158,15 @@ export const AuthProvider = ({ children }) => {
       };
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      // On error, return the stored data if available, otherwise return null state
+      if (auth?.user) {
+        return {
+          isAuthenticated: !!auth?.token,
+          user: auth?.user || null,
+          token: auth?.token || null,
+          loginTime: auth?.loginTime || null
+        };
+      }
       return {
         isAuthenticated: false,
         user: null,

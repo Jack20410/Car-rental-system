@@ -40,7 +40,7 @@ function ScrollToTop() {
 function App() {
   return (
     <ErrorBoundary>
-      <Router>
+      <Router basename="/">
         <AuthProvider>
           <ChatProvider>
             <RentalWebSocketProvider>

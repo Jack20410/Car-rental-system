@@ -72,7 +72,7 @@ const UserManagement = () => {
     setLoading(true);
     try {
       // Check if user is authenticated with admin role
-      const auth = getAuthState();
+      const auth = await getAuthState(false); // Don't force refresh, use stored data first
       if (!auth.isAuthenticated) {
         setError('You must be logged in to view users');
         setUsers([]);
@@ -81,7 +81,7 @@ const UserManagement = () => {
         return;
       }
 
-      if (!isAdmin()) {
+      if (auth.user?.role !== 'admin') {
         setError('You must have admin privileges to view user management');
         setUsers([]);
         setFilteredUsers([]);
@@ -103,7 +103,11 @@ const UserManagement = () => {
     } catch (err) {
       console.error('Error fetching users:', err);
       if (err.response?.status === 401) {
-        setError('Authentication error: You are not authorized to view users');
+        // If we get a 401, try refreshing the auth state
+        const refreshedAuth = await getAuthState(true);
+        if (!refreshedAuth.isAuthenticated) {
+          setError('Authentication error: You are not authorized to view users');
+        }
       } else {
         setError('Failed to load users. Please try again.');
       }

@@ -1,71 +1,78 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
 import {
   Box,
   Typography,
   Paper,
   CircularProgress,
   Alert,
-  Chip,
   Grid,
   Card,
   CardContent,
+  useTheme,
+  IconButton,
+  Tooltip,
   Tabs,
   Tab,
+  ButtonGroup,
+  Button,
   Divider,
-  useTheme,
 } from '@mui/material';
 import { 
   PeopleAlt, 
   DirectionsCar, 
   AttachMoney, 
   Timeline,
+  Refresh,
   TrendingUp,
-  DonutLarge
+  TrendingDown,
+  DonutLarge,
 } from '@mui/icons-material';
+import { ResponsiveLine } from '@nivo/line';
+import { ResponsivePie } from '@nivo/pie';
+import { ResponsiveBar } from '@nivo/bar';
 import api from '../../utils/api';
-// Import Vietnamese currency formatter
 import { formatCurrency, formatCompactCurrency } from '../../utils/formatCurrency';
+import RevenueOverview from './RevenueOverview';
 
-// Activity types and their corresponding colors
-const activityTypeColors = {
-  LOGIN: '#3f51b5',
-  LOGOUT: '#f50057',
-  CREATE_RENTAL_ORDER: '#4caf50',
-  UPDATE_RENTAL_ORDER: '#2196f3',
-  CANCEL_RENTAL_ORDER: '#f44336',
-  UPDATE_CAR_STATUS: '#ff9800',
-  ADD_CAR: '#8bc34a',
-  UPDATE_CAR: '#03a9f4',
-  DELETE_CAR: '#e91e63',
-  MAKE_PAYMENT: '#009688',
-  ADD_RATING: '#9c27b0',
-  ADD_REVIEW: '#673ab7',
+// Custom theme for Nivo charts
+const nivoTheme = {
+  axis: {
+    ticks: {
+      text: {
+        fontSize: 12,
+        fill: '#666',
+      },
+    },
+    legend: {
+      text: {
+        fontSize: 14,
+        fill: '#444',
+      },
+    },
+  },
+  grid: {
+    line: {
+      stroke: '#ddd',
+      strokeWidth: 1,
+    },
+  },
+  legends: {
+    text: {
+      fontSize: 12,
+      fill: '#444',
+    },
+  },
 };
-
-// RGBA colors for charts
-const chartColors = [
-  'rgba(63, 81, 181, 0.8)',
-  'rgba(0, 150, 136, 0.8)',
-  'rgba(255, 152, 0, 0.8)',
-  'rgba(233, 30, 99, 0.8)',
-  'rgba(76, 175, 80, 0.8)',
-];
-
-const chartColorsLight = [
-  'rgba(63, 81, 181, 0.2)',
-  'rgba(0, 150, 136, 0.2)',
-  'rgba(255, 152, 0, 0.2)',
-  'rgba(233, 30, 99, 0.2)',
-  'rgba(76, 175, 80, 0.2)',
-];
 
 const DashboardStats = () => {
   const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [timeRange, setTimeRange] = useState('month');
+  const [refreshKey, setRefreshKey] = useState(0);
   
-  // State for various statistics
+  // State for various statistics 
   const [activityStats, setActivityStats] = useState(null);
   const [userStats, setUserStats] = useState({ totalCustomers: 0, totalProviders: 0 });
   const [vehicleStats, setVehicleStats] = useState({ 
@@ -113,7 +120,7 @@ const DashboardStats = () => {
     };
 
     fetchAllStats();
-  }, []);
+  }, [refreshKey]);
 
   // Fetch activity statistics
   const fetchActivityStats = async (authOptions = {}) => {
@@ -144,26 +151,11 @@ const DashboardStats = () => {
         // Extract the count directly from the response data
         const count = response.data.count || 0;
         
-        // Now fetch user roles distribution if available
-        const roleDistribution = { customers: 0, providers: 0 };
-        try {
-          // This route should be handled by admin_routes
-          const rolesResponse = await api.get('/api/admin/users/role-stats', authOptions);
-          if (rolesResponse.data.success) {
-            // If the endpoint provides role distribution, use it
-            roleDistribution.customers = rolesResponse.data.data.customer || 0;
-            roleDistribution.providers = rolesResponse.data.data.car_provider || 0;
-          } else {
-            // Fallback to estimation if role stats endpoint returns success: false
-            roleDistribution.customers = Math.round(count * 0.7);
-            roleDistribution.providers = Math.round(count * 0.3);
-          }
-        } catch (roleErr) {
-          console.error('Could not fetch role distribution:', roleErr);
-          // Fallback to estimation if role stats endpoint is not available
-          roleDistribution.customers = Math.round(count * 0.7); // Assuming 70% are customers
-          roleDistribution.providers = Math.round(count * 0.3); // Assuming 30% are providers
-        }
+        // Use estimation for role distribution
+        const roleDistribution = {
+          customers: Math.round(count * 0.7), // Assuming 70% are customers
+          providers: Math.round(count * 0.3)  // Assuming 30% are providers
+        };
         
         setUserStats({
           totalCustomers: roleDistribution.customers,
@@ -202,16 +194,21 @@ const DashboardStats = () => {
         
         // Get vehicles array from the response
         const vehicles = response.data.data.vehicles || [];
-        let availableCount = 0;
+        
+        // Count available vehicles from current page
+        let availableCount = vehicles.filter(vehicle => vehicle.status === "Available").length;
+        
+        // Calculate approximate available ratio based on first page
+        const availableRatio = vehicles.length > 0 ? availableCount / vehicles.length : 0;
+        
+        // Estimate total available vehicles based on the ratio and total count
+        stats.availableVehicles = Math.round(availableRatio * stats.totalVehicles);
+        
+        // Process car types from available data
         const carTypeCounts = {};
         
-        // Process each vehicle to count available vehicles and car types
+        // Process each vehicle to count car types
         vehicles.forEach(vehicle => {
-          // Count available vehicles
-          if (vehicle.status === "Available") {
-            availableCount++;
-          }
-          
           // Count car types
           const carType = vehicle.carType;
           if (carType) {
@@ -219,13 +216,14 @@ const DashboardStats = () => {
           }
         });
         
-        // Set available vehicles count
-        stats.availableVehicles = availableCount;
+        // Estimate distribution ratio for car types
+        const totalFromCurrentPage = vehicles.length;
+        const scaleRatio = stats.totalVehicles / (totalFromCurrentPage || 1);
         
-        // Convert car type counts to the format needed for charts
+        // Scale up car type counts based on pagination ratio
         stats.vehicleTypes = Object.keys(carTypeCounts).map(type => ({
           name: type,
-          value: carTypeCounts[type]
+          value: Math.round(carTypeCounts[type] * scaleRatio) // Scale up the count based on pagination
         }));
         
         // If no car types were found, use default data
@@ -237,6 +235,14 @@ const DashboardStats = () => {
             { name: 'Convertible', value: Math.round(stats.totalVehicles * 0.10) },
             { name: 'Coupe', value: Math.round(stats.totalVehicles * 0.15) },
           ];
+        }
+        
+        // Ensure the sum of vehicleTypes values equals totalVehicles
+        const currentTotal = stats.vehicleTypes.reduce((sum, type) => sum + type.value, 0);
+        if (currentTotal !== stats.totalVehicles) {
+          // Adjust the largest type to make the sum match the total
+          stats.vehicleTypes.sort((a, b) => b.value - a.value);
+          stats.vehicleTypes[0].value += (stats.totalVehicles - currentTotal);
         }
         
         // Debug logs to help diagnose issues
@@ -549,18 +555,18 @@ const DashboardStats = () => {
         stats.cancelledRentals = cancelledCount;
         
         // Try to get total count if not available from pagination
-        if (!stats.totalRentals) {
-          try {
-            const countResponse = await api.get('/rentals/count', { headers });
-            if (countResponse.data.success) {
-              stats.totalRentals = countResponse.data.data.count || 0;
-            }
-          } catch (countErr) {
-            console.error('Could not fetch rental count:', countErr);
-            // Fallback: sum of active, completed, and cancelled
-            stats.totalRentals = activeCount + completedCount + cancelledCount;
-          }
-        }
+        // if (!stats.totalRentals) {
+        //   try {
+        //     const countResponse = await api.get('/rentals/count', { headers });
+        //     if (countResponse.data.success) {
+        //       stats.totalRentals = countResponse.data.data.count || 0;
+        //     }
+        //   } catch (countErr) {
+        //     console.error('Could not fetch rental count:', countErr);
+        //     // Fallback: sum of active, completed, and cancelled
+        //     stats.totalRentals = activeCount + completedCount + cancelledCount;
+        //   }
+        // }
         
         // Debug logs
         console.log('Rental stats:', stats);
@@ -581,8 +587,8 @@ const DashboardStats = () => {
 
   // Get revenue data based on selected time range
   const currentRevenueData = useMemo(() => {
-    return revenueStats[timeRange] || [];
-  }, [revenueStats, timeRange]);
+    return revenueStats.weekly || [];
+  }, [revenueStats]);
 
   // Calculate total revenue
   const totalRevenue = useMemo(() => {
@@ -644,9 +650,306 @@ const DashboardStats = () => {
     return rentalStatusData.reduce((acc, item) => acc + item.value, 0) || 1; // Avoid division by zero
   }, [rentalStatusData]);
 
+  // Stat Card Component
+  const StatCard = ({ title, value, icon: Icon, subtitle, trend, color }) => (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <Card
+        elevation={0}
+        sx={{
+          borderRadius: 4,
+          background: `linear-gradient(135deg, ${color}15, ${color}05)`,
+          border: `1px solid ${color}30`,
+          height: '100%',
+          transition: 'transform 0.3s ease-in-out',
+          '&:hover': {
+            transform: 'translateY(-5px)',
+          },
+        }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+            <Box>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                {title}
+              </Typography>
+              <Typography variant="h4" component="div" fontWeight="bold" color={color}>
+                {value}
+              </Typography>
+              <Box display="flex" alignItems="center" mt={1}>
+                {trend && (
+                  <Typography
+                    variant="body2"
+                    color={trend > 0 ? 'success.main' : 'error.main'}
+                    sx={{ display: 'flex', alignItems: 'center', mr: 1 }}
+                  >
+                    {trend > 0 ? <TrendingUp fontSize="small" /> : <TrendingDown fontSize="small" />}
+                    {Math.abs(trend)}%
+                  </Typography>
+                )}
+                <Typography variant="body2" color="text.secondary">
+                  {subtitle}
+                </Typography>
+              </Box>
+            </Box>
+            <Icon sx={{ fontSize: 40, color: `${color}50` }} />
+          </Box>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+
+  // Rental Distribution Chart Component
+  const RentalDistributionChart = ({ data }) => {
+    const chartData = [
+      {
+        id: 'active',
+        label: 'Active',
+        value: data.activeRentals,
+        color: theme.palette.success.main
+      },
+      {
+        id: 'completed',
+        label: 'Completed',
+        value: data.completedRentals,
+        color: theme.palette.info.main
+      },
+      {
+        id: 'cancelled',
+        label: 'Cancelled',
+        value: data.cancelledRentals,
+        color: theme.palette.error.main
+      }
+    ];
+    
+    const totalRentals = chartData.reduce((sum, item) => sum + item.value, 0);
+
+    return (
+      <Box>
+        <Box sx={{ height: 300, position: 'relative' }}>
+          <ResponsivePie
+            data={chartData}
+            margin={{ top: 40, right: 40, bottom: 40, left: 40 }}
+            innerRadius={0.6}
+            padAngle={0.7}
+            cornerRadius={3}
+            activeOuterRadiusOffset={8}
+            colors={{ datum: 'data.color' }}
+            borderWidth={1}
+            borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
+            enableArcLinkLabels={true}
+            arcLinkLabelsSkipAngle={10}
+            arcLinkLabelsTextColor="#333333"
+            arcLinkLabelsThickness={2}
+            arcLinkLabelsColor={{ from: 'color' }}
+            arcLabelsSkipAngle={10}
+            arcLabelsTextColor="#ffffff"
+            arcLabel={d => `${d.value}`}
+            arcLabelsRadiusOffset={0.6}
+            theme={nivoTheme}
+            motionConfig="gentle"
+            transitionMode="pushIn"
+            defs={[
+              {
+                id: 'dots',
+                type: 'patternDots',
+                background: 'inherit',
+                color: 'rgba(255, 255, 255, 0.3)',
+                size: 4,
+                padding: 1,
+                stagger: true
+              }
+            ]}
+            fill={[
+              { match: '*', id: 'dots' }
+            ]}
+            legends={[]}
+          />
+          
+          {/* Center Total Display */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+              textAlign: 'center',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              borderRadius: '50%',
+              width: '100px',
+              height: '100px',
+              boxShadow: 'inset 0 0 10px rgba(0,0,0,0.05)',
+              zIndex: 10
+            }}
+          >
+            <Typography variant="h4" fontWeight="bold" color="text.primary">
+              {totalRentals}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }}>
+              Total Rentals
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Rental Status Display at the bottom */}
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-around', pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+          {chartData.map((status) => (
+            <Box 
+              key={status.id} 
+              sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                <Box 
+                  sx={{ 
+                    width: 12, 
+                    height: 12, 
+                    borderRadius: '50%', 
+                    backgroundColor: status.color,
+                    mr: 1 
+                  }} 
+                />
+                <Typography variant="body2">{status.label}</Typography>
+              </Box>
+              <Typography variant="body1" fontWeight="bold">{status.value}</Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    );
+  };
+
+  // Vehicle Types Chart Component
+  const VehicleTypesChart = ({ data }) => {
+    // Transform data for pie chart
+    const pieData = data.map(item => ({
+      id: item.name,
+      label: item.name,
+      value: item.value,
+      color: theme.palette.primary.main
+    }));
+    
+    const totalVehicles = vehicleStats.totalVehicles;
+
+    return (
+      <Box>
+        <Box sx={{ height: 300, position: 'relative' }}>
+          <ResponsivePie
+            data={pieData}
+            margin={{ top: 40, right: 40, bottom: 40, left: 40 }}
+            innerRadius={0.6}
+            padAngle={0.7}
+            cornerRadius={3}
+            activeOuterRadiusOffset={8}
+            colors={{ scheme: 'blues' }}
+            borderWidth={1}
+            borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
+            enableArcLinkLabels={true}
+            arcLinkLabelsSkipAngle={10}
+            arcLinkLabelsTextColor="#333333"
+            arcLinkLabelsThickness={2}
+            arcLinkLabelsColor={{ from: 'color' }}
+            arcLabelsSkipAngle={10}
+            arcLabelsTextColor="#ffffff"
+            arcLabel={d => `${d.value}`}
+            arcLabelsRadiusOffset={0.6}
+            theme={nivoTheme}
+            motionConfig="gentle"
+            transitionMode="pushIn"
+            defs={[
+              {
+                id: 'dots',
+                type: 'patternDots',
+                background: 'inherit',
+                color: 'rgba(255, 255, 255, 0.3)',
+                size: 4,
+                padding: 1,
+                stagger: true
+              }
+            ]}
+            fill={[
+              { match: '*', id: 'dots' }
+            ]}
+            legends={[]}
+          />
+          
+          {/* Center Total Display */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+              textAlign: 'center',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              borderRadius: '50%',
+              width: '100px',
+              height: '100px',
+              boxShadow: 'inset 0 0 10px rgba(0,0,0,0.05)',
+              zIndex: 10
+            }}
+          >
+            <Typography variant="h4" fontWeight="bold" color="text.primary">
+              {totalVehicles}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }}>
+              Total Vehicles
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Vehicle Types Display at the bottom */}
+        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-around', pt: 1, flexWrap: 'wrap', borderTop: '1px solid', borderColor: 'divider' }}>
+          {pieData.slice(0, 4).map((type, index) => (
+            <Box 
+              key={type.id} 
+              sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                mb: 1,
+                minWidth: '80px'
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                <Box 
+                  sx={{ 
+                    width: 12, 
+                    height: 12, 
+                    borderRadius: '50%', 
+                    backgroundColor: theme.palette.primary[index % 3 === 0 ? 'main' : index % 3 === 1 ? 'light' : 'dark'],
+                    mr: 1 
+                  }} 
+                />
+                <Typography variant="body2">{type.label}</Typography>
+              </Box>
+              <Typography variant="body1" fontWeight="bold">{type.value}</Typography>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    );
+  };
+
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" my={4}>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
         <CircularProgress />
       </Box>
     );
@@ -654,902 +957,119 @@ const DashboardStats = () => {
 
   if (error) {
     return (
-      <Alert severity="warning" sx={{ my: 2 }}>
+      <Alert severity="error" sx={{ m: 2 }}>
         {error}
       </Alert>
     );
   }
 
   return (
-    <Box sx={{ mb: 4, px: 2 }}>
+    <Box sx={{ p: { xs: 2, md: 3 } }}>
       {/* Header */}
-      <Typography 
-        variant="h5" 
-        gutterBottom 
-        fontWeight="600" 
-        color="primary"
-        sx={{ 
-          mb: 3,
-          fontSize: { xs: '1.5rem', md: '1.8rem' },
-          borderBottom: '2px solid',
-          borderColor: 'primary.light',
-          pb: 1
-        }}
-      >
-        Dashboard Overview
-      </Typography>
-      
-      {/* Key Metrics Cards */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+        <Typography variant="h4" fontWeight="bold" color="primary">
+          Dashboard Overview
+        </Typography>
+        <Tooltip title="Refresh Data">
+          <IconButton onClick={() => setRefreshKey(k => k + 1)} color="primary">
+            <Refresh />
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {[
-          {
-            title: 'Total Customers',
-            value: userStats.totalCustomers,
-            icon: PeopleAlt,
-            gradient: 'linear-gradient(45deg, #3f51b5 30%, #7986cb 90%)',
-            subtitle: 'Active Users'
-          },
-          {
-            title: 'Total Vehicles',
-            value: vehicleStats.totalVehicles,
-            icon: DirectionsCar,
-            gradient: 'linear-gradient(45deg, #009688 30%, #4db6ac 90%)',
-            subtitle: `${vehicleStats.availableVehicles} Available`
-          },
-          {
-            title: 'Total Rentals',
-            value: rentalStats.totalRentals,
-            icon: Timeline,
-            gradient: 'linear-gradient(45deg, #ff9800 30%, #ffb74d 90%)',
-            subtitle: `${rentalStats.activeRentals} Active`
-          },
-          {
-            title: 'Total Revenue',
-            value: formatCompactCurrency(totalRevenue),
-            icon: AttachMoney,
-            gradient: 'linear-gradient(45deg, #e91e63 30%, #f48fb1 90%)',
-            subtitle: 'All Time'
-          }
-        ].map((metric, index) => (
-          <Grid item xs={12} sm={6} md={3} key={index}>
-            <Card 
-              elevation={2}
-              sx={{ 
-                borderRadius: 3,
-                transition: 'all 0.3s ease',
-                '&:hover': { 
-                  transform: 'translateY(-5px)',
-                  boxShadow: (theme) => theme.shadows[8]
-                },
-                background: metric.gradient,
-                color: 'white',
-                height: '100%',
-                minHeight: 140
-              }}
-            >
-              <CardContent sx={{ height: '100%', p: 3 }}>
-                <Box display="flex" flexDirection="column" height="100%" justifyContent="space-between">
-                  <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                    <Box>
-                      <Typography variant="subtitle2" sx={{ opacity: 0.8, mb: 1, fontSize: '0.9rem' }}>
-                        {metric.title}
-                      </Typography>
-                      <Typography variant="h4" fontWeight="bold" sx={{ fontSize: { xs: '1.8rem', md: '2rem' } }}>
-                        {typeof metric.value === 'number' ? metric.value.toLocaleString() : metric.value}
-                      </Typography>
-                    </Box>
-                    <metric.icon sx={{ fontSize: '2.5rem', opacity: 0.8 }} />
-                  </Box>
-                  <Typography variant="body2" sx={{ opacity: 0.8, mt: 2, fontSize: '0.85rem' }}>
-                    {metric.subtitle}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-      
-      {/* Revenue Chart */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12}>
-          <Paper 
-            elevation={2} 
-            sx={{ 
-              p: { xs: 2, md: 3 }, 
-              borderRadius: 3,
-              background: 'linear-gradient(to bottom, #ffffff, #f8f9fa)',
-              minHeight: { xs: 400, md: 500 }  // Increased minimum height
-            }}
-          >
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={2}>
-              <Typography variant="h6" fontWeight="600" sx={{ fontSize: { xs: '1.2rem', md: '1.4rem' } }}>
-                Revenue Overview
-              </Typography>
-              <Tabs 
-                value={timeRange} 
-                onChange={(e, newValue) => setTimeRange(newValue)}
-                textColor="primary"
-                indicatorColor="primary"
-                sx={{
-                  '& .MuiTab-root': {
-                    fontSize: { xs: '0.9rem', md: '1rem' },
-                    minWidth: { xs: 100, md: 120 },
-                    px: { xs: 3, md: 4 }
-                  }
-                }}
-              >
-                <Tab value="weekly" label="WEEKLY" />
-                <Tab value="monthly" label="MONTHLY" />
-                <Tab value="yearly" label="YEARLY" />
-              </Tabs>
-            </Box>
-            
-            {currentRevenueData && currentRevenueData.length > 0 ? (
-              <Box sx={{ 
-                height: { xs: 350, md: 450 },  // Increased chart height
-                position: 'relative', 
-                mb: 4,
-                mt: 2  // Added top margin
-              }}>
-                {/* Chart Container */}
-                <Box sx={{ 
-                  height: { xs: 300, md: 400 },  // Increased container height
-                  width: '100%',
-                  position: 'relative',
-                  boxSizing: 'border-box',
-                  pt: 1
-                }}>
-                  {/* Y-axis labels on the left */}
-                  <Box sx={{ 
-                    position: 'absolute', 
-                    left: 0, 
-                    top: 0, 
-                    bottom: 0, 
-                    width: { xs: 70, md: 80 },  // Increased label width
-                    display: 'flex', 
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    pr: 2, 
-                    pb: 2, 
-                    fontSize: { xs: '0.8rem', md: '0.9rem' },  // Increased font size
-                    color: 'text.secondary'
-                  }}>
-                    <Typography variant="caption" sx={{ 
-                      textAlign: 'right', 
-                      width: '100%',
-                      fontSize: { xs: '0.8rem', md: '0.9rem' }  // Increased font size
-                    }}>
-                      {formatCompactCurrency(yAxisScale.max)}
-                    </Typography>
-                    <Typography variant="caption" sx={{ 
-                      textAlign: 'right', 
-                      width: '100%',
-                      fontSize: { xs: '0.8rem', md: '0.9rem' }
-                    }}>
-                      {formatCompactCurrency(yAxisScale.mid)}
-                    </Typography>
-                    <Typography variant="caption" sx={{ 
-                      textAlign: 'right', 
-                      width: '100%',
-                      fontSize: { xs: '0.8rem', md: '0.9rem' }
-                    }}>
-                      {formatCompactCurrency(yAxisScale.min)}
-                    </Typography>
-                  </Box>
-
-                  {/* The Chart Area */}
-                  <Box sx={{ 
-                    position: 'absolute', 
-                    left: { xs: 70, md: 80 },  // Adjusted left margin
-                    right: { xs: 10, md: 20 },  // Added right margin
-                    top: 0, 
-                    bottom: 0, 
-                    pb: 2 
-                  }}>
-                    {/* Background Grid Lines */}
-                    <Box sx={{ 
-                      position: 'absolute', 
-                      left: 0, 
-                      right: 0, 
-                      top: 0, 
-                      bottom: 0, 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      justifyContent: 'space-between' 
-                    }}>
-                      {[0, 1, 2].map((index) => (
-                        <Box 
-                          key={index} 
-                          sx={{ 
-                            width: '100%', 
-                            height: '1px', 
-                            bgcolor: 'rgba(0,0,0,0.06)',
-                            position: 'relative'
-                          }} 
-                        />
-                      ))}
-                      {/* Vertical grid lines */}
-                      <Box sx={{ 
-                        position: 'absolute', 
-                        top: 0, 
-                        bottom: 0, 
-                        left: 0, 
-                        right: 0, 
-                        display: 'flex', 
-                        justifyContent: 'space-between' 
-                      }}>
-                        {Array.from({ length: 6 }).map((_, index) => (
-                          <Box 
-                            key={index} 
-                            sx={{ 
-                              width: '1px', 
-                              height: '100%', 
-                              bgcolor: 'rgba(0,0,0,0.04)' 
-                            }} 
-                          />
-                        ))}
-                      </Box>
-                    </Box>
-
-                    {/* Actual Chart SVG */}
-                    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
-                      <svg width="100%" height="100%" style={{ overflow: 'visible' }}>
-                        <defs>
-                          <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stopColor={`${theme.palette.primary.main}80`} />
-                            <stop offset="100%" stopColor={`${theme.palette.primary.main}00`} />
-                          </linearGradient>
-                          <filter id="glow" height="130%" width="130%">
-                            <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
-                            <feMerge>
-                              <feMergeNode in="coloredBlur" />
-                              <feMergeNode in="SourceGraphic" />
-                            </feMerge>
-                          </filter>
-                          <filter id="shadow" height="130%" width="130%">
-                            <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="rgba(0,0,0,0.1)" />
-                          </filter>
-                        </defs>
-
-                        {/* Area Chart */}
-                        {(() => {
-                          // Use the calculated scale instead of the raw maximum
-                          const maxValue = yAxisScale.max;
-                          const width = 100 / (currentRevenueData.length - 1 || 1);
-                          
-                          // Create path for the area - handle the case of a single data point
-                          let areaPath = '';
-                          let linePath = '';
-                          
-                          // Add line segments between points
-                          currentRevenueData.forEach((item, i) => {
-                            const x = i * width;
-                            // Cap percentage at 100% to handle outliers
-                            const y = 100 - Math.min(100, (item.revenue / maxValue * 100));
-                            
-                            if (i === 0) {
-                              areaPath = `M ${x} ${y}`;
-                              linePath = `M ${x} ${y}`;
-                            } else {
-                              // Use curved lines for smoother appearance
-                              const prevX = (i - 1) * width;
-                              const prevY = 100 - Math.min(100, (currentRevenueData[i-1].revenue / maxValue * 100));
-                              
-                              // Control points for the curve
-                              const cpx1 = prevX + (x - prevX) / 2;
-                              const cpx2 = prevX + (x - prevX) / 2;
-                              
-                              linePath += ` C ${cpx1} ${prevY}, ${cpx2} ${y}, ${x} ${y}`;
-                              areaPath += ` C ${cpx1} ${prevY}, ${cpx2} ${y}, ${x} ${y}`;
-                            }
-                          });
-                          
-                          // Complete the area by adding bottom corners
-                          if (currentRevenueData.length > 0) {
-                            const lastX = (currentRevenueData.length - 1) * width;
-                            areaPath += ` L ${lastX} 100 L 0 100 Z`;
-                          }
-                          
-                          return (
-                            <>
-                              {/* Filled area below the line */}
-                              <path
-                                d={areaPath}
-                                fill="url(#areaGradient)"
-                                stroke="none"
-                                opacity="0.7"
-                                filter="url(#shadow)"
-                              />
-                              
-                              {/* Line on top */}
-                              <path
-                                d={linePath}
-                                fill="none"
-                                stroke={theme.palette.primary.main}
-                                strokeWidth="3"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                filter="url(#glow)"
-                              />
-                            </>
-                          );
-                        })()}
-
-                        {/* Data Points */}
-                        {currentRevenueData.map((item, i) => {
-                          const maxValue = yAxisScale.max;
-                          const width = 100 / (currentRevenueData.length - 1 || 1);
-                          const x = i * width;
-                          // Cap percentage at 100% to handle outliers
-                          const y = 100 - Math.min(100, (item.revenue / maxValue * 100));
-                          
-                          // Note if this is an outlier value
-                          const isOutlier = yAxisScale.hasOutlier && item.revenue > yAxisScale.max;
-                          // Find peak value (highest revenue in the dataset)
-                          const isPeak = item.revenue === Math.max(...currentRevenueData.map(d => d.revenue));
-                          
-                          return (
-                            <g key={i} className="data-point-group">
-                              {/* Pulsating animation for peak point */}
-                              {isPeak && (
-                                <circle
-                                  cx={x}
-                                  cy={y}
-                                  r="8"
-                                  fill={`${theme.palette.primary.main}40`}
-                                  className="pulse-circle"
-                                />
-                              )}
-                              
-                              <circle
-                                cx={x}
-                                cy={y}
-                                r={isPeak ? "6" : "5"}
-                                fill="white"
-                                stroke={isOutlier || isPeak ? theme.palette.secondary.main : theme.palette.primary.main}
-                                strokeWidth={isPeak ? "3" : "2"}
-                                className="data-point"
-                                style={{
-                                  transition: "all 0.2s ease-out",
-                                  cursor: "pointer"
-                                }}
-                              />
-                              
-                              {/* Show value above peak point */}
-                              {isPeak && (
-                                <text
-                                  x={x}
-                                  y={y - 12}
-                                  textAnchor="middle"
-                                  fill={theme.palette.text.primary}
-                                  fontSize="11"
-                                  fontWeight="bold"
-                                  filter="url(#glow)"
-                                >
-                                  {formatCompactCurrency(item.revenue)}
-                                </text>
-                              )}
-                              
-                              {/* Enhanced Tooltip */}
-                              <g className="tooltip" opacity="0" pointerEvents="none">
-                                <rect
-                                  x={x - 55}
-                                  y={y - 60}
-                                  width="110"
-                                  height="48"
-                                  rx="6"
-                                  fill={theme.palette.background.paper}
-                                  stroke={theme.palette.divider}
-                                  strokeWidth="1"
-                                  filter="url(#shadow)"
-                                />
-                                <text
-                                  x={x}
-                                  y={y - 42}
-                                  textAnchor="middle"
-                                  fill={theme.palette.text.primary}
-                                  fontSize="11"
-                                  fontWeight="bold"
-                                >
-                                  {formatCurrency(item.revenue)}
-                                </text>
-                                <text
-                                  x={x}
-                                  y={y - 25}
-                                  textAnchor="middle"
-                                  fill={theme.palette.text.secondary}
-                                  fontSize="10"
-                                >
-                                  {item.transactions} transaction{item.transactions !== 1 ? 's' : ''}
-                                </text>
-                                <text
-                                  x={x}
-                                  y={y - 10}
-                                  textAnchor="middle"
-                                  fill={theme.palette.primary.main}
-                                  fontSize="10"
-                                  fontWeight="600"
-                                >
-                                  {item.name}
-                                </text>
-                                
-                                {/* Triangle pointer */}
-                                <path
-                                  d={`M ${x-5} ${y-12} L ${x+5} ${y-12} L ${x} ${y-5} Z`}
-                                  fill={theme.palette.background.paper}
-                                  stroke={theme.palette.divider}
-                                  strokeWidth="1"
-                                />
-                              </g>
-                            </g>
-                          );
-                        })}
-                      </svg>
-                    </Box>
-                  </Box>
-                </Box>
-
-                {/* X-Axis Labels */}
-                <Box sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  pl: { xs: 8, md: 10 },  // Increased left padding
-                  pr: { xs: 1, md: 2 },
-                  mt: 2  // Increased top margin
-                }}>
-                  {currentRevenueData.map((item, i) => (
-                    <Typography 
-                      key={i} 
-                      variant="caption" 
-                      sx={{ 
-                        color: 'text.secondary',
-                        fontSize: { xs: '0.8rem', md: '0.9rem' },  // Increased font size
-                        fontWeight: 500,
-                        transform: currentRevenueData.length > 15 ? 'rotate(-45deg)' : 'none',
-                        transformOrigin: 'center top',
-                        width: `${100 / currentRevenueData.length}%`,
-                        textAlign: 'center',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        maxWidth: currentRevenueData.length > 15 ? '50px' : '70px'  // Increased max width
-                      }}
-                    >
-                      {item.name}
-                    </Typography>
-                  ))}
-                </Box>
-
-                {/* Chart Notes - only show if there are outliers */}
-                {yAxisScale.hasOutlier && (
-                  <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                    <Box
-                      sx={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 0.5,
-                        bgcolor: 'rgba(233, 30, 99, 0.1)',
-                        px: 2,
-                        py: 1,
-                        borderRadius: 2,
-                        fontSize: { xs: '0.8rem', md: '0.9rem' }
-                      }}
-                    >
-                      <Typography variant="caption" sx={{ fontSize: 'inherit' }}>
-                        Chart scaled to show trend. Peak value: {formatCurrency(yAxisScale.outlier)}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-
-                {/* CSS for hover effects */}
-                <style jsx>{`
-                  .data-point-group:hover .data-point {
-                    r: 8;
-                    filter: drop-shadow(0px 0px 4px ${theme.palette.primary.main});
-                    transition: all 0.2s;
-                  }
-                  .data-point-group:hover .tooltip {
-                    opacity: 1;
-                    transition: opacity 0.3s;
-                  }
-                  @keyframes pulse {
-                    0% { r: 8; opacity: 0.6; }
-                    50% { r: 12; opacity: 0.4; }
-                    100% { r: 8; opacity: 0.6; }
-                  }
-                  .pulse-circle {
-                    animation: pulse 2s infinite;
-                  }
-                `}</style>
-              </Box>
-            ) : (
-              <Box 
-                sx={{ 
-                  width: '100%', 
-                  height: { xs: 350, md: 450 },  // Matched empty state height
-                  display: 'flex', 
-                  justifyContent: 'center', 
-                  alignItems: 'center',
-                  flexDirection: 'column',
-                  color: 'text.secondary' 
-                }}
-              >
-                <Typography variant="body2" mb={1}>No revenue data available</Typography>
-                <TrendingUp fontSize="large" color="disabled" />
-              </Box>
-            )}
-          </Paper>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Total Users"
+            value={userStats.totalCustomers + userStats.totalProviders}
+            icon={PeopleAlt}
+            subtitle={`${userStats.totalProviders} Providers`}
+            trend={5}
+            color={theme.palette.primary.main}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Total Vehicles"
+            value={vehicleStats.totalVehicles}
+            icon={DirectionsCar}
+            subtitle={`${vehicleStats.availableVehicles} Available`}
+            trend={3}
+            color={theme.palette.success.main}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Active Rentals"
+            value={rentalStats.activeRentals}
+            icon={Timeline}
+            subtitle="Current Period"
+            trend={-2}
+            color={theme.palette.warning.main}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <StatCard
+            title="Total Revenue"
+            value={formatCompactCurrency(revenueStats.totalRevenue)}
+            icon={AttachMoney}
+            subtitle="All Time"
+            trend={8}
+            color={theme.palette.error.main}
+          />
         </Grid>
       </Grid>
-      
-      {/* Bottom Section */}
+
+      {/* Revenue Chart - using our new component */}
+      <Box sx={{ mb: 4 }}>
+        <RevenueOverview />
+      </Box>
+
+      {/* Bottom Charts */}
       <Grid container spacing={3}>
-        {/* Rental Status Distribution */}
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={6}>
           <Paper 
-            elevation={2} 
+            elevation={0} 
             sx={{ 
-              p: { xs: 2, md: 3 }, 
-              borderRadius: 3,
-              height: '100%',
-              minHeight: 400,
-              background: 'linear-gradient(to bottom, #ffffff, #f8f9fa)'
+              p: 3, 
+              borderRadius: 4, 
+              border: '1px solid', 
+              borderColor: 'divider',
+              background: 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(245,247,250,1) 100%)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 8px 16px rgba(0,0,0,0.05)',
+                transform: 'translateY(-5px)'
+              }
             }}
           >
-            <Typography 
-              variant="h6" 
-              fontWeight="600" 
-              gutterBottom 
-              sx={{ fontSize: { xs: '1.1rem', md: '1.25rem' } }}
-            >
-              Rental Status Distribution
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              Rental Distribution
             </Typography>
-            <Divider sx={{ mb: 3 }} />
-            
-            {rentalStatusTotal > 0 ? (
-              <Box sx={{ position: 'relative', width: 220, height: 220, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                {/* SVG Donut Chart */}
-                <svg width="220" height="220" viewBox="0 0 220 220">
-                  <defs>
-                    {rentalStatusData.map((item, i) => (
-                      <filter key={`shadow-${i}`} id={`shadow-${i}`} height="130%">
-                        <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor={item.color} />
-                      </filter>
-                    ))}
-                  </defs>
-                  
-                  {/* Draw the donut segments */}
-                  {rentalStatusData.map((item, i) => {
-                    // Calculate the percentage to determine arc length
-                    const percentage = (item.value / rentalStatusTotal);
-                    
-                    // We start from the top (270 degrees) and go clockwise
-                    // Previous segments determine our starting angle
-                    const previousPercentage = rentalStatusData
-                      .slice(0, i)
-                      .reduce((acc, segment) => acc + (segment.value / rentalStatusTotal), 0);
-                    
-                    // Convert percentages to angles (in degrees)
-                    const startAngle = previousPercentage * 360 + 270;
-                    const endAngle = startAngle + (percentage * 360);
-                    
-                    // Convert angles to radians for SVG calculations
-                    const startRad = (startAngle * Math.PI) / 180;
-                    const endRad = (endAngle * Math.PI) / 180;
-                    
-                    // Calculate points on the circumference
-                    const radius = 80; // Outer radius
-                    const innerRadius = 50; // Inner radius (for the donut hole)
-                    
-                    // Outer arc points
-                    const startX = 110 + radius * Math.cos(startRad);
-                    const startY = 110 + radius * Math.sin(startRad);
-                    const endX = 110 + radius * Math.cos(endRad);
-                    const endY = 110 + radius * Math.sin(endRad);
-                    
-                    // Inner arc points
-                    const innerStartX = 110 + innerRadius * Math.cos(endRad);
-                    const innerStartY = 110 + innerRadius * Math.sin(endRad);
-                    const innerEndX = 110 + innerRadius * Math.cos(startRad);
-                    const innerEndY = 110 + innerRadius * Math.sin(startRad);
-                    
-                    // Flag for large arc (> 180 degrees)
-                    const largeArcFlag = percentage > 0.5 ? 1 : 0;
-                    
-                    // Construct the SVG path
-                    // Move to start point, draw outer arc, line to inner arc, draw inner arc, close path
-                    const path = `M ${startX},${startY} 
-                                 A ${radius},${radius} 0 ${largeArcFlag},1 ${endX},${endY} 
-                                 L ${innerStartX},${innerStartY} 
-                                 A ${innerRadius},${innerRadius} 0 ${largeArcFlag},0 ${innerEndX},${innerEndY} Z`;
-                    
-                    // Calculate position for percentage text
-                    // Midpoint angle to place the text
-                    const midAngle = (startAngle + endAngle) / 2;
-                    const midRad = (midAngle * Math.PI) / 180;
-                    
-                    // Text position between the inner and outer radius
-                    const textRadius = (radius + innerRadius) / 2 + 5;
-                    const textX = 110 + textRadius * Math.cos(midRad);
-                    const textY = 110 + textRadius * Math.sin(midRad);
-                    
-                    // Only show text for segments with enough space
-                    const showText = percentage > 0.08;
-                    
-                    return (
-                      <g key={`segment-${i}`} className="chart-segment">
-                        <path
-                          d={path}
-                          fill={item.color}
-                          stroke="#fff"
-                          strokeWidth="1"
-                          filter={`url(#shadow-${i})`}
-                          className="segment"
-                        />
-                        {showText && (
-                          <text
-                            x={textX}
-                            y={textY}
-                            textAnchor="middle"
-                            fill="#fff"
-                            fontSize="12"
-                            fontWeight="bold"
-                            className="segment-text"
-                          >
-                            {Math.round(percentage * 100)}%
-                          </text>
-                        )}
-                      </g>
-                    );
-                  })}
-                  
-                  {/* Center text with total */}
-                  <g>
-                    <text
-                      x="110"
-                      y="100"
-                      textAnchor="middle"
-                      fontSize="14"
-                      fill={theme.palette.text.secondary}
-                    >
-                      Total Rentals
-                    </text>
-                    <text
-                      x="110"
-                      y="130"
-                      textAnchor="middle"
-                      fontSize="24"
-                      fontWeight="bold"
-                      fill={theme.palette.text.primary}
-                    >
-                      {rentalStats.totalRentals}
-                    </text>
-                  </g>
-                </svg>
-                
-                {/* Hover effects for the segments */}
-                <style jsx>{`
-                  .chart-segment:hover .segment {
-                    transform: translateX(5px) translateY(5px);
-                    transition: transform 0.3s ease-out;
-                  }
-                  .chart-segment:hover .segment-text {
-                    font-size: 14px;
-                    transition: font-size 0.3s ease-out;
-                  }
-                `}</style>
-              </Box>
-            ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: 'text.secondary' }}>
-                <DonutLarge fontSize="large" color="disabled" sx={{ mb: 1 }} />
-                <Typography variant="body2">No rental data available</Typography>
-              </Box>
-            )}
-            
-            {/* Legend */}
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, gap: 2, flexWrap: 'wrap' }}>
-              {rentalStatusData.map((item, i) => (
-                <Box 
-                  key={`legend-${i}`} 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 1,
-                    px: 2,
-                    py: 0.5,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 2,
-                    bgcolor: 'background.paper',
-                    boxShadow: 1
-                  }}
-                >
-                  <Box 
-                    sx={{ 
-                      width: 12, 
-                      height: 12, 
-                      borderRadius: '50%', 
-                      backgroundColor: item.color 
-                    }} 
-                  />
-                  <Typography variant="body2">{item.name}</Typography>
-                  <Typography variant="body2" fontWeight="bold" sx={{ ml: 0.5 }}>
-                    ({item.value})
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
+            <RentalDistributionChart data={rentalStats} />
           </Paper>
         </Grid>
-        
-        {/* User Activities */}
-        <Grid item xs={12} md={4}>
+        <Grid item xs={12} md={6}>
           <Paper 
-            elevation={2} 
+            elevation={0} 
             sx={{ 
-              p: { xs: 2, md: 3 }, 
-              borderRadius: 3,
-              height: '100%',
-              minHeight: 400,
-              background: 'linear-gradient(to bottom, #ffffff, #f8f9fa)'
+              p: 3, 
+              borderRadius: 4, 
+              border: '1px solid', 
+              borderColor: 'divider',
+              background: 'linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(245,247,250,1) 100%)',
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              '&:hover': {
+                boxShadow: '0 8px 16px rgba(0,0,0,0.05)',
+                transform: 'translateY(-5px)'
+              }
             }}
           >
-            <Typography 
-              variant="h6" 
-              fontWeight="600" 
-              gutterBottom 
-              sx={{ fontSize: { xs: '1.1rem', md: '1.25rem' } }}
-            >
-              User Activities
+            <Typography variant="h6" fontWeight="bold" gutterBottom>
+              Vehicle Types
             </Typography>
-            <Divider sx={{ mb: 3 }} />
-            
-            {!activityStats || activityStats.length === 0 ? (
-              <Alert severity="info" sx={{ borderRadius: 2 }}>
-                No activity data available yet.
-              </Alert>
-            ) : (
-              <Box sx={{ height: 'calc(100% - 60px)', overflowY: 'auto' }}>
-                {activityStats.map((roleStats) => (
-                  <Box key={roleStats._id} sx={{ mb: 3 }}>
-                    <Typography 
-                      variant="subtitle1" 
-                      gutterBottom 
-                      sx={{ 
-                        fontSize: { xs: '1rem', md: '1.1rem' },
-                        fontWeight: 600,
-                        color: 'text.primary'
-                      }}
-                    >
-                      {roleStats._id === 'customer' ? 'Customer' : 'Car Provider'} Activities
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {roleStats.activities.map((activity) => (
-                        <Box
-                          key={activity.type}
-                          sx={{
-                            p: 1.5,
-                            borderRadius: 2,
-                            backgroundColor: activityTypeColors[activity.type] || '#757575',
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                              transform: 'translateY(-2px)',
-                              boxShadow: 2
-                            }
-                          }}
-                        >
-                          <Typography 
-                            variant="caption" 
-                            sx={{ 
-                              fontSize: { xs: '0.75rem', md: '0.85rem' },
-                              fontWeight: 500
-                            }}
-                          >
-                            {activity.type.replace(/_/g, ' ')}
-                          </Typography>
-                          <Box
-                            sx={{
-                              backgroundColor: 'rgba(255,255,255,0.3)',
-                              px: 1,
-                              py: 0.5,
-                              borderRadius: 10,
-                              fontSize: { xs: '0.7rem', md: '0.8rem' },
-                              fontWeight: 600
-                            }}
-                          >
-                            {activity.count}
-                          </Box>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
-                ))}
-              </Box>
-            )}
-          </Paper>
-        </Grid>
-        
-        {/* Vehicle Types Distribution */}
-        <Grid item xs={12} md={4}>
-          <Paper 
-            elevation={2} 
-            sx={{ 
-              p: { xs: 2, md: 3 }, 
-              borderRadius: 3,
-              height: '100%',
-              minHeight: 400,
-              background: 'linear-gradient(to bottom, #ffffff, #f8f9fa)'
-            }}
-          >
-            <Typography 
-              variant="h6" 
-              fontWeight="600" 
-              gutterBottom 
-              sx={{ fontSize: { xs: '1.1rem', md: '1.25rem' } }}
-            >
-              Vehicle Types Distribution
-            </Typography>
-            <Divider sx={{ mb: 3 }} />
-            
-            <Box sx={{ height: 'calc(100% - 60px)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              {vehicleStats.vehicleTypes.map((entry, index) => (
-                <Box 
-                  key={index} 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    mb: 2,
-                    p: 1,
-                    borderRadius: 2,
-                    '&:hover': {
-                      backgroundColor: 'rgba(0,0,0,0.02)'
-                    }
-                  }}
-                >
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      width: '30%',
-                      fontSize: { xs: '0.85rem', md: '0.95rem' },
-                      fontWeight: 500
-                    }}
-                  >
-                    {entry.name}
-                  </Typography>
-                  <Box sx={{ width: '50%', mr: 2 }}>
-                    <Box 
-                      sx={{ 
-                        height: 16,
-                        width: `${(entry.value / vehicleStats.vehicleTypes.reduce((acc, curr) => acc + curr.value, 0)) * 100}%`,
-                        backgroundColor: chartColors[index % chartColors.length],
-                        borderRadius: 2,
-                        transition: 'all 0.3s ease',
-                        '&:hover': {
-                          transform: 'scaleX(1.02)',
-                          boxShadow: 2
-                        }
-                      }} 
-                    />
-                  </Box>
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      width: '20%',
-                      fontSize: { xs: '0.85rem', md: '0.95rem' },
-                      fontWeight: 600
-                    }}
-                  >
-                    {Math.round((entry.value / vehicleStats.vehicleTypes.reduce((acc, curr) => acc + curr.value, 0)) * 100)}%
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
+            <VehicleTypesChart data={vehicleStats.vehicleTypes} />
           </Paper>
         </Grid>
       </Grid>

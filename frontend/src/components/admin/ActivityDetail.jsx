@@ -433,18 +433,36 @@ const RentalActivitySummary = ({ activity, vehicleDetails, vehicleLoading, custo
       <Grid container spacing={2} mb={2}>
         <Grid item xs={12} sm={6}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar sx={{ mr: 2, bgcolor: 'primary.main', width: 36, height: 36 }}>
+            <Avatar 
+              src={`http://localhost:3001${customerDetails?.avatar}`} 
+              sx={{ 
+                mr: 2, 
+                bgcolor: 'primary.main', 
+                width: 36, 
+                height: 36 
+              }}
+            >
               {customerDetails?.fullName?.charAt(0) || <PersonIcon fontSize="small" />}
             </Avatar>
             <Box>
               <Typography variant="subtitle2" color="text.secondary">Customer</Typography>
-              <Typography variant="body1" fontWeight="medium">
-                {customerLoading
-                  ? 'Loading...'
-                  : customerDetails && customerDetails.fullName
-                    ? customerDetails.fullName
-                    : 'N/A'}
-              </Typography>
+              {customerLoading ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CircularProgress size={16} />
+                  <Typography variant="body2">Loading...</Typography>
+                </Box>
+              ) : (
+                <>
+                  <Typography variant="body1" fontWeight="medium">
+                    {customerDetails?.fullName || 'N/A'}
+                  </Typography>
+                  {customerDetails?.email && (
+                    <Typography variant="caption" color="text.secondary">
+                      {customerDetails.email}
+                    </Typography>
+                  )}
+                </>
+              )}
             </Box>
           </Box>
         </Grid>
@@ -760,7 +778,11 @@ const ActivityDetail = ({ activity, open, onClose }) => {
         
         // If rental contains customer info, fetch customer details
         if (response.data.data.userId) {
-          fetchCustomerDetails(response.data.data.userId);
+          console.log('Found userId in rental:', response.data.data.userId);
+          await fetchCustomerDetails(response.data.data.userId);
+        } else if (response.data.data.customerId) {  // Fallback to customerId if userId is not present
+          console.log('Found customerId in rental:', response.data.data.customerId);
+          await fetchCustomerDetails(response.data.data.customerId);
         }
       }
     } catch (err) {
@@ -779,7 +801,14 @@ const ActivityDetail = ({ activity, open, onClose }) => {
       console.log('Customer API response:', response.data);
       
       if (response.data && response.data.success) {
-        setCustomerDetails(response.data.data);
+        const customerData = response.data.data;
+        console.log('Setting customer details:', customerData);
+        setCustomerDetails({
+          fullName: customerData.name || customerData.fullName || 'N/A',
+          email: customerData.email || 'N/A',
+          role: customerData.role || 'customer',
+          avatar: customerData.avatar || null
+        });
       }
     } catch (err) {
       console.error('Error fetching customer details:', err);

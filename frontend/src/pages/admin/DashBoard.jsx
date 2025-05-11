@@ -28,6 +28,7 @@ import { useAuth } from '../../context/AuthContext';
 import ActivityList from '../../components/admin/ActivityList';
 import DashboardStats from '../../components/admin/DashboardStats';
 import UserManagement from '../../components/admin/UserManagement';
+import VehicleManagement from '../../components/admin/VehicleManagement';
 import { useNavigate } from 'react-router-dom';
 import Button from '@mui/material/Button';
 
@@ -94,13 +95,9 @@ const DashBoard = () => {
       case 'Users':
         return <UserManagement />;
       case 'Vehicles':
-        return <Typography>Vehicles content goes here</Typography>;
-      case 'Payments':
-        return <Typography>Payments content goes here</Typography>;
+        return <VehicleManagement />;
       case 'Ratings':
         return <Typography>Ratings content goes here</Typography>;
-      case 'Settings':
-        return <Typography>Settings content goes here</Typography>;
       default:
         return <DashboardStats />;
     }
@@ -158,9 +155,6 @@ const DashBoard = () => {
       </Drawer>
       <Main open={open}>
         <DrawerHeader />
-        <Typography variant="h4" gutterBottom>
-          {selectedItem}
-        </Typography>
         {renderContent()}
       </Main>
     </Box>

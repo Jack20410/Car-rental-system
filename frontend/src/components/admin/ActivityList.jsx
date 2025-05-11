@@ -194,6 +194,62 @@ const ActivityList = () => {
   const [userRoleFilter, setUserRoleFilter] = useState('all');
   const [activityTab, setActivityTab] = useState('all');
   const [selectedActivity, setSelectedActivity] = useState(null);
+  const [totalActivitiesCount, setTotalActivitiesCount] = useState(0);
+  const [activityTypeCounts, setActivityTypeCounts] = useState({
+    authentication: 0,
+    rental: 0,
+    vehicle: 0,
+    payment: 0,
+    feedback: 0
+  });
+
+  const fetchActivityCounts = async () => {
+    try {
+      // Get total count for all activities
+      const allResponse = await api.get(`/api/admin/activities?page=1&limit=1`);
+      const totalCount = allResponse.data.pagination?.total || 0;
+      setTotalActivitiesCount(totalCount);
+      
+      // Get counts for each category by querying each activity type
+      const categoryCounts = {
+        authentication: 0,
+        rental: 0,
+        vehicle: 0,
+        payment: 0,
+        feedback: 0
+      };
+      
+      // Create an array of promises for all activity type count queries
+      const countPromises = [];
+      
+      // For each category and its activity types
+      Object.entries(activityTypeGroups).forEach(([category, activityTypes]) => {
+        // For each activity type in this category
+        activityTypes.forEach(activityType => {
+          // Create a promise for this activity type query
+          const promise = api.get(`/api/admin/activities?page=1&limit=1&activityType=${activityType}`)
+            .then(response => {
+              const typeCount = response.data.pagination?.total || 0;
+              // Add this count to the category total
+              categoryCounts[category] += typeCount;
+            })
+            .catch(err => {
+              console.error(`Error fetching count for ${activityType}:`, err);
+            });
+          
+          countPromises.push(promise);
+        });
+      });
+      
+      // Wait for all count queries to complete
+      await Promise.all(countPromises);
+      
+      // Update state with the counts
+      setActivityTypeCounts(categoryCounts);
+    } catch (err) {
+      console.error('Error fetching activity counts:', err);
+    }
+  };
 
   const fetchActivities = async () => {
     setLoading(true);
@@ -220,8 +276,17 @@ const ActivityList = () => {
         }
         
         // Set pagination
-        if (data.pagination && typeof data.pagination.pages === 'number') {
-          setTotalPages(data.pagination.pages);
+        if (data.pagination) {
+          if (typeof data.pagination.pages === 'number') {
+            setTotalPages(data.pagination.pages);
+          } else {
+            setTotalPages(1);
+          }
+          
+          // Set total count
+          if (typeof data.pagination.total === 'number') {
+            setTotalActivitiesCount(data.pagination.total);
+          }
         } else {
           setTotalPages(1);
         }
@@ -237,6 +302,12 @@ const ActivityList = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchActivities();
+    // Fetch activity counts when component mounts
+    fetchActivityCounts();
+  }, []);
 
   useEffect(() => {
     fetchActivities();
@@ -297,12 +368,11 @@ const ActivityList = () => {
 
   // Get count of activities per tab for badges
   const getCategoryCount = (category) => {
-    if (!Array.isArray(activities)) return 0;
+    if (category === 'all') {
+      return totalActivitiesCount;
+    }
     
-    if (category === 'all') return activities.length;
-    
-    const types = activityTypeGroups[category] || [];
-    return activities.filter(a => a && a.activityType && types.includes(a.activityType)).length;
+    return activityTypeCounts[category] || 0;
   };
 
   const filteredActivities = getFilteredActivities();
@@ -350,7 +420,7 @@ const ActivityList = () => {
             label="All Activities" 
             value="all" 
             icon={
-              <Badge badgeContent={getCategoryCount('all')} color="primary" max={99}>
+              <Badge badgeContent={getCategoryCount('all')} color="primary" max={999}>
                 <ActivityIcon />
               </Badge>
             } 
@@ -360,7 +430,7 @@ const ActivityList = () => {
             label="Authentication" 
             value="authentication" 
             icon={
-              <Badge badgeContent={getCategoryCount('authentication')} color="primary" max={99}>
+              <Badge badgeContent={getCategoryCount('authentication')} color="primary" max={999}>
                 <LoginIcon />
               </Badge>
             } 
@@ -370,7 +440,7 @@ const ActivityList = () => {
             label="Rentals" 
             value="rental" 
             icon={
-              <Badge badgeContent={getCategoryCount('rental')} color="primary" max={99}>
+              <Badge badgeContent={getCategoryCount('rental')} color="primary" max={999}>
                 <PurchaseIcon />
               </Badge>
             } 
@@ -380,7 +450,7 @@ const ActivityList = () => {
             label="Vehicles" 
             value="vehicle" 
             icon={
-              <Badge badgeContent={getCategoryCount('vehicle')} color="primary" max={99}>
+              <Badge badgeContent={getCategoryCount('vehicle')} color="primary" max={999}>
                 <VehiclesIcon />
               </Badge>
             } 
@@ -390,7 +460,7 @@ const ActivityList = () => {
             label="Payments" 
             value="payment" 
             icon={
-              <Badge badgeContent={getCategoryCount('payment')} color="primary" max={99}>
+              <Badge badgeContent={getCategoryCount('payment')} color="primary" max={999}>
                 <PaymentsIcon />
               </Badge>
             } 
@@ -400,7 +470,7 @@ const ActivityList = () => {
             label="Feedback" 
             value="feedback" 
             icon={
-              <Badge badgeContent={getCategoryCount('feedback')} color="primary" max={99}>
+              <Badge badgeContent={getCategoryCount('feedback')} color="primary" max={999}>
                 <RatingsIcon />
               </Badge>
             } 
