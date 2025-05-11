@@ -654,12 +654,35 @@ const CarDetails = () => {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Features</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {car.features.map((feature, index) => (
-                  <div key={index} className="flex items-center text-gray-700">
-                    <AiOutlineCheck className="h-5 w-5 text-primary mr-2" />
-                    {feature}
-                  </div>
-                ))}
+                {car.features.map((featureName) => {
+                  const featureMap = {
+                    'Entertainment': '/icons/dvd-v2.png',
+                    'Tire Pressure Monitoring System': '/icons/tpms-v2.png',
+                    'Spare Tire': '/icons/spare_tire-v2.png',
+                    'Navigation': '/icons/map-v2.png',
+                    'ETC': '/icons/etc-v2.png',
+                    'Head Up Display': '/icons/head_up-v2.png',
+                    'Impact Sensor': '/icons/impact_sensor-v2.png',
+                    '360 Camera': '/icons/360_camera-v2.png',
+                    'Airbags': '/icons/airbags-v2.png',
+                    'Reverse Camera': '/icons/reverse_camera-v2.png',
+                    'USB Port': '/icons/usb-v2.png',
+                    'GPS': '/icons/gps-v2.png',
+                    'Bluetooth': '/icons/bluetooth-v2.png',
+                    'Sunroof': '/icons/sunroof-v2.png'
+                  };
+                  
+                  return (
+                    <div key={featureName} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded">
+                      <img 
+                        src={featureMap[featureName]} 
+                        alt={featureName}
+                        className="w-5 h-5 object-contain"
+                      />
+                      <span className="text-sm text-gray-700">{featureName}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
