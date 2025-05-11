@@ -210,7 +210,7 @@ const fiveStarRatio = reviews.length ? ((fiveStarCount / reviews.length) * 100).
             <div className="relative">
               <img
                 src={owner.avatar 
-                  ? `http://localhost:3001${owner.avatar.replace('/uploads', '')}` 
+                  ? `http://localhost:3001${owner.avatar}` 
                   : "http://localhost:3001/avatar/user.png"}
                 alt={owner.fullName}
                 className="w-28 h-28 rounded-full object-cover border-4 border-primary"
