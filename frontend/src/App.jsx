@@ -25,6 +25,7 @@ import OwnerProfile from './pages/OwnerProfile';
 import PaymentSuccess from './pages/PaymentSuccess';
 import DashBoard from './pages/admin/DashBoard';
 import ProtectedRoute from './components/ProtectedRoute';
+import VehicleManagement from './components/admin/VehicleManagement';
 
 // Scroll restoration component
 function ScrollToTop() {
@@ -54,6 +55,7 @@ function App() {
                   <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
                     <Route index element={<DashBoard />} />
                     <Route path="dashboard" element={<DashBoard />} />
+                    <Route path="vehicles" element={<VehicleManagement />} />
                   </Route>
                   
                   <Route path="/" element={<MainLayout />}>

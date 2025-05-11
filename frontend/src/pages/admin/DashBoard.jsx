@@ -66,9 +66,7 @@ const menuItems = [
   { text: 'Activity', icon: <ActivityIcon />, path: '/admin/activity' },
   { text: 'Users', icon: <UsersIcon />, path: '/admin/users' },
   { text: 'Vehicles', icon: <VehiclesIcon />, path: '/admin/vehicles' },
-  { text: 'Payments', icon: <PaymentsIcon />, path: '/admin/payments' },
   { text: 'Ratings', icon: <RatingsIcon />, path: '/admin/ratings' },
-  { text: 'Settings', icon: <SettingsIcon />, path: '/admin/settings' },
 ];
 
 const DashBoard = () => {
