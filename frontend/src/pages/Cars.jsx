@@ -46,8 +46,8 @@ const Cars = () => {
 
         // Nếu không có search params, hoặc không có kết quả search, fetch tất cả xe
         const url = city 
-          ? `http://localhost:3000/vehicles?city=${encodeURIComponent(city)}`
-          : 'http://localhost:3000/vehicles';
+          ? `http://localhost:3000/vehicles?city=${encodeURIComponent(city)}&limit=100`
+          : 'http://localhost:3000/vehicles?limit=100';
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error('Failed to fetch cars');
