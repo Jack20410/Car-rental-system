@@ -3,7 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { endpoints } from '../utils/api';
 
-const DEFAULT_AVATAR = 'http://localhost:3001/avatar/user.png';
+const DEFAULT_AVATAR = 'http://localhost:3001/uploads/avatars/user.png';
+
+const getAvatarUrl = (avatar) =>
+  avatar?.startsWith('/uploads/')
+    ? `http://localhost:3001${avatar}`
+    : DEFAULT_AVATAR;
 
 const Profile = () => {
   const { user, getAuthState } = useAuth();
@@ -14,30 +19,27 @@ const Profile = () => {
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
-    phone: user?.phoneNumber || '',
-    address: user?.address || '',
+    phoneNumber: user?.phoneNumber || '',
     avatar: user?.avatar || DEFAULT_AVATAR,
   });
   const [previewAvatar, setPreviewAvatar] = useState(user?.avatar || DEFAULT_AVATAR);
-  const [sessionUser, setSessionUser] = useState(null);
 
   useEffect(() => {
-    // Debug: check session storage
-    try {
-      const auth = localStorage.getItem('auth');
-      if (auth) {
-        const parsedAuth = JSON.parse(auth);
-        setSessionUser(parsedAuth.user);
-      }
-    } catch (error) {
-      console.error("Error parsing session storage:", error);
+    if (!user) {
+      navigate('/login');
+      return;
     }
-  }, []);
+  }, [user, navigate]);
 
-  if (!user) {
-    navigate('/login');
-    return null;
-  }
+  useEffect(() => {
+    setFormData({
+      name: user?.name || '',
+      email: user?.email || '',
+      phoneNumber: user?.phoneNumber || '',
+      avatar: user?.avatar || DEFAULT_AVATAR,
+    });
+    setPreviewAvatar(user?.avatar || DEFAULT_AVATAR);
+  }, [user]);
 
   const handleChange = (e) => {
     setFormData({
@@ -49,14 +51,12 @@ const Profile = () => {
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Preview the image
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreviewAvatar(reader.result);
       };
       reader.readAsDataURL(file);
       
-      // Will be handled in form submission
       setFormData({
         ...formData,
         avatarFile: file
@@ -70,33 +70,54 @@ const Profile = () => {
     setMessage({ type: '', text: '' });
 
     try {
-      // Create form data for file upload
+      console.log('Starting profile update with data:', formData);
+      
       const submitData = new FormData();
       submitData.append('name', formData.name);
       submitData.append('email', formData.email);
-      submitData.append('phoneNumber', formData.phone);
+      submitData.append('phoneNumber', formData.phoneNumber);
       
-      if (formData.address) {
-        submitData.append('address', formData.address);
-      }
-      
-      // If we have a new avatar file
       if (formData.avatarFile) {
         submitData.append('avatar', formData.avatarFile);
+        console.log('Adding avatar file to update');
       }
 
-      await api.put(endpoints.user.update, submitData, {
+      console.log('Sending update request to:', endpoints.user.update(user._id));
+      const response = await api.patch(endpoints.user.update(user._id), submitData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
       
-      setMessage({ type: 'success', text: 'Profile updated successfully!' });
-      setIsEditing(false);
+      console.log('Profile update response:', response.data);
       
-      // Force a reload of the profile
-      window.location.reload();
+      // Update local user state with new data
+      if (response.data.success) {
+        const updatedUser = response.data.data;
+        // Update AuthContext
+        const auth = JSON.parse(localStorage.getItem('auth'));
+        if (auth) {
+          auth.user = updatedUser;
+          localStorage.setItem('auth', JSON.stringify(auth));
+        }
+        
+        setFormData({
+          name: updatedUser.name || '',
+          email: updatedUser.email || '',
+          phoneNumber: updatedUser.phoneNumber || '',
+          avatar: updatedUser.avatar || DEFAULT_AVATAR,
+        });
+
+        getAuthState();
+        
+        setMessage({ type: 'success', text: 'Profile updated successfully!' });
+        setIsEditing(false);
+      } else {
+        throw new Error(response.data.message || 'Failed to update profile');
+      }
+      
     } catch (error) {
+      console.error('Profile update error:', error.response?.data || error);
       setMessage({ 
         type: 'error', 
         text: error.response?.data?.message || 'Failed to update profile' 
@@ -135,7 +156,7 @@ const Profile = () => {
                 <div className="flex flex-col items-center mb-6">
                   <div className="relative">
                     <img 
-                      src={previewAvatar} 
+                      src={getAvatarUrl(previewAvatar)} 
                       alt="Profile Avatar" 
                       className="h-24 w-24 rounded-full object-cover border-2 border-gray-200"
                       onError={(e) => {
@@ -194,28 +215,14 @@ const Profile = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
                     Phone Number
                   </label>
                   <input
                     type="text"
-                    name="phone"
-                    id="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-                    Address
-                  </label>
-                  <textarea
-                    name="address"
-                    id="address"
-                    rows="3"
-                    value={formData.address}
+                    name="phoneNumber"
+                    id="phoneNumber"
+                    value={formData.phoneNumber}
                     onChange={handleChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary focus:border-primary"
                   />
@@ -236,7 +243,7 @@ const Profile = () => {
             <div className="border-t border-gray-200">
               <div className="flex justify-center py-5">
                 <img 
-                  src={user.avatar || DEFAULT_AVATAR} 
+                  src={getAvatarUrl(user.avatar)} 
                   alt="Profile Avatar" 
                   className="h-32 w-32 rounded-full object-cover border-2 border-gray-200"
                   onError={(e) => {
@@ -261,12 +268,6 @@ const Profile = () => {
                   </dd>
                 </div>
                 <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Address</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {user.address || 'Not provided'}
-                  </dd>
-                </div>
-                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-500">Role</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                     <span className="px-2 py-1 text-xs font-medium rounded-full bg-primary text-white">
@@ -274,7 +275,7 @@ const Profile = () => {
                     </span>
                   </dd>
                 </div>
-                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-500">Member since</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                     {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
@@ -283,33 +284,6 @@ const Profile = () => {
               </dl>
             </div>
           )}
-        </div>
-        
-        {/* Debugging section */}
-        <div className="mt-8 bg-white shadow overflow-hidden sm:rounded-lg">
-          <div className="px-4 py-5 sm:px-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">Debug Information</h3>
-          </div>
-          <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
-            <h4 className="text-md font-semibold mb-3">User from Context</h4>
-            <div className="bg-gray-50 p-3 rounded mb-4">
-              <p className="mb-1"><span className="font-medium">Name:</span> {user?.name}</p>
-              <p className="mb-1"><span className="font-medium">Email:</span> {user?.email}</p>
-              <p className="mb-1"><span className="font-medium">Role:</span> {user?.role}</p>
-            </div>
-            
-            <h4 className="text-md font-semibold mb-3">User from Session Storage</h4>
-            <div className="bg-gray-50 p-3 rounded">
-              <p className="mb-1"><span className="font-medium">User Present:</span> {sessionUser ? 'Yes' : 'No'}</p>
-              {sessionUser && (
-                <>
-                  <p className="mb-1"><span className="font-medium">Name:</span> {sessionUser?.name}</p>
-                  <p className="mb-1"><span className="font-medium">Email:</span> {sessionUser?.email}</p>
-                  <p className="mb-1"><span className="font-medium">Role:</span> {sessionUser?.role}</p>
-                </>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>

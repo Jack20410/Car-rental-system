@@ -73,9 +73,7 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) =
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
-    let date = new Date(dateString);
-    // Trừ đi 7 tiếng để về đúng giờ Việt Nam nếu bị cộng dư
-    date = new Date(date.getTime() - 7 * 60 * 60 * 1000);
+    const date = new Date(dateString);
     return date.toLocaleString('vi-VN', {
       year: 'numeric',
       month: '2-digit',

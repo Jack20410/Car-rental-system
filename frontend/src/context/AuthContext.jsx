@@ -117,14 +117,41 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Get current auth state
-  const getAuthState = () => {
-    const auth = getStoredAuth();
-    return {
-      isAuthenticated: !!auth?.token,
-      user: auth?.user || null,
-      token: auth?.token || null,
-      loginTime: auth?.loginTime || null
-    };
+  const getAuthState = async () => {
+    try {
+      console.log('Fetching current user profile...');
+      const response = await api.get(endpoints.user.profile);
+      const userData = response.data.data;
+      
+      console.log('Received user data:', userData);
+      
+      // Update local storage and state
+      const auth = getStoredAuth();
+      if (auth) {
+        const updatedAuth = {
+          ...auth,
+          user: userData
+        };
+        localStorage.setItem('auth', JSON.stringify(updatedAuth));
+        setUser(userData);
+        console.log('Updated user state with new data');
+      }
+      
+      return {
+        isAuthenticated: !!auth?.token,
+        user: userData,
+        token: auth?.token || null,
+        loginTime: auth?.loginTime || null
+      };
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      return {
+        isAuthenticated: false,
+        user: null,
+        token: null,
+        loginTime: null
+      };
+    }
   };
 
   // Check if user is admin
