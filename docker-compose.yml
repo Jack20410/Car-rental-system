@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   # Frontend
   frontend:
@@ -34,6 +33,7 @@ services:
       - admin-service
     volumes:
       - ./api-gateway:/app
+      - ./uploads:/app/uploads
     networks:
       - car-rental-network
     healthcheck:

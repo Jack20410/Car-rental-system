@@ -674,37 +674,22 @@ exports.getProviderRentals = async (req, res) => {
 // Get all present/active rentals
 exports.getPresentRentals = async (req, res) => {
   try {
-    const { limit = 10, page = 1 } = req.query;
+    // Fetch all rentals without status filtering
+    const rentals = await Rental.find().sort({ createdAt: -1 });
     
-    // Present rentals are all except cancelled and rejected
-    const filter = { status: { $nin: ['cancelled', 'rejected'] } };
-    
-    // Calculate pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    const rentals = await Rental.find(filter)
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(skip);
-    
-    const total = await Rental.countDocuments(filter);
+    const total = await Rental.countDocuments();
     
     return res.status(200).json({
       success: true,
-      message: 'Present rentals retrieved successfully',
+      message: 'All rentals retrieved successfully',
       data: rentals,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit))
-      }
+      total
     });
   } catch (error) {
-    console.error('Error retrieving present rentals:', error);
+    console.error('Error retrieving rentals:', error);
     return res.status(500).json({
       success: false,
-      message: 'An error occurred while retrieving present rentals'
+      message: 'An error occurred while retrieving rentals'
     });
   }
 };

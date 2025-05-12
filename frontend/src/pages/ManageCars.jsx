@@ -1421,9 +1421,7 @@ const ManageCars = () => {
                                   <span className="text-gray-400">|</span>
                                   <div className="flex items-center gap-2 text-gray-600">
                                     <img
-                                      src={customer?.avatar 
-                                        ? `http://localhost:3001${customer.avatar.replace('/uploads', '')}` 
-                                        : "http://localhost:3001/avatar/user.png"}
+                                      src="http://localhost:3001/uploads/avatars/user.png"
                                       alt={customer?.fullName || 'Customer'}
                                       className="w-5 h-5 rounded-full object-cover"
                                     />

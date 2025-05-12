@@ -16,7 +16,7 @@ from routes import (
     health_router,
     rating_router,
     payment_router,
-    admin_router,
+    admin_router
 )
 
 # Import utility functions

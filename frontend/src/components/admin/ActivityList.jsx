@@ -446,7 +446,7 @@ const ActivityList = () => {
             } 
             iconPosition="start" 
           />
-          <Tab 
+          {/* <Tab 
             label="Vehicles" 
             value="vehicle" 
             icon={
@@ -455,7 +455,7 @@ const ActivityList = () => {
               </Badge>
             } 
             iconPosition="start" 
-          />
+          /> */}
           <Tab 
             label="Payments" 
             value="payment" 
