@@ -2,12 +2,11 @@ services:
   # Admin Service (Deploy first - other services depend on it)
   - type: web
     name: car-rental-admin-service
-    env: node
+    env: docker
     plan: free
     region: singapore
-    buildCommand: "npm install"
-    startCommand: "npm start"
-    rootDir: services/admin-service
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./services/admin-service
     envVars:
       - key: PORT
         value: 10000
@@ -25,12 +24,11 @@ services:
   # User Service
   - type: web
     name: car-rental-user-service
-    env: node
+    env: docker
     plan: free
     region: singapore
-    buildCommand: "npm install"
-    startCommand: "npm start"
-    rootDir: services/user-service
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./services/user-service
     envVars:
       - key: PORT
         value: 10000
@@ -44,12 +42,11 @@ services:
   # Vehicle Service
   - type: web
     name: car-rental-vehicle-service
-    env: node
+    env: docker
     plan: free
     region: singapore
-    buildCommand: "npm install"
-    startCommand: "npm start"
-    rootDir: services/vehicle-service
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./services/vehicle-service
     envVars:
       - key: PORT
         value: 10000
@@ -65,19 +62,18 @@ services:
   # Rental Service
   - type: web
     name: car-rental-rental-service
-    env: node
+    env: docker
     plan: free
     region: singapore
-    buildCommand: "npm install"
-    startCommand: "npm start"
-    rootDir: services/rental-service
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./services/rental-service
     envVars:
       - key: PORT
         value: 10000
       - key: MONGODB_URI
         value: "mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/rental_service_db"
       - key: JWT_SECRET
-        value: "ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt"
+        value: "ihrwkjhfqkldsjflakjsdhfalkjsdhlkjasdhklafjdhlfkjaiuerqyiquwyt"
       - key: VEHICLE_SERVICE_URL
         value: "https://car-rental-vehicle-service.onrender.com"
       - key: ADMIN_SERVICE_URL
@@ -86,19 +82,18 @@ services:
   # Payment Service
   - type: web
     name: car-rental-payment-service
-    env: node
+    env: docker
     plan: free
     region: singapore
-    buildCommand: "npm install"
-    startCommand: "npm start"
-    rootDir: services/payment-service
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./services/payment-service
     envVars:
       - key: PORT
         value: 10000
       - key: MONGODB_URI
         value: "mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/payment_service_db"
       - key: JWT_SECRET
-        value: "ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt"
+        value: "ihrwkjhfqkldsjflakjsdhfalkjsdhlkjasdhklafjdhlfkjaiuerqyiquwyt"
       - key: RENTAL_SERVICE_URL
         value: "https://car-rental-rental-service.onrender.com"
       - key: ADMIN_SERVICE_URL
@@ -107,12 +102,11 @@ services:
   # Chat Service
   - type: web
     name: car-rental-chat-service
-    env: node
+    env: docker
     plan: free
     region: singapore
-    buildCommand: "npm install"
-    startCommand: "npm start"
-    rootDir: services/chat-service
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./services/chat-service
     envVars:
       - key: PORT
         value: 10000
@@ -128,34 +122,30 @@ services:
   # Rating Service
   - type: web
     name: car-rental-rating-service
-    env: node
+    env: docker
     plan: free
     region: singapore
-    buildCommand: "npm install"
-    startCommand: "npm start"
-    rootDir: services/rating-service
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./services/rating-service
     envVars:
       - key: PORT
         value: 10000
       - key: MONGODB_URI
         value: "mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/rating_service_db"
       - key: JWT_SECRET
-        value: "ihrwkjhfqkldsjflakjsdhfalkjsdhlkjasdhklafjdhlfkjaiuerqyiquwyt"
+        value: "ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt"
       - key: ADMIN_SERVICE_URL
         value: "https://car-rental-admin-service.onrender.com"
 
-  # API Gateway (Main Entry Point)
+  # API Gateway (Main Entry Point) - Docker Version
   - type: web
     name: car-rental-api-gateway
-    env: python
+    env: docker
     plan: free
     region: singapore
-    buildCommand: "pip install --upgrade pip && pip install --only-binary=:all: --no-cache-dir -r requirements.txt"
-    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
-    rootDir: api-gateway
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./api-gateway
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.11"
       - key: PORT
         value: 10000
       - key: API_VERSION
