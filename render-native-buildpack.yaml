@@ -1,4 +1,46 @@
 services:
+  # API Gateway (Main Entry Point)
+  - type: web
+    name: car-rental-api-gateway
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    rootDir: api-gateway
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: API_VERSION
+        value: "1.0.0"
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 300
+      - key: RATE_LIMIT_WINDOW_SECONDS
+        value: 60
+      - key: USER_SERVICE_URL
+        value: "https://car-rental-user-service.onrender.com"
+      - key: VEHICLE_SERVICE_URL
+        value: "https://car-rental-vehicle-service.onrender.com"
+      - key: RENTAL_SERVICE_URL
+        value: "https://car-rental-rental-service.onrender.com"
+      - key: PAYMENT_SERVICE_URL
+        value: "https://car-rental-payment-service.onrender.com"
+      - key: ADMIN_SERVICE_URL
+        value: "https://car-rental-admin-service.onrender.com"
+      - key: CHAT_SERVICE_URL
+        value: "https://car-rental-chat-service.onrender.com"
+      - key: RATING_SERVICE_URL
+        value: "https://car-rental-rating-service.onrender.com"
+      - key: FRONTEND_URL
+        value: "https://your-frontend-domain.com"
+      - key: ADDITIONAL_CORS_ORIGINS
+        value: "https://your-frontend-domain.com"
+
   # Admin Service (Deploy first - other services depend on it)
   - type: web
     name: car-rental-admin-service
@@ -133,48 +175,6 @@ services:
       - key: MONGODB_URI
         value: "mongodb+srv://jack10:baole1010@car-rental-users.bemrrqe.mongodb.net/rating_service_db"
       - key: JWT_SECRET
-        value: "ihrwkjhfqkldsjflakjsdhfalkjsdhlkjasdhklafjdhlfkjaiuerqyiquwyt"
+        value: "ihrwkjhfqkldsjflakjsdhfalkjsdhlkfsdhlkjasdhklafjdhlfkjaiuerqyiquwyt"
       - key: ADMIN_SERVICE_URL
         value: "https://car-rental-admin-service.onrender.com"
-
-  # API Gateway (Main Entry Point)
-  - type: web
-    name: car-rental-api-gateway
-    env: python
-    plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
-    rootDir: api-gateway
-    envVars:
-      - key: PORT
-        value: 10000
-      - key: API_VERSION
-        value: "1.0.0"
-      - key: ENVIRONMENT
-        value: production
-      - key: LOG_LEVEL
-        value: INFO
-      - key: JWT_SECRET_KEY
-        generateValue: true
-      - key: RATE_LIMIT_MAX_REQUESTS
-        value: 300
-      - key: RATE_LIMIT_WINDOW_SECONDS
-        value: 60
-      - key: USER_SERVICE_URL
-        value: "https://car-rental-user-service.onrender.com"
-      - key: VEHICLE_SERVICE_URL
-        value: "https://car-rental-vehicle-service.onrender.com"
-      - key: RENTAL_SERVICE_URL
-        value: "https://car-rental-rental-service.onrender.com"
-      - key: PAYMENT_SERVICE_URL
-        value: "https://car-rental-payment-service.onrender.com"
-      - key: ADMIN_SERVICE_URL
-        value: "https://car-rental-admin-service.onrender.com"
-      - key: CHAT_SERVICE_URL
-        value: "https://car-rental-chat-service.onrender.com"
-      - key: RATING_SERVICE_URL
-        value: "https://car-rental-rating-service.onrender.com"
-      - key: FRONTEND_URL
-        value: "https://your-frontend-domain.com"
-      - key: ADDITIONAL_CORS_ORIGINS
-        value: "https://your-frontend-domain.com"
