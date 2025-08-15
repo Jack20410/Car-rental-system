@@ -4,6 +4,7 @@ services:
     name: car-rental-admin-service
     env: docker
     plan: free
+    region: singapore
     dockerfilePath: ./Dockerfile
     dockerContext: ./services/admin-service
     envVars:
@@ -25,6 +26,7 @@ services:
     name: car-rental-user-service
     env: docker
     plan: free
+    region: singapore
     dockerfilePath: ./Dockerfile
     dockerContext: ./services/user-service
     envVars:
@@ -42,6 +44,7 @@ services:
     name: car-rental-vehicle-service
     env: docker
     plan: free
+    region: singapore
     dockerfilePath: ./Dockerfile
     dockerContext: ./services/vehicle-service
     envVars:
@@ -61,6 +64,7 @@ services:
     name: car-rental-rental-service
     env: docker
     plan: free
+    region: singapore
     dockerfilePath: ./Dockerfile
     dockerContext: ./services/rental-service
     envVars:
@@ -80,6 +84,7 @@ services:
     name: car-rental-payment-service
     env: docker
     plan: free
+    region: singapore
     dockerfilePath: ./Dockerfile
     dockerContext: ./services/payment-service
     envVars:
@@ -99,6 +104,7 @@ services:
     name: car-rental-chat-service
     env: docker
     plan: free
+    region: singapore
     dockerfilePath: ./Dockerfile
     dockerContext: ./services/chat-service
     envVars:
@@ -118,6 +124,7 @@ services:
     name: car-rental-rating-service
     env: docker
     plan: free
+    region: singapore
     dockerfilePath: ./Dockerfile
     dockerContext: ./services/rating-service
     envVars:
@@ -135,6 +142,7 @@ services:
     name: car-rental-api-gateway
     env: docker
     plan: free
+    region: singapore
     dockerfilePath: ./Dockerfile
     dockerContext: ./api-gateway
     envVars:

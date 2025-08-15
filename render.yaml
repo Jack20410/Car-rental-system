@@ -4,6 +4,7 @@ services:
     name: car-rental-admin-service
     env: node
     plan: free
+    region: singapore
     buildCommand: "npm install"
     startCommand: "npm start"
     rootDir: services/admin-service
@@ -26,6 +27,7 @@ services:
     name: car-rental-user-service
     env: node
     plan: free
+    region: singapore
     buildCommand: "npm install"
     startCommand: "npm start"
     rootDir: services/user-service
@@ -44,6 +46,7 @@ services:
     name: car-rental-vehicle-service
     env: node
     plan: free
+    region: singapore
     buildCommand: "npm install"
     startCommand: "npm start"
     rootDir: services/vehicle-service
@@ -64,6 +67,7 @@ services:
     name: car-rental-rental-service
     env: node
     plan: free
+    region: singapore
     buildCommand: "npm install"
     startCommand: "npm start"
     rootDir: services/rental-service
@@ -84,6 +88,7 @@ services:
     name: car-rental-payment-service
     env: node
     plan: free
+    region: singapore
     buildCommand: "npm install"
     startCommand: "npm start"
     rootDir: services/payment-service
@@ -104,6 +109,7 @@ services:
     name: car-rental-chat-service
     env: node
     plan: free
+    region: singapore
     buildCommand: "npm install"
     startCommand: "npm start"
     rootDir: services/chat-service
@@ -124,6 +130,7 @@ services:
     name: car-rental-rating-service
     env: node
     plan: free
+    region: singapore
     buildCommand: "npm install"
     startCommand: "npm start"
     rootDir: services/rating-service
@@ -142,6 +149,7 @@ services:
     name: car-rental-api-gateway
     env: python
     plan: free
+    region: singapore
     buildCommand: "pip install -r requirements.txt"
     startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     rootDir: api-gateway
