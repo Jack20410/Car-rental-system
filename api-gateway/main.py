@@ -69,16 +69,24 @@ app.add_middleware(
     window_size=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", 60))
 )
 
-# Check if uploads directory exists
+# Check if uploads directory exists (for local development)
+# In production (Render.com), file uploads should use cloud storage
 uploads_dir = "/app/uploads"
-if os.path.exists(uploads_dir):
+environment = os.getenv("ENVIRONMENT", "development")
+
+if environment == "development" and os.path.exists(uploads_dir):
     logger.info(f"Mounting uploads directory: {uploads_dir}")
     # List contents for debugging
     logger.info(f"Contents of {uploads_dir}: {os.listdir(uploads_dir)}")
     # Serve static files from uploads directory
     app.mount("/uploads", StaticFiles(directory=uploads_dir, html=True), name="uploads")
+elif environment == "production":
+    logger.info("Production environment: File uploads should use cloud storage service")
+    # In production, you should configure cloud storage (AWS S3, Cloudinary, etc.)
+    # For now, we'll log a warning
+    logger.warning("File upload functionality requires cloud storage configuration in production")
 else:
-    logger.error(f"Uploads directory {uploads_dir} not found!")
+    logger.warning(f"Uploads directory {uploads_dir} not found! File uploads may not work properly.")
 
 # Include routers
 app.include_router(health_router)
