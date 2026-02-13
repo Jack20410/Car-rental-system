@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // API Base URL - centralized configuration
-export const API_BASE_URL = 'https://car-rental-api-gateway.onrender.com';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://car-rental-api-gateway.onrender.com';
 
 // Create axios instance with default config
 const api = axios.create({
