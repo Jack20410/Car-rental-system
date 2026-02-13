@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: 'http://localhost:3000',
+  baseURL: 'https://car-rental-api-gateway.onrender.com',
   headers: {
     'Content-Type': 'application/json',
   },
