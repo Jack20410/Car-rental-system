@@ -9,6 +9,27 @@ logger = logging.getLogger("api_gateway")
 
 router = APIRouter(tags=["Health"])
 
+@router.get("/")
+async def root():
+    """
+    Root endpoint - API Gateway welcome message.
+    """
+    return {
+        "message": "Car Rental API Gateway",
+        "version": "1.0.0",
+        "status": "running",
+        "timestamp": datetime.now().isoformat(),
+        "endpoints": {
+            "health": "/api/health",
+            "users": "/users",
+            "vehicles": "/vehicles",
+            "rentals": "/rentals",
+            "ratings": "/ratings",
+            "payments": "/payments",
+            "admin": "/admin"
+        }
+    }
+
 @router.get("/api/health")
 async def health_check():
     """
