@@ -11,9 +11,9 @@ const Navbar = () => {
   const [providerRole, setProviderRole] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const navigate = useNavigate();
-  
+
   // Direct URL to the vehicle service for static files
-  const DEFAULT_AVATAR = `http://localhost:3001/avatar/user.png`;
+  const DEFAULT_AVATAR = `${API_BASE_URL}/avatar/user.png`;
 
   // Check session storage directly for debugging
   useEffect(() => {
@@ -29,7 +29,7 @@ const Navbar = () => {
       }
     }
   }, [user]);
-  
+
   const handleLogout = () => {
     logout();
     setProviderRole(false);
@@ -43,7 +43,7 @@ const Navbar = () => {
     // Close any open menus
     setIsProfileOpen(false);
     setNotificationOpen(false);
-    
+
     // Check if user is a car provider to navigate to the appropriate page
     if (user?.role === 'car_provider' || providerRole) {
       // Navigate to manage-cars page with tab=messages for car providers
@@ -58,9 +58,9 @@ const Navbar = () => {
   const Avatar = ({ className }) => {
     if (user?.avatar) {
       return (
-        <img 
-          src={user.avatar} 
-          alt="Profile" 
+        <img
+          src={user.avatar}
+          alt="Profile"
           className={`${className} rounded-full object-cover`}
           onError={(e) => {
             // If user avatar fails, try default avatar
@@ -121,7 +121,7 @@ const Navbar = () => {
               )}
             </div>
           </div>
-          
+
           {/* Mobile menu button */}
           <div className="flex items-center md:hidden">
             <button
@@ -140,7 +140,7 @@ const Navbar = () => {
               )}
             </button>
           </div>
-          
+
           <div className="hidden md:flex items-center">
             {user ? (
               <div className="flex items-center">
@@ -151,21 +151,21 @@ const Navbar = () => {
                     className="text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                   >
                     <span className="sr-only">View notifications</span>
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className="h-6 w-6" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
                       stroke="currentColor"
                     >
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        strokeWidth="2" 
-                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" 
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                       />
                     </svg>
-                    
+
                     {/* Notification Badge */}
                     {totalUnread > 0 && (
                       <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">
@@ -174,7 +174,7 @@ const Navbar = () => {
                     )}
                   </button>
                 </div>
-                
+
                 <div className="ml-3 relative">
                   <div>
                     <button
@@ -292,7 +292,7 @@ const Navbar = () => {
             </Link>
           )}
         </div>
-        
+
         {/* Mobile menu auth buttons */}
         {!user ? (
           <div className="pt-4 pb-3 border-t border-gray-200">
@@ -325,7 +325,7 @@ const Navbar = () => {
                 <div className="text-base font-medium text-gray-800">{user.name}</div>
                 <div className="text-sm font-medium text-gray-500">{user.email}</div>
               </div>
-              
+
               {/* Mobile Notification Icon */}
               {user && (
                 <div className="ml-auto">
@@ -334,21 +334,21 @@ const Navbar = () => {
                     className="flex-shrink-0 p-1 rounded-full text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                   >
                     <span className="sr-only">View notifications</span>
-                    <svg 
-                      xmlns="http://www.w3.org/2000/svg" 
-                      className="h-6 w-6" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
                       stroke="currentColor"
                     >
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        strokeWidth="2" 
-                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" 
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                       />
                     </svg>
-                    
+
                     {/* Mobile Notification Badge */}
                     {totalUnread > 0 && (
                       <span className="absolute top-2 right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">

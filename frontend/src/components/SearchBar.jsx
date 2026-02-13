@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../utils/api';
 
 const SearchBar = () => {
   const navigate = useNavigate();
@@ -13,38 +14,38 @@ const SearchBar = () => {
       date: ''
     }
   });
-  
+
   // Current displayed month/year in calendar
   const [currentView, setCurrentView] = useState({
     month: new Date().getMonth(),
     year: new Date().getFullYear()
   });
-  
+
   // Days of the week
   const weekDays = useMemo(() => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], []);
-  
+
   // Generate calendar days for current month
   const generateCalendarDays = useCallback((month, year) => {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstDay = new Date(year, month, 1).getDay();
     const days = [];
-    
+
     // Adjust first day (0 is Sunday in JS but we want Monday as first day)
     const adjustedFirstDay = firstDay === 0 ? 6 : firstDay - 1;
-    
+
     // Add empty slots for days before first of month
     for (let i = 0; i < adjustedFirstDay; i++) {
       days.push(null);
     }
-    
+
     // Add days of the month
     for (let i = 1; i <= daysInMonth; i++) {
       days.push(i);
     }
-    
+
     return days;
   }, []);
-  
+
   // Get next month
   const nextMonth = useCallback(() => {
     setCurrentView(prev => {
@@ -55,7 +56,7 @@ const SearchBar = () => {
       }
     });
   }, []);
-  
+
   // Get previous month
   const prevMonth = useCallback(() => {
     setCurrentView(prev => {
@@ -66,11 +67,11 @@ const SearchBar = () => {
       }
     });
   }, []);
-  
+
   // Format date for display
   const formatDateDisplay = useCallback(() => {
     if (!selectedDates.pickup.date || !selectedDates.return.date) return 'Select dates';
-    
+
     const formatDate = (dateStr) => {
       const date = new Date(dateStr);
       const day = date.getDate();
@@ -78,31 +79,31 @@ const SearchBar = () => {
       const year = date.getFullYear();
       return `${day}/${month}/${year}`;
     };
-    
+
     const pickup = formatDate(selectedDates.pickup.date);
     const returnDate = formatDate(selectedDates.return.date);
-    
+
     return `${pickup} - ${returnDate}`;
   }, [selectedDates]);
-  
+
   // Handle day selection
   const handleDaySelect = useCallback((day, month, year) => {
     if (!day) return;
-    
-    const dateStr = `${year}-${String(month+1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    
+
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
     // If no pickup date is selected or a return date is already selected, set pickup date
     if (!selectedDates.pickup.date || selectedDates.return.date) {
       setSelectedDates({
         pickup: { ...selectedDates.pickup, date: dateStr },
         return: { ...selectedDates.return, date: '' }
       });
-    } 
+    }
     // If pickup date is selected, set return date
     else {
       const pickupDate = new Date(selectedDates.pickup.date);
       const newDate = new Date(dateStr);
-      
+
       // Ensure return date is not before pickup date
       if (newDate >= pickupDate) {
         setSelectedDates(prev => ({
@@ -118,7 +119,7 @@ const SearchBar = () => {
       }
     }
   }, [selectedDates]);
-  
+
   // Available cities
   const cities = useMemo(() => [
     'Ho Chi Minh',
@@ -132,7 +133,7 @@ const SearchBar = () => {
   const handleLocationChange = useCallback((e) => {
     setLocation(e.target.value);
   }, []);
-  
+
   // Handle search submission
   const handleSearch = useCallback(() => {
     if (!location || !selectedDates.pickup.date || !selectedDates.return.date) {
@@ -144,7 +145,7 @@ const SearchBar = () => {
     const formattedCity = location.toLowerCase().replace(/\s+/g, '');
 
     // Lấy danh sách xe theo thành phố
-    fetch(`http://localhost:3000/vehicles?city=${formattedCity}`)
+    fetch(`${API_BASE_URL}/vehicles?city=${formattedCity}`)
       .then(response => {
         if (!response.ok) {
           throw new Error('Network response was not ok');
@@ -157,8 +158,8 @@ const SearchBar = () => {
         }
 
         // Lấy danh sách xe
-        const vehicles = Array.isArray(vehiclesResponse.data) 
-          ? vehiclesResponse.data 
+        const vehicles = Array.isArray(vehiclesResponse.data)
+          ? vehiclesResponse.data
           : vehiclesResponse.data?.vehicles || [];
 
         // Kiểm tra availability cho từng xe trong khoảng ngày đã chọn
@@ -167,7 +168,7 @@ const SearchBar = () => {
           if (!vehicle || vehicle.status !== 'Available') continue;
           try {
             const res = await fetch(
-              `http://localhost:3000/rentals/availability?vehicleId=${vehicle._id}&startDate=${selectedDates.pickup.date}&endDate=${selectedDates.return.date}`
+              `${API_BASE_URL}/rentals/availability?vehicleId=${vehicle._id}&startDate=${selectedDates.pickup.date}&endDate=${selectedDates.return.date}`
             );
             if (!res.ok) continue;
             const avail = await res.json();
@@ -204,38 +205,38 @@ const SearchBar = () => {
         alert('Error searching for vehicles. Please try again.');
       });
   }, [location, selectedDates, navigate]);
-  
+
   // Months array for display
   const months = useMemo(() => [
-    'January', 'February', 'March', 'April', 'May', 'June', 
+    'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ], []);
-  
+
   // Check if day is selected
   const isDaySelected = useCallback((day, month, year) => {
     if (!day) return false;
-    
-    const dateStr = `${year}-${String(month+1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     return selectedDates.pickup.date === dateStr || selectedDates.return.date === dateStr;
   }, [selectedDates]);
-  
+
   // Check if day is in range between pickup and return
   const isDayInRange = useCallback((day, month, year) => {
     if (!day || !selectedDates.pickup.date || !selectedDates.return.date) return false;
-    
-    const dateStr = `${year}-${String(month+1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const date = new Date(dateStr);
     const pickup = new Date(selectedDates.pickup.date);
     const returnDate = new Date(selectedDates.return.date);
-    
+
     return date > pickup && date < returnDate;
   }, [selectedDates]);
-  
+
   // Toggle date modal
   const toggleDateModal = useCallback(() => {
     setShowDateModal(prev => !prev);
   }, []);
-  
+
   return (
     <>
       <div className="bg-white rounded-xl shadow-lg overflow-hidden max-w-6xl mx-auto">
@@ -261,9 +262,9 @@ const SearchBar = () => {
               </select>
             </div>
           </div>
-          
+
           {/* Date/time selector */}
-          <div 
+          <div
             className="flex-1 flex items-center border rounded-lg p-3 gap-2 cursor-pointer hover:border-blue-600 transition"
             onClick={toggleDateModal}
           >
@@ -275,9 +276,9 @@ const SearchBar = () => {
               <div className="text-gray-800">{formatDateDisplay()}</div>
             </div>
           </div>
-          
+
           {/* Search button */}
-          <button 
+          <button
             onClick={handleSearch}
             className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg transition font-medium w-full md:w-auto"
           >
@@ -285,7 +286,7 @@ const SearchBar = () => {
           </button>
         </div>
       </div>
-      
+
       {/* Date selection modal */}
       {showDateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -293,7 +294,7 @@ const SearchBar = () => {
             {/* Modal header */}
             <div className="p-4 border-b flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-800">Rental Period</h2>
-              <button 
+              <button
                 onClick={toggleDateModal}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -302,7 +303,7 @@ const SearchBar = () => {
                 </svg>
               </button>
             </div>
-            
+
             {/* Tabs */}
             <div className="p-4 border-b">
               <div className="grid gap-4">
@@ -311,7 +312,7 @@ const SearchBar = () => {
                 </button>
               </div>
             </div>
-            
+
             {/* Calendar section */}
             <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Current month */}
@@ -327,7 +328,7 @@ const SearchBar = () => {
                   </h3>
                   <div className="w-5"></div> {/* Empty space for alignment */}
                 </div>
-                
+
                 {/* Weekday headers */}
                 <div className="grid grid-cols-7 mb-2">
                   {weekDays.map(day => (
@@ -336,12 +337,12 @@ const SearchBar = () => {
                     </div>
                   ))}
                 </div>
-                
+
                 {/* Calendar days */}
                 <div className="grid grid-cols-7 gap-1">
                   {generateCalendarDays(currentView.month, currentView.year).map((day, index) => (
-                    <div 
-                      key={index} 
+                    <div
+                      key={index}
                       className={`
                         h-10 flex items-center justify-center text-sm rounded-md
                         ${!day ? 'text-gray-300' : 'cursor-pointer hover:bg-gray-100 text-gray-800'}
@@ -355,14 +356,14 @@ const SearchBar = () => {
                   ))}
                 </div>
               </div>
-              
+
               {/* Next month */}
               <div>
                 <div className="flex justify-between items-center mb-4">
                   <div className="w-5"></div> {/* Empty space for alignment */}
                   <h3 className="font-medium text-lg text-gray-800">
-                    {currentView.month === 11 
-                      ? `${months[0]} ${currentView.year + 1}` 
+                    {currentView.month === 11
+                      ? `${months[0]} ${currentView.year + 1}`
                       : `${months[currentView.month + 1]} ${currentView.year}`}
                   </h3>
                   <button onClick={nextMonth} className="p-1 text-gray-600 hover:text-blue-600">
@@ -371,7 +372,7 @@ const SearchBar = () => {
                     </svg>
                   </button>
                 </div>
-                
+
                 {/* Weekday headers */}
                 <div className="grid grid-cols-7 mb-2">
                   {weekDays.map(day => (
@@ -380,32 +381,32 @@ const SearchBar = () => {
                     </div>
                   ))}
                 </div>
-                
+
                 {/* Calendar days */}
                 <div className="grid grid-cols-7 gap-1">
                   {generateCalendarDays(
-                    currentView.month === 11 ? 0 : currentView.month + 1, 
+                    currentView.month === 11 ? 0 : currentView.month + 1,
                     currentView.month === 11 ? currentView.year + 1 : currentView.year
                   ).map((day, index) => (
-                    <div 
-                      key={index} 
+                    <div
+                      key={index}
                       className={`
                         h-10 flex items-center justify-center text-sm rounded-md
                         ${!day ? 'text-gray-300' : 'cursor-pointer hover:bg-gray-100 text-gray-800'}
                         ${isDaySelected(
-                          day, 
-                          currentView.month === 11 ? 0 : currentView.month + 1, 
-                          currentView.month === 11 ? currentView.year + 1 : currentView.year
-                        ) ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}
+                        day,
+                        currentView.month === 11 ? 0 : currentView.month + 1,
+                        currentView.month === 11 ? currentView.year + 1 : currentView.year
+                      ) ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}
                         ${isDayInRange(
-                          day, 
-                          currentView.month === 11 ? 0 : currentView.month + 1, 
-                          currentView.month === 11 ? currentView.year + 1 : currentView.year
-                        ) ? 'bg-blue-100 text-gray-800' : ''}
+                        day,
+                        currentView.month === 11 ? 0 : currentView.month + 1,
+                        currentView.month === 11 ? currentView.year + 1 : currentView.year
+                      ) ? 'bg-blue-100 text-gray-800' : ''}
                       `}
                       onClick={() => handleDaySelect(
-                        day, 
-                        currentView.month === 11 ? 0 : currentView.month + 1, 
+                        day,
+                        currentView.month === 11 ? 0 : currentView.month + 1,
                         currentView.month === 11 ? currentView.year + 1 : currentView.year
                       )}
                     >
@@ -415,10 +416,10 @@ const SearchBar = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* Footer with buttons */}
             <div className="p-4 border-t flex justify-end">
-              <button 
+              <button
                 onClick={() => setShowDateModal(false)}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg transition"
               >

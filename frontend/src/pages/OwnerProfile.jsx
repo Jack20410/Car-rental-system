@@ -5,6 +5,7 @@ import { MdVerified, MdLocationOn, MdChevronLeft, MdChevronRight, MdSort } from 
 import { BsSpeedometer2, BsCalendarCheck } from 'react-icons/bs';
 import { formatCurrency } from '../utils/formatCurrency';
 import CarCard from '../components/CarCard';
+import { API_BASE_URL } from '../utils/api';
 
 const OwnerProfile = () => {
   const { id } = useParams();
@@ -22,7 +23,7 @@ const OwnerProfile = () => {
       try {
         setLoading(true);
         // Fetch owner details
-        const ownerResponse = await fetch(`http://localhost:3000/users/${id}`);
+        const ownerResponse = await fetch(`${API_BASE_URL}/users/${id}`);
         if (!ownerResponse.ok) {
           throw new Error('Failed to fetch owner details');
         }
@@ -30,7 +31,7 @@ const OwnerProfile = () => {
         setOwner(ownerData.data);
 
         // Fetch owner's cars
-        const carsResponse = await fetch(`http://localhost:3000/vehicles?car_providerId=${id}`);
+        const carsResponse = await fetch(`${API_BASE_URL}/vehicles?car_providerId=${id}`);
         if (!carsResponse.ok) {
           throw new Error('Failed to fetch owner cars');
         }
@@ -41,7 +42,7 @@ const OwnerProfile = () => {
         // Fetch all ratings for these cars
         if (cars.length > 0) {
           const vehicleIds = cars.map(car => car._id).join(',');
-          const ratingsResponse = await fetch(`http://localhost:3000/ratings/by-provider/${id}?vehicleIds=${vehicleIds}`);
+          const ratingsResponse = await fetch(`${API_BASE_URL}/ratings/by-provider/${id}?vehicleIds=${vehicleIds}`);
           if (!ratingsResponse.ok) {
             throw new Error('Failed to fetch reviews');
           }
@@ -51,7 +52,7 @@ const OwnerProfile = () => {
               id: rating.id || rating._id,
               user: {
                 name: rating.userName || "Anonymous",
-                avatar: rating.userAvatar || "http://localhost:3001/avatar/user.png",
+                avatar: rating.userAvatar || "${API_BASE_URL}/avatar/user.png",
                 isVerified: true,
               },
               rating: rating.rating,
@@ -85,7 +86,7 @@ const OwnerProfile = () => {
             id: 1,
             user: {
               name: "John Doe",
-              avatar: "http://localhost:3001/avatar/user.png",
+              avatar: "${API_BASE_URL}/avatar/user.png",
               isVerified: true
             },
             rating: 5,
@@ -99,7 +100,7 @@ const OwnerProfile = () => {
             id: 2,
             user: {
               name: "Alice Smith",
-              avatar: "http://localhost:3001/avatar/user.png",
+              avatar: "${API_BASE_URL}/avatar/user.png",
               isVerified: true
             },
             rating: 4.5,
@@ -121,12 +122,12 @@ const OwnerProfile = () => {
   }, [id]);
 
   const averageRating = reviews.length
-  ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
-  : "N/A";
-const totalRentals = ownerCars.reduce((sum, car) => sum + (car.totalRentals || 0), 0);
+    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+    : "N/A";
+  const totalRentals = ownerCars.reduce((sum, car) => sum + (car.totalRentals || 0), 0);
 
-const fiveStarCount = reviews.filter(r => Math.round(r.rating) === 5).length;
-const fiveStarRatio = reviews.length ? ((fiveStarCount / reviews.length) * 100).toFixed(0) + "%" : "N/A";
+  const fiveStarCount = reviews.filter(r => Math.round(r.rating) === 5).length;
+  const fiveStarRatio = reviews.length ? ((fiveStarCount / reviews.length) * 100).toFixed(0) + "%" : "N/A";
 
   const renderStars = (rating) => {
     const stars = [];
@@ -209,9 +210,9 @@ const fiveStarRatio = reviews.length ? ((fiveStarCount / reviews.length) * 100).
           <div className="flex items-start gap-6">
             <div className="relative">
               <img
-                src={owner.avatar 
-                  ? `http://localhost:3001${owner.avatar}` 
-                  : "http://localhost:3001/avatar/user.png"}
+                src={owner.avatar
+                  ? `${API_BASE_URL}${owner.avatar}`
+                  : "${API_BASE_URL}/avatar/user.png"}
                 alt={owner.fullName}
                 className="w-28 h-28 rounded-full object-cover border-4 border-primary"
               />
@@ -223,11 +224,11 @@ const fiveStarRatio = reviews.length ? ((fiveStarCount / reviews.length) * 100).
                 <span className="bg-primary bg-opacity-10 text-primary text-sm px-3 py-1 rounded-full">Car Provider</span>
               </div>
               <p className="text-gray-600 mb-6">
-                Member since {owner.createdAt 
-                  ? new Date(owner.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) 
+                Member since {owner.createdAt
+                  ? new Date(owner.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
                   : 'Unknown date'}
               </p>
-              
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
                   <FaCar className="text-primary text-xl mb-2" />
@@ -264,31 +265,29 @@ const fiveStarRatio = reviews.length ? ((fiveStarCount / reviews.length) * 100).
                   <button
                     onClick={handlePrevCars}
                     disabled={currentCarIndex === 0}
-                    className={`p-2 rounded-full ${
-                      currentCarIndex === 0
+                    className={`p-2 rounded-full ${currentCarIndex === 0
                         ? 'text-gray-300 cursor-not-allowed'
                         : 'text-primary hover:bg-gray-100'
-                    }`}
+                      }`}
                   >
                     <MdChevronLeft size={24} />
                   </button>
                   <button
                     onClick={handleNextCars}
                     disabled={currentCarIndex >= ownerCars.length - 3}
-                    className={`p-2 rounded-full ${
-                      currentCarIndex >= ownerCars.length - 3
+                    className={`p-2 rounded-full ${currentCarIndex >= ownerCars.length - 3
                         ? 'text-gray-300 cursor-not-allowed'
                         : 'text-primary hover:bg-gray-100'
-                    }`}
+                      }`}
                   >
                     <MdChevronRight size={24} />
                   </button>
                 </div>
               )}
             </div>
-            
+
             <div className="relative overflow-hidden">
-              <div 
+              <div
                 className="flex transition-transform duration-300 ease-in-out"
                 style={{ transform: `translateX(-${currentCarIndex * (100 / 3)}%)` }}
               >

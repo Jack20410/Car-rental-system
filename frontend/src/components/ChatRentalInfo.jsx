@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatCurrency } from '../utils/formatCurrency';
+import { API_BASE_URL } from '../utils/api';
 
 const ChatRentalInfo = ({ userId, recipientId, isProvider }) => {
   const [rental, setRental] = useState(null);
@@ -10,16 +11,16 @@ const ChatRentalInfo = ({ userId, recipientId, isProvider }) => {
   useEffect(() => {
     const fetchActiveRental = async () => {
       if (!userId || !recipientId) return;
-      
+
       try {
         setLoading(true);
         const auth = JSON.parse(localStorage.getItem('auth'));
         const token = auth?.token;
-        
+
         if (!token) throw new Error('No authentication token found');
 
         // Fetch all rentals
-        const rentalsResponse = await fetch(`http://localhost:3000/rentals/all`, {
+        const rentalsResponse = await fetch(`${API_BASE_URL}/rentals/all`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -32,10 +33,10 @@ const ChatRentalInfo = ({ userId, recipientId, isProvider }) => {
 
         const rentalsData = await rentalsResponse.json();
         const allRentals = rentalsData.data?.rentals || [];
-        
+
         // Find active rentals between these two users
         let activeRentals = [];
-        
+
         // For provider: look for rentals where userId is the customer and vehicle belongs to provider
         // For customer: look for rentals where userId is customer and provider owns the vehicle
         for (const r of allRentals) {
@@ -44,22 +45,22 @@ const ChatRentalInfo = ({ userId, recipientId, isProvider }) => {
             // if (['cancelled', 'rejected', 'completed'].includes(r.status)) {
             //   continue;
             // }
-            
+
             // Get vehicle details to check provider
-            const vehicleResponse = await fetch(`http://localhost:3000/vehicles/${r.vehicleId}`, {
+            const vehicleResponse = await fetch(`${API_BASE_URL}/vehicles/${r.vehicleId}`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
               }
             });
-            
+
             if (!vehicleResponse.ok) continue;
-            
+
             const vehicleData = await vehicleResponse.json();
             const vehicle = vehicleData.data;
-            
+
             const vehicleProviderId = vehicle?.car_providerId?._id || vehicle?.car_providerId;
-            
+
             // Match the rental to our chat participants
             if (isProvider) {
               // Provider view: customer + provider's vehicle
@@ -76,10 +77,10 @@ const ChatRentalInfo = ({ userId, recipientId, isProvider }) => {
             console.error('Error processing rental:', error);
           }
         }
-        
+
         // Sort by startDate descending (newest first)
         activeRentals.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
-        
+
         // Get the most recent active rental
         if (activeRentals.length > 0) {
           setRental(activeRentals[0]);
@@ -121,11 +122,11 @@ const ChatRentalInfo = ({ userId, recipientId, isProvider }) => {
           {rental.status.charAt(0).toUpperCase() + rental.status.slice(1)}
         </span>
       </div>
-      
+
       <div className="flex items-center">
         {vehicle?.images && vehicle.images.length > 0 ? (
-          <img 
-            src={`http://localhost:3002${vehicle.images[0]}`}
+          <img
+            src={`${API_BASE_URL}${vehicle.images[0]}`}
             alt={vehicle.name}
             className="w-10 h-10 object-cover rounded mr-2"
           />
@@ -136,7 +137,7 @@ const ChatRentalInfo = ({ userId, recipientId, isProvider }) => {
             </svg>
           </div>
         )}
-        
+
         <div className="flex-1">
           <p className="text-sm font-medium">{vehicle?.name || 'Vehicle'}</p>
           <div className="flex justify-between text-xs text-gray-500">

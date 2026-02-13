@@ -8,6 +8,7 @@ import ChatWindow from '../components/ChatWindow';
 import { useRentalWebSocket } from '../context/RentalWebSocketContext';
 import { MdVerified, MdEmail } from 'react-icons/md';
 import { FaPhoneAlt } from 'react-icons/fa';
+import { API_BASE_URL } from '../utils/api';
 
 // Modal Component
 const Modal = ({ isOpen, onClose, children }) => {
@@ -79,12 +80,12 @@ const ManageCars = () => {
   const [rentalCustomers, setRentalCustomers] = useState({});
 
   // Chat context
-  const { 
-    connected, 
-    connectionError, 
-    sendMessage, 
-    currentChat, 
-    setCurrentChat, 
+  const {
+    connected,
+    connectionError,
+    sendMessage,
+    currentChat,
+    setCurrentChat,
     reconnect,
     createChatId,
     loadChatMessages,
@@ -109,7 +110,7 @@ const ManageCars = () => {
   useEffect(() => {
     // Get role from context or session storage
     const isProvider = user?.role === 'car_provider' || providerRole;
-    
+
     if (!isProvider) {
       console.log('Not a car provider, redirecting', { user, providerRole });
       navigate('/');
@@ -118,7 +119,7 @@ const ManageCars = () => {
       fetchCars();
     }
   }, [user, navigate, providerRole]);
-  
+
   // Function to fetch cars
   const fetchCars = async () => {
     try {
@@ -126,20 +127,20 @@ const ManageCars = () => {
       const auth = JSON.parse(localStorage.getItem('auth'));
       const token = auth?.token;
       const userId = auth?.user?._id;
-      
+
       if (!token || !userId) {
         throw new Error('No authentication token or user ID found');
       }
-      
+
       // Fetch from the API gateway with user ID as query parameter
-      const response = await fetch(`http://localhost:3000/vehicles?car_providerId=${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/vehicles?car_providerId=${userId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setCars(data.data?.vehicles || []);
@@ -155,7 +156,7 @@ const ManageCars = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Handle nested location fields
     if (name.startsWith('location.')) {
       const locationField = name.split('.')[1];
@@ -212,11 +213,11 @@ const ManageCars = () => {
     try {
       const imageToDelete = existingImages[indexToDelete];
       const token = JSON.parse(localStorage.getItem('auth'))?.token;
-      
+
       if (!token) throw new Error('No authentication token found');
 
       // Call API to delete the image
-      const response = await fetch(`http://localhost:3000/vehicles/${editingCar._id}/images`, {
+      const response = await fetch(`${API_BASE_URL}/vehicles/${editingCar._id}/images`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -241,7 +242,7 @@ const ManageCars = () => {
     e.preventDefault();
     try {
       const formDataToSend = new FormData();
-      
+
       // Add all non-nested fields
       Object.keys(formData).forEach(key => {
         if (key === 'images') {
@@ -265,33 +266,33 @@ const ManageCars = () => {
           formDataToSend.append(key, formData[key]);
         }
       });
-      
+
       const token = JSON.parse(localStorage.getItem('auth'))?.token;
-      
+
       if (!token) {
         throw new Error('No authentication token found');
       }
 
       let response;
-    if (editingCar) {
-      // Nếu đang edit, gọi PATCH
-      response = await fetch(`http://localhost:3000/vehicles/${editingCar._id}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formDataToSend
-      });
-    } else {
-      // Nếu tạo mới, gọi POST
-      response = await fetch('http://localhost:3000/vehicles', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formDataToSend
-      });
-    }
+      if (editingCar) {
+        // Nếu đang edit, gọi PATCH
+        response = await fetch(`${API_BASE_URL}/vehicles/${editingCar._id}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formDataToSend
+        });
+      } else {
+        // Nếu tạo mới, gọi POST
+        response = await fetch('${API_BASE_URL}/vehicles', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formDataToSend
+        });
+      }
 
       if (response.ok) {
         const result = await response.json();
@@ -332,14 +333,14 @@ const ManageCars = () => {
     try {
       const token = JSON.parse(localStorage.getItem('auth'))?.token;
       if (!token) throw new Error('No authentication token found');
-  
-      const response = await fetch(`http://localhost:3000/vehicles/${carId}`, {
+
+      const response = await fetch(`${API_BASE_URL}/vehicles/${carId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-  
+
       if (response.ok) {
         setCars(prev => prev.filter(car => car._id !== carId));
       } else {
@@ -356,8 +357,8 @@ const ManageCars = () => {
     try {
       const token = JSON.parse(localStorage.getItem('auth'))?.token;
       if (!token) throw new Error('No authentication token found');
-  
-      const response = await fetch(`http://localhost:3000/vehicles/${car._id}/status`, {
+
+      const response = await fetch(`${API_BASE_URL}/vehicles/${car._id}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -365,7 +366,7 @@ const ManageCars = () => {
         },
         body: JSON.stringify({ status: newStatus })
       });
-  
+
       if (response.ok) {
         fetchCars(); // Refresh list
       } else {
@@ -380,20 +381,20 @@ const ManageCars = () => {
   // Handle customer selection for chat - defined as regular function
   const handleCustomerSelect = (customer) => {
     if (!customer || !user?._id) return;
-    
+
     setSelectedCustomer(customer);
-    
+
     try {
       const chatId = createChatId(user._id, customer._id);
       console.log(`Setting up chat with ${customer.fullName}, chatId: ${chatId}`);
-      
+
       setCurrentChat({
         id: chatId,
         recipient: customer
       });
-      
+
       loadChatMessages(chatId);
-      
+
       setTimeout(() => {
         markMessagesAsRead(chatId);
       }, 300);
@@ -418,7 +419,7 @@ const ManageCars = () => {
       }
 
       // Get all rentals and extract customer info
-      const rentalsResponse = await fetch(`http://localhost:3000/rentals/all`, {
+      const rentalsResponse = await fetch(`${API_BASE_URL}/rentals/all`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -432,56 +433,56 @@ const ManageCars = () => {
       const rentalsData = await rentalsResponse.json();
       // The rentals are in data.rentals, not directly in data
       const rentals = rentalsData.data?.rentals || [];
-      
+
       // console.log("Fetched rentals:", rentals);
-      
+
       // Create a map to store unique customers
       const customersMap = new Map();
-      
+
       // Process each rental to find those related to this provider
       for (let i = 0; i < rentals.length; i++) {
         const rental = rentals[i];
         if (rental.vehicleId) {
           try {
             // console.log(`Processing rental ${i+1}/${rentals.length} with vehicleId: ${rental.vehicleId}`);
-            
+
             // Get vehicle details to check if it belongs to this provider
-            const vehicleResponse = await fetch(`http://localhost:3000/vehicles/${rental.vehicleId}`, {
+            const vehicleResponse = await fetch(`${API_BASE_URL}/vehicles/${rental.vehicleId}`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
               }
             });
-            
+
             if (vehicleResponse.ok) {
               const vehicleData = await vehicleResponse.json();
               const vehicle = vehicleData.data;
-              
+
               // Get the provider ID from the vehicle
               const vehicleProviderId = vehicle?.car_providerId?._id || vehicle?.car_providerId;
-              
+
               console.log(`Vehicle ${rental.vehicleId} belongs to provider:`, vehicleProviderId);
               console.log(`Comparing with current provider:`, providerId);
-              
+
               // Check if this vehicle belongs to the current provider
               if (vehicle && vehicleProviderId === providerId) {
                 console.log(`Match found! Adding customer ${rental.userId} to the list`);
-                
+
                 // Add customer to map if not already added
                 if (rental.userId && !customersMap.has(rental.userId)) {
                   // Try to get user details if available
                   try {
-                    const userResponse = await fetch(`http://localhost:3000/users/${rental.userId}`, {
+                    const userResponse = await fetch(`${API_BASE_URL}/users/${rental.userId}`, {
                       headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                       }
                     });
-                    
+
                     if (userResponse.ok) {
                       const userData = await userResponse.json();
                       const user = userData.data;
-                      
+
                       customersMap.set(rental.userId, {
                         _id: rental.userId,
                         fullName: user?.fullName || rental.customer?.fullName || 'Unknown Customer',
@@ -513,20 +514,20 @@ const ManageCars = () => {
           }
         }
       }
-      
+
       // Convert map to array for state
       const customersList = Array.from(customersMap.values());
       console.log("Extracted customers:", customersList);
       setCustomers(customersList);
-      
+
       // Check if we should auto-select a customer with unread messages
       if (customersList.length > 0) {
         // Get unread messages status
         const unreadMessages = JSON.parse(localStorage.getItem('unread_messages') || '{}');
-        
+
         // Find a customer with unread messages
         let customerWithUnread = null;
-        
+
         // Look through unread message chats to find a customer
         for (const chatId in unreadMessages) {
           if (unreadMessages[chatId] > 0) {
@@ -534,7 +535,7 @@ const ManageCars = () => {
             const ids = chatId.split('_');
             // Find which ID is the customer (not the current user/provider)
             const customerId = ids.find(id => id !== providerId);
-            
+
             if (customerId) {
               // Find this customer in our list
               customerWithUnread = customersList.find(c => c._id === customerId);
@@ -542,7 +543,7 @@ const ManageCars = () => {
             }
           }
         }
-        
+
         // Auto-select the first customer with unread messages or the first customer
         // Only select if no customer is currently selected (to avoid overriding user selection)
         if (!selectedCustomer) {
@@ -577,7 +578,7 @@ const ManageCars = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://localhost:3000/rentals/provider', {
+      const response = await fetch('${API_BASE_URL}/rentals/provider', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -599,7 +600,7 @@ const ManageCars = () => {
       for (const rental of rentalsData) {
         try {
           // Fetch vehicle details
-          const vehicleResponse = await fetch(`http://localhost:3000/vehicles/${rental.vehicleId}`, {
+          const vehicleResponse = await fetch(`${API_BASE_URL}/vehicles/${rental.vehicleId}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -611,7 +612,7 @@ const ManageCars = () => {
           }
 
           // Fetch customer details
-          const customerResponse = await fetch(`http://localhost:3000/users/${rental.userId}`, {
+          const customerResponse = await fetch(`${API_BASE_URL}/users/${rental.userId}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -649,7 +650,7 @@ const ManageCars = () => {
     const handleRentalUpdate = (event) => {
       const update = event.detail;
       console.log('Received rental update in ManageCars:', update);
-      
+
       // Nếu có cập nhật về rental, fetch lại danh sách
       if (update.type === 'RENTAL_UPDATE') {
         fetchRentals();
@@ -667,7 +668,7 @@ const ManageCars = () => {
       const auth = JSON.parse(localStorage.getItem('auth'));
       const token = auth?.token;
 
-      const response = await fetch(`http://localhost:3000/rentals/${rentalId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/rentals/${rentalId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -700,7 +701,7 @@ const ManageCars = () => {
   // Add this function near handleRentalStatusChange
   const handlePaymentStatusChange = async (rentalId) => {
     try {
-      const response = await fetch(`http://localhost:3000/rentals/${rentalId}/payment`, {
+      const response = await fetch(`${API_BASE_URL}/rentals/${rentalId}/payment`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${JSON.parse(localStorage.getItem('auth'))?.token}`,
@@ -746,28 +747,28 @@ const ManageCars = () => {
   const handleNewMessage = useCallback((event) => {
     // Skip if not initialized yet
     if (!user || !currentChat) return;
-    
+
     console.log("Event received in ManageCars:", event);
-    
+
     // Make sure we have the message data from the event
     const message = event.detail;
     if (!message) {
       console.error("Message event received but no detail found:", event);
       return;
     }
-    
+
     // Create a unique message identifier
     const messageId = `${message.senderId}_${message.timestamp}_${message.text}`;
-    
+
     // Skip if we've already processed this message
     if (processedMessageIds.current.has(messageId)) {
       console.log("Skipping already processed message:", messageId);
       return;
     }
-    
+
     console.log("New message received in ManageCars:", message);
     processedMessageIds.current.add(messageId);
-    
+
     // Only add message to this chat if it belongs to the current conversation
     if (currentChat && message.chatId === currentChat.id) {
       // Update UI as needed - ChatWindow component handles this now
@@ -784,13 +785,13 @@ const ManageCars = () => {
   useEffect(() => {
     // Skip if component not fully initialized
     if (!user) return;
-    
+
     const messageHandler = (event) => {
       handleNewMessage(event);
     };
-    
+
     window.addEventListener('chat-message', messageHandler);
-    
+
     return () => {
       window.removeEventListener('chat-message', messageHandler);
     };
@@ -800,7 +801,7 @@ const ManageCars = () => {
   useEffect(() => {
     // Only try to scroll if we have a current chat
     if (!currentChat) return;
-    
+
     // Use RequestAnimationFrame to ensure DOM is ready
     const scrollTimeout = requestAnimationFrame(() => {
       if (messagesEndRef.current) {
@@ -812,7 +813,7 @@ const ManageCars = () => {
         }
       }
     });
-    
+
     return () => cancelAnimationFrame(scrollTimeout);
   }, [currentChat]); // Only depend on currentChat, not on chatMessages which could cause extra renders
 
@@ -835,31 +836,28 @@ const ManageCars = () => {
             <nav className="-mb-px flex space-x-8" aria-label="Tabs">
               <button
                 onClick={() => setActiveTab('manage-cars')}
-                className={`${
-                  activeTab === 'manage-cars'
+                className={`${activeTab === 'manage-cars'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
               >
                 Manage My Cars
               </button>
               <button
                 onClick={() => setActiveTab('rental-management')}
-                className={`${
-                  activeTab === 'rental-management'
+                className={`${activeTab === 'rental-management'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
               >
                 Car Rental Management
               </button>
               <button
                 onClick={() => setActiveTab('messages')}
-                className={`${
-                  activeTab === 'messages'
+                className={`${activeTab === 'messages'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
+                  } whitespace-nowrap py-4 px-1 border-b-2 font-medium`}
               >
                 Messages
               </button>
@@ -1115,8 +1113,8 @@ const ManageCars = () => {
                               onChange={handleFeaturesChange}
                               className="mr-2"
                             />
-                            <img 
-                              src={feature.icon} 
+                            <img
+                              src={feature.icon}
                               alt={feature.name}
                               className="w-5 h-5 object-contain"
                             />
@@ -1151,7 +1149,7 @@ const ManageCars = () => {
                           {existingImages.map((img, idx) => (
                             <div key={idx} className="relative group">
                               <img
-                                src={`http://localhost:3002${img}`}
+                                src={`${API_BASE_URL}${img}`}
                                 alt={`Car image ${idx + 1}`}
                                 className="w-24 h-16 object-cover border rounded"
                               />
@@ -1249,11 +1247,10 @@ const ManageCars = () => {
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                       disabled={currentPage === 1}
-                      className={`px-3 py-1 rounded ${
-                        currentPage === 1
+                      className={`px-3 py-1 rounded ${currentPage === 1
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           : 'bg-primary text-white hover:bg-secondary'
-                      }`}
+                        }`}
                     >
                       Previous
                     </button>
@@ -1263,11 +1260,10 @@ const ManageCars = () => {
                     <button
                       onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(cars.length / carsPerPage)))}
                       disabled={currentPage >= Math.ceil(cars.length / carsPerPage)}
-                      className={`px-3 py-1 rounded ${
-                        currentPage >= Math.ceil(cars.length / carsPerPage)
+                      className={`px-3 py-1 rounded ${currentPage >= Math.ceil(cars.length / carsPerPage)
                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           : 'bg-primary text-white hover:bg-secondary'
-                      }`}
+                        }`}
                     >
                       Next
                     </button>
@@ -1283,71 +1279,70 @@ const ManageCars = () => {
                   {cars
                     .slice((currentPage - 1) * carsPerPage, currentPage * carsPerPage)
                     .map(car => (
-                    <div key={car._id} className="border rounded-lg overflow-hidden bg-white shadow">
-                      <div className="h-48 overflow-hidden">
-                        {car.images && car.images.length > 0 ? (
-                          <img
-                            src={`http://localhost:3002${car.images[0]}`}
-                            alt={`${car.brand} ${car.name}`}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                            <span className="text-gray-500">No image</span>
+                      <div key={car._id} className="border rounded-lg overflow-hidden bg-white shadow">
+                        <div className="h-48 overflow-hidden">
+                          {car.images && car.images.length > 0 ? (
+                            <img
+                              src={`${API_BASE_URL}${car.images[0]}`}
+                              alt={`${car.brand} ${car.name}`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                              <span className="text-gray-500">No image</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <h3 className="text-lg font-semibold text-gray-900">{car.name}</h3>
+                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${car.status === 'Available' ? 'bg-blue-100 text-blue-800' :
+                                car.status === 'Unavailable' ? 'bg-red-100 text-red-800' :
+                                  car.status === 'Rented' ? 'bg-purple-100 text-purple-800' :
+                                    'bg-gray-100 text-gray-800'
+                              }`}>
+                              {car.status}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                      <div className="p-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <h3 className="text-lg font-semibold text-gray-900">{car.name}</h3>
-                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                            car.status === 'Available' ? 'bg-blue-100 text-blue-800' :
-                            car.status === 'Unavailable' ? 'bg-red-100 text-red-800' :
-                            car.status === 'Rented' ? 'bg-purple-100 text-purple-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {car.status}
-                          </span>
-                        </div>
-                        <p className="text-gray-600 mb-2">{car.brand} • {car.modelYear}</p>
-                        <p className="text-gray-700 font-semibold mb-2">{formatCurrency(car.rentalPricePerDay)} per day</p>
-                        <p className="text-gray-600 text-sm mb-3">{car.licensePlate}</p>
-                        <div className="flex justify-end space-x-2">
-                          <button
-                            className="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300"
-                            onClick={() => {
-                              setEditingCar(car);
-                              setShowForm(true);
-                              setExistingImages(car.images || []);
-                              setFormData({
-                                ...car,
-                                location: car.location || { city: '', address: '' },
-                                features: car.features || [],
-                                images: []
-                              });
-                            }}
-                          >
-                            Edit
-                          </button>
-                          <select
-                            className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded hover:bg-yellow-200"
-                            value={car.status}
-                            onChange={e => handleChangeStatus(car, e.target.value)}
-                            disabled={car.status === 'Rented'}
-                          >
-                            <option value="Available">Available</option>
-                            <option value="Unavailable">Unavailable</option>
-                          </select>
-                          <button
-                            className="bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200"
-                            onClick={() => handleDeleteCar(car._id)}
-                          >
-                            Delete
-                          </button>
+                          <p className="text-gray-600 mb-2">{car.brand} • {car.modelYear}</p>
+                          <p className="text-gray-700 font-semibold mb-2">{formatCurrency(car.rentalPricePerDay)} per day</p>
+                          <p className="text-gray-600 text-sm mb-3">{car.licensePlate}</p>
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              className="bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300"
+                              onClick={() => {
+                                setEditingCar(car);
+                                setShowForm(true);
+                                setExistingImages(car.images || []);
+                                setFormData({
+                                  ...car,
+                                  location: car.location || { city: '', address: '' },
+                                  features: car.features || [],
+                                  images: []
+                                });
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <select
+                              className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded hover:bg-yellow-200"
+                              value={car.status}
+                              onChange={e => handleChangeStatus(car, e.target.value)}
+                              disabled={car.status === 'Rented'}
+                            >
+                              <option value="Available">Available</option>
+                              <option value="Unavailable">Unavailable</option>
+                            </select>
+                            <button
+                              className="bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200"
+                              onClick={() => handleDeleteCar(car._id)}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </div>
@@ -1360,7 +1355,7 @@ const ManageCars = () => {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900">Rental Requests</h2>
               <div className="flex space-x-2">
-                <select 
+                <select
                   className="bg-white border border-gray-300 rounded-md px-3 py-2 text-sm"
                   value={rentalStatusFilter}
                   onChange={(e) => setRentalStatusFilter(e.target.value)}
@@ -1399,7 +1394,7 @@ const ManageCars = () => {
                           <div className="w-48 h-32 rounded-lg overflow-hidden">
                             {vehicle?.images?.[0] ? (
                               <img
-                                src={`http://localhost:3002${vehicle.images[0]}`}
+                                src={`${API_BASE_URL}${vehicle.images[0]}`}
                                 alt={vehicle.name}
                                 className="w-full h-full object-cover"
                               />
@@ -1421,7 +1416,7 @@ const ManageCars = () => {
                                   <span className="text-gray-400">|</span>
                                   <div className="flex items-center gap-2 text-gray-600">
                                     <img
-                                      src="http://localhost:3001/uploads/avatars/user.png"
+                                      src="${API_BASE_URL}/uploads/avatars/user.png"
                                       alt={customer?.fullName || 'Customer'}
                                       className="w-5 h-5 rounded-full object-cover"
                                     />
@@ -1430,15 +1425,14 @@ const ManageCars = () => {
                                 </div>
                               </div>
                               <div className="flex flex-col items-end">
-                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                  rental.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                  rental.status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                                  rental.status === 'started' ? 'bg-green-100 text-green-800' :
-                                  rental.status === 'completed' ? 'bg-gray-100 text-gray-800' :
-                                  rental.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                  rental.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}>
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${rental.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                    rental.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                                      rental.status === 'started' ? 'bg-green-100 text-green-800' :
+                                        rental.status === 'completed' ? 'bg-gray-100 text-gray-800' :
+                                          rental.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                            rental.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                              'bg-gray-100 text-gray-800'
+                                  }`}>
                                   {rental.status.charAt(0).toUpperCase() + rental.status.slice(1)}
                                 </span>
                               </div>
@@ -1465,15 +1459,14 @@ const ManageCars = () => {
                                   {rental.statusHistory?.map((history, index) => (
                                     <div key={index} className="flex items-center space-x-2">
                                       <div className="h-2 w-2 rounded-full bg-primary"></div>
-                                      <span className={`text-xs font-semibold rounded-full px-2 py-1 ${
-                                        history.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                        history.status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                                        history.status === 'started' ? 'bg-green-100 text-green-800' :
-                                        history.status === 'completed' ? 'bg-gray-100 text-gray-800' :
-                                        history.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                        history.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                        'bg-gray-100 text-gray-800'
-                                      }`}>
+                                      <span className={`text-xs font-semibold rounded-full px-2 py-1 ${history.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                          history.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                                            history.status === 'started' ? 'bg-green-100 text-green-800' :
+                                              history.status === 'completed' ? 'bg-gray-100 text-gray-800' :
+                                                history.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                                  history.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                                    'bg-gray-100 text-gray-800'
+                                        }`}>
                                         {history.status.charAt(0).toUpperCase() + history.status.slice(1)}
                                       </span>
                                       <span className="text-xs text-gray-500">
@@ -1491,9 +1484,8 @@ const ManageCars = () => {
                                   {rental.paymentHistory?.map((history, index) => (
                                     <div key={index} className="flex items-center space-x-2">
                                       <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                                      <span className={`text-xs font-semibold rounded-full px-2 py-1 ${
-                                        history.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                      }`}>
+                                      <span className={`text-xs font-semibold rounded-full px-2 py-1 ${history.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                        }`}>
                                         {history.status.charAt(0).toUpperCase() + history.status.slice(1)}
                                       </span>
                                       <span className="text-xs text-gray-500">
@@ -1514,14 +1506,13 @@ const ManageCars = () => {
                             <div className="mt-4 flex justify-between items-center">
                               <div className="text-lg font-semibold text-primary">
                                 {formatCurrency(rental.totalPrice)}
-                                <span className={`ml-4 px-2 py-1 text-xs font-semibold rounded-full ${
-                                  rental.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
-                                  'bg-red-100 text-red-800'
-                                }`}>
+                                <span className={`ml-4 px-2 py-1 text-xs font-semibold rounded-full ${rental.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
+                                    'bg-red-100 text-red-800'
+                                  }`}>
                                   {rental.paymentStatus.charAt(0).toUpperCase() + rental.paymentStatus.slice(1)}
                                 </span>
                               </div>
-                              
+
                               {/* Status Actions */}
                               <div className="flex gap-2">
                                 {rental.status === 'pending' && (
@@ -1596,7 +1587,7 @@ const ManageCars = () => {
                 </div>
               </div>
             )}
-            
+
             <div className="grid grid-cols-4 h-[655px]">
               {/* Customers list */}
               <div className="col-span-1 border-r border-gray-200 overflow-y-auto">
@@ -1612,22 +1603,21 @@ const ManageCars = () => {
                         // Check if this customer has unread messages
                         const chatId = createChatId(user._id, customer._id);
                         const hasUnread = unreadMessages[chatId] && unreadMessages[chatId] > 0;
-                        
+
                         return (
                           <button
                             key={customer._id}
                             onClick={() => handleCustomerSelect(customer)}
-                            className={`w-full p-3 rounded-lg text-left transition-colors relative ${
-                              selectedCustomer?._id === customer._id
+                            className={`w-full p-3 rounded-lg text-left transition-colors relative ${selectedCustomer?._id === customer._id
                                 ? 'bg-blue-50 text-blue-700'
                                 : hasUnread
                                   ? 'bg-yellow-50 hover:bg-yellow-100'
                                   : 'hover:bg-gray-50'
-                            }`}
+                              }`}
                           >
                             <div className="font-medium">{customer.fullName || 'Unknown User'}</div>
                             <div className="text-sm text-gray-500">{customer.email || 'No email available'}</div>
-                            
+
                             {/* Unread indicator */}
                             {hasUnread && (
                               <span className="absolute top-3 right-3 h-3 w-3 bg-red-500 rounded-full animate-pulse"></span>
@@ -1644,11 +1634,11 @@ const ManageCars = () => {
               <div className="col-span-3 p-4">
                 {currentChat && selectedCustomer ? (
                   <div className="h-full chat-wrapper">
-                    <ChatWindow 
+                    <ChatWindow
                       key={currentChat.id}
-                      chatId={currentChat.id} 
+                      chatId={currentChat.id}
                       recipient={selectedCustomer}
-                      isProvider={true} 
+                      isProvider={true}
                     />
                   </div>
                 ) : (

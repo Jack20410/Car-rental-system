@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { endpoints } from '../utils/api';
 
-const DEFAULT_AVATAR = 'http://localhost:3001/uploads/avatars/user.png';
+const DEFAULT_AVATAR = `${API_BASE_URL}/uploads/avatars/user.png`;
 
 const getAvatarUrl = (avatar) =>
   avatar?.startsWith('/uploads/')
@@ -56,7 +56,7 @@ const Profile = () => {
         setPreviewAvatar(reader.result);
       };
       reader.readAsDataURL(file);
-      
+
       setFormData({
         ...formData,
         avatarFile: file
@@ -71,12 +71,12 @@ const Profile = () => {
 
     try {
       console.log('Starting profile update with data:', formData);
-      
+
       const submitData = new FormData();
       submitData.append('name', formData.name);
       submitData.append('email', formData.email);
       submitData.append('phoneNumber', formData.phoneNumber);
-      
+
       if (formData.avatarFile) {
         submitData.append('avatar', formData.avatarFile);
         console.log('Adding avatar file to update');
@@ -88,9 +88,9 @@ const Profile = () => {
           'Content-Type': 'multipart/form-data'
         }
       });
-      
+
       console.log('Profile update response:', response.data);
-      
+
       // Update local user state with new data
       if (response.data.success) {
         const updatedUser = response.data.data;
@@ -100,7 +100,7 @@ const Profile = () => {
           auth.user = updatedUser;
           localStorage.setItem('auth', JSON.stringify(auth));
         }
-        
+
         setFormData({
           name: updatedUser.name || '',
           email: updatedUser.email || '',
@@ -109,18 +109,18 @@ const Profile = () => {
         });
 
         getAuthState();
-        
+
         setMessage({ type: 'success', text: 'Profile updated successfully!' });
         setIsEditing(false);
       } else {
         throw new Error(response.data.message || 'Failed to update profile');
       }
-      
+
     } catch (error) {
       console.error('Profile update error:', error.response?.data || error);
-      setMessage({ 
-        type: 'error', 
-        text: error.response?.data?.message || 'Failed to update profile' 
+      setMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'Failed to update profile'
       });
     } finally {
       setLoading(false);
@@ -155,29 +155,29 @@ const Profile = () => {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="flex flex-col items-center mb-6">
                   <div className="relative">
-                    <img 
-                      src={getAvatarUrl(previewAvatar)} 
-                      alt="Profile Avatar" 
+                    <img
+                      src={getAvatarUrl(previewAvatar)}
+                      alt="Profile Avatar"
                       className="h-24 w-24 rounded-full object-cover border-2 border-gray-200"
                       onError={(e) => {
                         e.target.onerror = null;
                         e.target.src = DEFAULT_AVATAR;
                       }}
                     />
-                    <label 
-                      htmlFor="avatar-upload" 
+                    <label
+                      htmlFor="avatar-upload"
                       className="absolute bottom-0 right-0 bg-primary text-white p-1 rounded-full cursor-pointer hover:bg-secondary"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                       </svg>
                     </label>
-                    <input 
-                      id="avatar-upload" 
-                      name="avatar" 
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
+                    <input
+                      id="avatar-upload"
+                      name="avatar"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
                       onChange={handleAvatarChange}
                     />
                   </div>
@@ -242,9 +242,9 @@ const Profile = () => {
           ) : (
             <div className="border-t border-gray-200">
               <div className="flex justify-center py-5">
-                <img 
-                  src={getAvatarUrl(user.avatar)} 
-                  alt="Profile Avatar" 
+                <img
+                  src={getAvatarUrl(user.avatar)}
+                  alt="Profile Avatar"
                   className="h-32 w-32 rounded-full object-cover border-2 border-gray-200"
                   onError={(e) => {
                     e.target.onerror = null;

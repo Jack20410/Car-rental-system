@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import CarCard from '../components/CarCard';
 import SearchBar from '../components/SearchBar';
+import { API_BASE_URL } from '../utils/api';
 import { formatCurrency } from '../utils/formatCurrency';
 
 const Cars = () => {
@@ -45,9 +46,9 @@ const Cars = () => {
         }
 
         // Nếu không có search params, hoặc không có kết quả search, fetch tất cả xe
-        const url = city 
-          ? `http://localhost:3000/vehicles?city=${encodeURIComponent(city)}&limit=100`
-          : 'http://localhost:3000/vehicles?limit=100';
+        const url = city
+          ? `${API_BASE_URL}/vehicles?city=${encodeURIComponent(city)}&limit=100`
+          : `${API_BASE_URL}/vehicles?limit=100`;
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error('Failed to fetch cars');
@@ -56,8 +57,8 @@ const Cars = () => {
         if (!result.success) {
           throw new Error(result.message || 'Error fetching cars');
         }
-        const vehicles = Array.isArray(result.data?.vehicles) 
-          ? result.data.vehicles 
+        const vehicles = Array.isArray(result.data?.vehicles)
+          ? result.data.vehicles
           : result.data || [];
         if (vehicles.length === 0) {
           setError(city ? `No cars available in ${city}` : 'No cars available');
@@ -233,11 +234,11 @@ const Cars = () => {
                 </span>
               )}
             </span>
-            <svg 
-              className={`h-5 w-5 transform transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} 
-              xmlns="http://www.w3.org/2000/svg" 
-              fill="none" 
-              viewBox="0 0 24 24" 
+            <svg
+              className={`h-5 w-5 transform transition-transform ${isFilterOpen ? 'rotate-180' : ''}`}
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
               stroke="currentColor"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -267,7 +268,7 @@ const Cars = () => {
                   </button>
                 )}
               </div>
-              
+
               {/* Filter groups */}
               <div className="space-y-5">
                 {/* Price Range Filter */}
@@ -345,8 +346,8 @@ const Cars = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Seats</label>
                   <div className="grid grid-cols-4 gap-2">
                     {['2', '4', '5', '7+'].map((seats) => (
-                      <label 
-                        key={seats} 
+                      <label
+                        key={seats}
                         className={`flex items-center justify-center px-3 py-2 rounded-md cursor-pointer border text-center ${filters.seats === seats.replace('+', '') ? 'border-primary bg-blue-50 text-primary' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
                       >
                         <input
@@ -383,8 +384,8 @@ const Cars = () => {
                       'Bluetooth',
                       'Sunroof'
                     ].map((feature) => (
-                      <label 
-                        key={feature} 
+                      <label
+                        key={feature}
                         className={`flex items-center px-3 py-2 rounded-md cursor-pointer border ${filters.features.includes(feature) ? 'border-primary bg-blue-50 text-primary' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
                       >
                         <input
@@ -399,7 +400,7 @@ const Cars = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Apply Filters Button - Mobile Only */}
               <button
                 onClick={() => setIsFilterOpen(false)}

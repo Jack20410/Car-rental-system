@@ -10,7 +10,7 @@ import { formatCurrency } from '../utils/formatCurrency';
 import L from 'leaflet';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
-import api from '../utils/api';
+import api, { API_BASE_URL } from '../utils/api';
 
 const CarDetails = () => {
   const { id } = useParams();
@@ -44,7 +44,7 @@ const CarDetails = () => {
 
     const fetchRatings = async () => {
       try {
-        const res = await fetch(`http://localhost:3000/ratings/${id}`);
+        const res = await fetch(`${API_BASE_URL}/ratings/${id}`);
         if (!res.ok) throw new Error('Failed to fetch ratings');
         const data = await res.json();
         setReviews(
@@ -52,7 +52,7 @@ const CarDetails = () => {
             id: rating.id || rating._id,
             user: {
               name: rating.userName || "Anonymous", // Now this will be present
-              avatar: rating.userAvatar || "http://localhost:3001/avatar/user.png",
+              avatar: rating.userAvatar || "${API_BASE_URL}/avatar/user.png",
               isVerified: true,
             },
             rating: rating.rating,
@@ -74,7 +74,7 @@ const CarDetails = () => {
       try {
         setLoading(true);
         // Fetch car details
-        const carResponse = await fetch(`http://localhost:3000/vehicles/${id}`);
+        const carResponse = await fetch(`${API_BASE_URL}/vehicles/${id}`);
         if (!carResponse.ok) {
           throw new Error('Failed to fetch car details');
         }
@@ -85,16 +85,16 @@ const CarDetails = () => {
         if (data && data.car_providerId) {
           try {
             // Get the provider ID (handle both object and string cases)
-            const providerId = typeof data.car_providerId === 'object' 
-              ? data.car_providerId._id 
+            const providerId = typeof data.car_providerId === 'object'
+              ? data.car_providerId._id
               : data.car_providerId;
 
             // Fetch provider details
-            const providerResponse = await fetch(`http://localhost:3000/users/${providerId}`);
+            const providerResponse = await fetch(`${API_BASE_URL}/users/${providerId}`);
             if (providerResponse.ok) {
               const providerData = await providerResponse.json();
               setProvider(providerData.data);
-              
+
               // Update car data with provider info
               data.car_providerId = providerData.data;
             } else {
@@ -109,7 +109,7 @@ const CarDetails = () => {
           console.warn('No car_providerId found in vehicle data');
           setProvider(null);
         }
-        
+
         setCar(data);
       } catch (err) {
         console.error('Error:', err);
@@ -124,7 +124,7 @@ const CarDetails = () => {
 
   // Initialize WebSocket connection
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:3003');
+    const ws = new WebSocket('wss://car-rental-api-gateway.onrender.com');
 
     ws.onopen = () => {
       console.log('WebSocket Connected');
@@ -172,18 +172,18 @@ const CarDetails = () => {
       data: {
         vehicleId: id,
         rentalType,
-        ...(rentalType === 'hourly' 
+        ...(rentalType === 'hourly'
           ? {
-              startDate: pickupDate,
-              pickupTime,
-              hourlyDuration
-            }
+            startDate: pickupDate,
+            pickupTime,
+            hourlyDuration
+          }
           : {
-              startDate: pickupDate,
-              endDate: returnDate,
-              pickupTime,
-              returnTime
-            }
+            startDate: pickupDate,
+            endDate: returnDate,
+            pickupTime,
+            returnTime
+          }
         )
       }
     };
@@ -224,7 +224,7 @@ const CarDetails = () => {
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1&countrycodes=vn`
       );
       const data = await response.json();
-      
+
       if (data && data.length > 0) {
         return {
           lat: parseFloat(data[0].lat),
@@ -236,8 +236,8 @@ const CarDetails = () => {
     } catch (error) {
       console.error('Error getting coordinates:', error);
       // Default coordinates for Vietnam (Hanoi)
-      return { 
-        lat: 21.028511, 
+      return {
+        lat: 21.028511,
         lng: 105.804817,
         boundingBox: null
       };
@@ -286,10 +286,10 @@ const CarDetails = () => {
 
       try {
         const locationData = await getCoordinates(car.location.city);
-        
+
         // Create new map instance
         const newMap = L.map(mapRef.current).setView([locationData.lat, locationData.lng], 17);
-        
+
         // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap contributors'
@@ -299,7 +299,7 @@ const CarDetails = () => {
         const marker = L.marker([locationData.lat, locationData.lng])
           .addTo(newMap)
           .bindPopup(car.location.city);
-        
+
         // Open popup by default
         marker.openPopup();
 
@@ -333,7 +333,7 @@ const CarDetails = () => {
 
   const handleBooking = async (e) => {
     e.preventDefault();
-    
+
     if (rentalType === 'hourly') {
       // Validate hourly rental
       if (!pickupDate || !pickupTime) {
@@ -407,7 +407,7 @@ const CarDetails = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:3000/rentals', {
+      const response = await fetch('${API_BASE_URL}/rentals', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -453,14 +453,14 @@ const CarDetails = () => {
         userName: user?.name || "Anonymous", // Add this line
         userAvatar: user?.avatar
           ? (user.avatar.startsWith('http')
-              ? user.avatar
-              : `http://localhost:3001${user.avatar.replace('/uploads', '')}`)
-          : "http://localhost:3001/avatar/user.png", // Add this line
+            ? user.avatar
+            : `${API_BASE_URL}${user.avatar.replace('/uploads', '')}`)
+          : "${API_BASE_URL}/avatar/user.png", // Add this line
         rating: reviewRating,
         comment: reviewComment,
-      };  
+      };
 
-      const res = await fetch('http://localhost:3000/ratings', {
+      const res = await fetch('${API_BASE_URL}/ratings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -480,9 +480,9 @@ const CarDetails = () => {
             name: user?.name || "Anonymous",
             avatar: user?.avatar
               ? (user.avatar.startsWith('http')
-                  ? user.avatar
-                  : `http://localhost:3001${user.avatar.replace('/uploads', '')}`)
-              : "http://localhost:3001/avatar/user.png",
+                ? user.avatar
+                : `${API_BASE_URL}${user.avatar.replace('/uploads', '')}`)
+              : "${API_BASE_URL}/avatar/user.png",
             isVerified: true,
           },
           rating: newReview.rating,
@@ -506,7 +506,7 @@ const CarDetails = () => {
     }
   };
 
-  const DEFAULT_AVATAR = "http://localhost:3001/uploads/avatars/user.png";
+  const DEFAULT_AVATAR = "${API_BASE_URL}/uploads/avatars/user.png";
   function ReviewAvatar({ avatar, name, className }) {
     return avatar ? (
       <img
@@ -579,12 +579,12 @@ const CarDetails = () => {
   return (
     <div className="bg-gray-50 min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+
         {/* Car Images Gallery */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-8">
           <div className="aspect-w-16 aspect-h-9 relative">
             <img
-              src={car.images?.[selectedImage] ? `http://localhost:3002${car.images[selectedImage]}` : "/placeholder-car-image.jpg"}
+              src={car.images?.[selectedImage] ? `${API_BASE_URL}${car.images[selectedImage]}` : "/placeholder-car-image.jpg"}
               alt={`${car.brand} ${car.name}`}
               className="w-full h-[400px] object-cover"
             />
@@ -594,13 +594,12 @@ const CarDetails = () => {
               <button
                 key={index}
                 onClick={() => setSelectedImage(index)}
-                className={`flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden border-2 transition-colors ${
-                  selectedImage === index ? 'border-primary' : 'border-transparent'
-                }`}
+                className={`flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden border-2 transition-colors ${selectedImage === index ? 'border-primary' : 'border-transparent'
+                  }`}
               >
-                <img 
-                  src={`http://localhost:3002${image}`} 
-                  alt={`${car.brand} ${car.name} view ${index + 1}`} 
+                <img
+                  src={`${API_BASE_URL}${image}`}
+                  alt={`${car.brand} ${car.name} view ${index + 1}`}
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     e.target.src = "/placeholder-car-image.jpg";
@@ -671,11 +670,11 @@ const CarDetails = () => {
                     'Bluetooth': '/icons/bluetooth-v2.png',
                     'Sunroof': '/icons/sunroof-v2.png'
                   };
-                  
+
                   return (
                     <div key={featureName} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded">
-                      <img 
-                        src={featureMap[featureName]} 
+                      <img
+                        src={featureMap[featureName]}
                         alt={featureName}
                         className="w-5 h-5 object-contain"
                       />
@@ -694,7 +693,7 @@ const CarDetails = () => {
               </h2>
               <div className="space-y-4">
                 {/* Leaflet Map */}
-                <div 
+                <div
                   ref={mapRef}
                   className="w-full h-64 rounded-lg"
                   style={{ background: '#f1f1f1', position: 'relative', zIndex: 0 }}
@@ -742,10 +741,10 @@ const CarDetails = () => {
                 Car Owner Information
               </h2>
 
-              <div 
+              <div
                 onClick={() => {
-                  const providerId = typeof car.car_providerId === 'object' 
-                    ? car.car_providerId._id 
+                  const providerId = typeof car.car_providerId === 'object'
+                    ? car.car_providerId._id
                     : car.car_providerId;
                   navigate(`/owner-profile/${providerId}`);
                 }}
@@ -755,15 +754,15 @@ const CarDetails = () => {
                 <div className="flex items-start gap-6">
                   <div className="relative">
                     <img
-                      src={provider?.avatar 
-                        ? `http://localhost:3001${provider.avatar}` 
-                        : "http://localhost:3001/uploads/avatars/user.png"}
+                      src={provider?.avatar
+                        ? `${API_BASE_URL}${provider.avatar}`
+                        : "${API_BASE_URL}/uploads/avatars/user.png"}
                       alt={provider?.fullName || 'Car Provider'}
                       className="w-20 h-20 rounded-full object-cover border-2 border-primary"
                     />
                     <MdVerified className="text-primary text-xl absolute -bottom-1 -right-1 bg-white rounded-full" title="Verified Owner" />
                   </div>
-                  
+
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="text-lg font-semibold text-gray-900">{provider?.fullName || 'Car Provider'}</h3>
@@ -796,8 +795,8 @@ const CarDetails = () => {
                     </div>
                     <div>
                       <span className="block font-semibold text-xl text-gray-900">
-                        {reviews.length > 0 
-                          ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1) 
+                        {reviews.length > 0
+                          ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
                           : "N/A"}
                       </span>
                       <span className="text-sm text-gray-600">Average Rating</span>
@@ -816,7 +815,7 @@ const CarDetails = () => {
               </div>
             </div>
 
-            
+
             {/* Reviews and Ratings Section */}
             <div className="bg-white rounded-lg shadow-sm p-6 mt-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -824,18 +823,18 @@ const CarDetails = () => {
                 Reviews and Ratings
               </h2>
 
-                        {/* Dropdown chọn sort */}
-            <div className="flex justify-end mb-4">
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value)}
-                className="border border-gray-300 rounded px-3 py-1 text-sm"
-              >
-                <option value="newest">Newest First</option>
-                <option value="highest">Highest Rating</option>
-                <option value="lowest">Lowest Rating</option>
-              </select>
-            </div>
+              {/* Dropdown chọn sort */}
+              <div className="flex justify-end mb-4">
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value)}
+                  className="border border-gray-300 rounded px-3 py-1 text-sm"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="highest">Highest Rating</option>
+                  <option value="lowest">Lowest Rating</option>
+                </select>
+              </div>
 
               {/* Leave a Review Form */}
               {/* <div className="mb-8">
@@ -1037,11 +1036,10 @@ const CarDetails = () => {
                           key={hours}
                           type="button"
                           onClick={() => setHourlyDuration(hours)}
-                          className={`py-2 px-4 rounded-lg border ${
-                            hourlyDuration === hours
+                          className={`py-2 px-4 rounded-lg border ${hourlyDuration === hours
                               ? 'border-primary bg-primary text-white'
                               : 'border-gray-300 hover:border-primary'
-                          }`}
+                            }`}
                         >
                           {hours} hours
                         </button>
@@ -1085,8 +1083,8 @@ const CarDetails = () => {
                         <span>Base rate ({hourlyDuration} hours)</span>
                         <span>{formatCurrency(car.rentalPricePerDay)} × {
                           hourlyDuration === 6 ? '50%' :
-                          hourlyDuration === 8 ? '65%' :
-                          '75%'
+                            hourlyDuration === 8 ? '65%' :
+                              '75%'
                         }</span>
                       </div>
                     )}

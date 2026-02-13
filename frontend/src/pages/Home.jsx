@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import SearchBar from '../components/SearchBar';
 import CarCard from '../components/CarCard';
 import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../utils/api';
 import '../styles/Home.css';
 
 const Home = () => {
@@ -25,7 +26,7 @@ const Home = () => {
     {
       id: 2,
       name: 'Ha Noi',
-      image: 'https://images.contentstack.io/v3/assets/blt1306150c2c4003bc/bltd403157dcd0ef9a3/660caf8a6c4a3972dfe468d3/00-what-to-see-and-do-in-hanoi-getty-cropped.jpg?auto=webp&width=784',
+      image: 'https://vietnamstory.in/wp-content/uploads/2025/01/The-best-time-to-visit-Ha-Noi-is-during-the-spring-and-autumn.jpg',
       description: 'The capital city with extensive car rental services',
       carCount: 'Loading...'
     },
@@ -60,7 +61,7 @@ const Home = () => {
         const updatedLocations = await Promise.all(
           popularLocations.map(async (location) => {
             try {
-              const response = await fetch(`http://localhost:3000/vehicles?city=${encodeURIComponent(location.name)}`);
+              const response = await fetch(`${API_BASE_URL}/vehicles?city=${encodeURIComponent(location.name)}`);
               if (!response.ok) {
                 throw new Error(`Failed to fetch cars for ${location.name}`);
               }
@@ -93,21 +94,21 @@ const Home = () => {
     const fetchCars = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('http://localhost:3000/vehicles');
+        const response = await fetch(`${API_BASE_URL}/vehicles`);
         if (!response.ok) {
           throw new Error('Failed to fetch cars');
         }
         const result = await response.json();
-        
+
         if (!result.data?.vehicles || !Array.isArray(result.data.vehicles)) {
           throw new Error('Invalid response format: vehicles array not found');
         }
-        
+
         // Filter out invalid vehicles and ensure required fields are present
         const vehicles = result.data.vehicles.filter(vehicle => {
           if (!vehicle || typeof vehicle !== 'object') return false;
           if (!vehicle._id || !vehicle.name) return false;
-          
+
           // Ensure the vehicle has all required fields, use defaults if missing
           vehicle.brand = vehicle.brand || 'Unknown Brand';
           vehicle.name = vehicle.name || 'Unnamed Vehicle';
@@ -117,15 +118,15 @@ const Home = () => {
           if (typeof vehicle.location === 'string') {
             vehicle.location = { city: vehicle.location };
           }
-          
+
           return true;
         });
-        
+
         if (vehicles.length === 0) {
           setError('No vehicles available');
           return;
         }
-        
+
         // Lọc chỉ các xe Available
         const availableVehicles = vehicles.filter(car => car.status === 'Available');
         // Get random cars but ensure they have images
@@ -270,7 +271,7 @@ const Home = () => {
               </svg>
             </button>
           </div>
-          
+
           <div className="absolute inset-y-0 right-2 z-20 flex items-center justify-center">
             <button
               onClick={goToNextSlide}
@@ -282,8 +283,8 @@ const Home = () => {
               </svg>
             </button>
           </div>
-          
-          <div 
+
+          <div
             ref={sliderRef}
             className="flex overflow-x-auto pb-6 space-x-6 snap-x hide-scrollbar overscroll-x-none will-change-transform touch-pan-x px-14"
             role="region"
@@ -317,7 +318,7 @@ const Home = () => {
                 </div>
               </Link>
             ))}
-            
+
             {/* Clone first few items for infinite scroll effect */}
             {popularLocations.slice(0, 2).map((location, index) => (
               <Link
@@ -347,16 +348,15 @@ const Home = () => {
               </Link>
             ))}
           </div>
-          
+
           {/* Slide indicators */}
           <div className="flex justify-center mt-4 space-x-3">
             {popularLocations.map((_, index) => (
               <button
                 key={`indicator-${index}`}
                 onClick={() => goToSlide(index)}
-                className={`h-2.5 rounded-full transition-all duration-300 ${
-                  currentSlide === index ? 'w-8 bg-primary' : 'w-2.5 bg-gray-300 hover:bg-gray-400'
-                }`}
+                className={`h-2.5 rounded-full transition-all duration-300 ${currentSlide === index ? 'w-8 bg-primary' : 'w-2.5 bg-gray-300 hover:bg-gray-400'
+                  }`}
                 aria-label={`Go to slide ${index + 1}`}
               />
             ))}

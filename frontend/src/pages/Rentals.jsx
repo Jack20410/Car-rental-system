@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import api, { endpoints } from '../utils/api';
+import api, { endpoints, API_BASE_URL } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/formatCurrency';
 import { toast } from 'react-toastify';
@@ -23,15 +23,15 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) =
         // Fetch vehicle details first
         const vehicleResponse = await api.get(endpoints.vehicles.details(rental.vehicleId));
         const vehicleData = vehicleResponse.data.data;
-        
+
         // Transform image URLs to use correct port (3002)
         if (vehicleData.images && vehicleData.images.length > 0) {
           vehicleData.images = vehicleData.images.map(image => {
             if (image.startsWith('http')) return image;
-            return `http://localhost:3002${image}`;
+            return `${API_BASE_URL}${image}`;
           });
         }
-        
+
         setVehicle(vehicleData);
 
         // Fetch provider details if we have providerId
@@ -39,7 +39,7 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) =
           try {
             const providerIdRaw = vehicleData.car_providerId;
             const providerId = typeof providerIdRaw === 'object' ? providerIdRaw._id : providerIdRaw;
-            
+
             const providerResponse = await api.get(endpoints.user.details(providerId));
             setProvider(providerResponse.data.data);
           } catch (error) {
@@ -211,9 +211,8 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) =
                 {rental.paymentHistory?.map((history, index) => (
                   <div key={index} className="flex items-center space-x-2">
                     <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                    <span className={`text-xs font-semibold rounded-full px-2 py-1 ${
-                      history.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`text-xs font-semibold rounded-full px-2 py-1 ${history.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
                       {history.status.charAt(0).toUpperCase() + history.status.slice(1)}
                     </span>
                     <span className="text-xs text-gray-500">
@@ -240,10 +239,9 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) =
                   currency: 'VND'
                 }).format(rental.totalPrice)}
               </span>
-              <span className={`ml-4 px-2 py-1 text-xs font-semibold rounded-full ${
-                rental.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
-                'bg-red-100 text-red-800'
-              }`}>
+              <span className={`ml-4 px-2 py-1 text-xs font-semibold rounded-full ${rental.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
+                  'bg-red-100 text-red-800'
+                }`}>
                 {rental.paymentStatus}
               </span>
             </div>
@@ -264,15 +262,15 @@ const RentalCard = ({ rental, onStatusChange, onPaymentClick, onRatingClick }) =
                   Start Rental
                 </button>
               )}
-              {['approved', 'started', 'completed'].includes(rental.status) && 
-               rental.paymentStatus === 'unpaid' && (
-                <button
-                  onClick={() => onPaymentClick(rental, vehicle, provider)}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Pay Now
-                </button>
-              )}
+              {['approved', 'started', 'completed'].includes(rental.status) &&
+                rental.paymentStatus === 'unpaid' && (
+                  <button
+                    onClick={() => onPaymentClick(rental, vehicle, provider)}
+                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Pay Now
+                  </button>
+                )}
               {rental.status === 'completed' && (
                 <button
                   onClick={() => onRatingClick(rental, vehicle, handleRatingUpdate)}
@@ -309,7 +307,7 @@ const Rentals = () => {
   const [selectedRentalForRating, setSelectedRentalForRating] = useState(null);
   const [selectedVehicleForRating, setSelectedVehicleForRating] = useState(null);
   const [ratingUpdateCallback, setRatingUpdateCallback] = useState(null);
-  
+
   // Chat context
   const {
     connected,
@@ -333,41 +331,41 @@ const Rentals = () => {
   // Handle new messages with useCallback and prevent duplicate processing
   const handleNewMessage = useCallback((event) => {
     //console.log("Event received in Rentals:", event);
-    
+
     // Make sure we have the message data from the event
     const message = event.detail;
     if (!message) {
       console.error("Message event received but no detail found:", event);
       return;
     }
-    
+
     // Create a unique message identifier
     const messageId = `${message.senderId}_${message.timestamp}_${message.text}`;
-    
+
     // Skip if we've already processed this message
     if (processedMessageIds.current.has(messageId)) {
       //console.log("Skipping already processed message:", messageId);
       return;
     }
-    
+
     //console.log("New message received in Rentals:", message);
     processedMessageIds.current.add(messageId);
-    
+
     // Only add message to this chat if it belongs to the current conversation
     if (currentChat && message.chatId === currentChat.id) {
       setChatMessages(prev => {
         // Check if message is already in the array
-        const isDuplicate = prev.some(m => 
-          m.senderId === message.senderId && 
-          m.text === message.text && 
+        const isDuplicate = prev.some(m =>
+          m.senderId === message.senderId &&
+          m.text === message.text &&
           m.timestamp === message.timestamp
         );
-        
+
         if (isDuplicate) {
           //console.log("Duplicate message detected, skipping update");
           return prev;
         }
-        
+
         //console.log("Adding new message to chat:", message);
         return [...prev, message];
       });
@@ -403,11 +401,11 @@ const Rentals = () => {
   useEffect(() => {
     // console.log('Applying filter:', rentalStatusFilter);
     // console.log('Current all rentals:', allRentals);
-    
+
     const filteredRentals = rentalStatusFilter === 'all'
       ? allRentals
       : allRentals.filter(rental => rental.status === rentalStatusFilter);
-    
+
     // console.log('Filtered rentals:', filteredRentals);
     setRentals(filteredRentals);
   }, [rentalStatusFilter, allRentals]);
@@ -422,74 +420,74 @@ const Rentals = () => {
       const auth = JSON.parse(localStorage.getItem('auth'));
       const token = auth?.token;
       const userId = auth?.user?._id;
-      
+
       console.log("Current customer ID:", userId);
-      
+
       if (!token || !userId) {
         throw new Error('No authentication token or user ID found');
       }
-      
+
       // Get all rentals first to identify providers this customer has interacted with
-      const rentalsResponse = await fetch(`http://localhost:3000/rentals/all`, {
+      const rentalsResponse = await fetch(`${API_BASE_URL}/rentals/all`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!rentalsResponse.ok) {
         throw new Error('Failed to fetch rentals');
       }
-      
+
       const rentalsData = await rentalsResponse.json();
       const rentals = rentalsData.data?.rentals || [];
-      
+
       console.log("Fetched rentals:", rentals);
-      
+
       // Create a map to store unique providers
       const providersMap = new Map();
-      
+
       // Process each rental to find providers
       for (let i = 0; i < rentals.length; i++) {
         const rental = rentals[i];
-        
+
         // Only process rentals for this customer
         if (rental.userId === userId && rental.vehicleId) {
-          console.log(`Processing rental ${i+1}/${rentals.length} with vehicleId: ${rental.vehicleId}`);
-          
+          console.log(`Processing rental ${i + 1}/${rentals.length} with vehicleId: ${rental.vehicleId}`);
+
           try {
             // Get vehicle details to find the provider
-            const vehicleResponse = await fetch(`http://localhost:3000/vehicles/${rental.vehicleId}`, {
+            const vehicleResponse = await fetch(`${API_BASE_URL}/vehicles/${rental.vehicleId}`, {
               headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
               }
             });
-            
+
             if (vehicleResponse.ok) {
               const vehicleData = await vehicleResponse.json();
               const vehicle = vehicleData.data;
-              
+
               // Extract provider ID (could be string or object)
               const providerIdRaw = vehicle?.car_providerId;
               const providerId = typeof providerIdRaw === 'object' ? providerIdRaw._id : providerIdRaw;
-              
+
               console.log(`Vehicle ${rental.vehicleId} belongs to provider:`, providerId);
-              
+
               if (providerId && !providersMap.has(providerId)) {
                 // Get provider details
                 try {
-                  const providerResponse = await fetch(`http://localhost:3000/users/${providerId}`, {
+                  const providerResponse = await fetch(`${API_BASE_URL}/users/${providerId}`, {
                     headers: {
                       'Authorization': `Bearer ${token}`,
                       'Content-Type': 'application/json'
                     }
                   });
-                  
+
                   if (providerResponse.ok) {
                     const providerData = await providerResponse.json();
                     const provider = providerData.data;
-                    
+
                     console.log(`Adding provider ${providerId} to chat list:`, provider?.fullName);
                     providersMap.set(providerId, {
                       _id: providerId,
@@ -507,7 +505,7 @@ const Rentals = () => {
           }
         }
       }
-      
+
       // Convert map to array for state
       const providersList = Array.from(providersMap.values());
       console.log("Extracted providers:", providersList);
@@ -519,10 +517,10 @@ const Rentals = () => {
       if (params.get('tab') === 'messages' && providersList.length > 0) {
         // Get unread messages status
         const unreadMessages = JSON.parse(localStorage.getItem('unread_messages') || '{}');
-        
+
         // Find a provider with unread messages
         let providerWithUnread = null;
-        
+
         // Look through unread message chats to find a provider
         for (const chatId in unreadMessages) {
           if (unreadMessages[chatId] > 0) {
@@ -530,7 +528,7 @@ const Rentals = () => {
             const ids = chatId.split('_');
             // Find which ID is the provider (not the current user)
             const providerId = ids.find(id => id !== userId);
-            
+
             if (providerId) {
               // Find this provider in our list
               providerWithUnread = providersList.find(p => p._id === providerId);
@@ -538,7 +536,7 @@ const Rentals = () => {
             }
           }
         }
-        
+
         // Auto-select the first provider with unread messages, or the first provider if none have unread messages
         setSelectedProvider(providerWithUnread || providersList[0]);
       }
@@ -561,7 +559,7 @@ const Rentals = () => {
     const handleRentalUpdate = (event) => {
       const update = event.detail;
       console.log('Received rental update:', update);
-      
+
       // Nếu có cập nhật về rental, fetch lại danh sách
       if (update.type === 'RENTAL_UPDATE') {
         fetchRentals();
@@ -579,7 +577,7 @@ const Rentals = () => {
       const response = await api.patch(`/rentals/${rentalId}/status`, {
         status: newStatus
       });
-      
+
       if (response.data.success) {
         // Send notification via WebSocket
         sendRentalUpdate({
@@ -589,10 +587,10 @@ const Rentals = () => {
           updatedBy: user._id,
           timestamp: new Date().toISOString()
         });
-        
+
         toast.success('Rental status has been updated successfully');
         fetchRentals();
-        
+
         // Show rating modal if completed
         if (newStatus === 'completed') {
           // Find the rental object to pass to the modal
@@ -603,10 +601,10 @@ const Rentals = () => {
       }
     } catch (error) {
       console.error('Error updating rental status:', error);
-      
-      const errorMessage = error.response?.data?.message || 
-                          'Failed to update rental status. Please try again.';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        'Failed to update rental status. Please try again.';
+
       if (errorMessage.includes('Cannot start rental until payment is completed')) {
         toast.error('Payment is required before starting the rental. Please complete the payment first.');
       } else if (errorMessage.includes('Not authorized')) {
@@ -626,7 +624,7 @@ const Rentals = () => {
 
   const handleClosePaymentModal = (result) => {
     setShowPaymentModal(false);
-    
+
     if (result === 'success') {
       fetchRentals();
     }
@@ -635,7 +633,7 @@ const Rentals = () => {
   // Function to format chat timestamp
   const formatMessageTime = (timestamp) => {
     if (!timestamp) return '';
-    
+
     const messageDate = new Date(timestamp);
     return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
@@ -645,7 +643,7 @@ const Rentals = () => {
     if (currentChat) {
       console.log("Current chat changed:", currentChat);
       setActiveChat(currentChat);
-      
+
       // Get current messages and update local state
       const loadMessages = async () => {
         await loadChatMessages(currentChat.id);
@@ -665,22 +663,22 @@ const Rentals = () => {
   // Start chat with provider
   const startChat = (provider) => {
     if (!provider) return;
-    
+
     try {
       // Clear previous chat messages first
       setChatMessages([]);
       processedMessageIds.current.clear();
-      
+
       // Use the consistent chatId function to ensure the same ID is used in both directions
       const chatId = createChatId(user._id, provider._id);
       //console.log(`Setting up chat with ${provider.fullName}`);
-      
+
       // Set the current chat with the consistent ID
       setCurrentChat({
         id: chatId,
         recipient: provider
       });
-      
+
       // Pre-load messages for this chat
       loadChatMessages(chatId);
     } catch (error) {
@@ -728,7 +726,7 @@ const Rentals = () => {
         }
       }
     });
-    
+
     return () => {
       cancelAnimationFrame(scrollTimeout);
     };
@@ -737,13 +735,13 @@ const Rentals = () => {
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!messageInput.trim() || !selectedProvider || !connected) return;
-    
+
     //console.log(`Sending message to ${selectedProvider.fullName} (${selectedProvider._id}): ${messageInput}`);
-    
+
     if (!currentChat) {
       //console.log("No current chat, starting a new one");
       startChat(selectedProvider);
-      
+
       setTimeout(() => {
         sendMessage({
           content: messageInput,
@@ -751,16 +749,16 @@ const Rentals = () => {
         });
         setMessageInput('');
       }, 500);
-      
+
       return;
     }
-    
+
     const success = sendMessage({
       content: messageInput,
       recipientId: selectedProvider._id,
       chatId: currentChat.id
     });
-    
+
     if (success) {
       const newMessage = {
         senderId: user._id,
@@ -770,7 +768,7 @@ const Rentals = () => {
       };
       setChatMessages(prev => [...(prev || []), newMessage]);
       setMessageInput('');
-      
+
       requestAnimationFrame(() => {
         if (messagesEndRef.current) {
           const chatContainer = messagesEndRef.current.closest('.chat-message-container');
@@ -845,21 +843,19 @@ const Rentals = () => {
             <nav className="-mb-px flex" aria-label="Tabs">
               <button
                 onClick={() => setActiveTab('rentals')}
-                className={`${
-                  activeTab === 'rentals'
+                className={`${activeTab === 'rentals'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-6 border-b-2 font-medium`}
+                  } whitespace-nowrap py-4 px-6 border-b-2 font-medium`}
               >
                 My Rentals
               </button>
               <button
                 onClick={() => setActiveTab('messages')}
-                className={`${
-                  activeTab === 'messages'
+                className={`${activeTab === 'messages'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-6 border-b-2 font-medium`}
+                  } whitespace-nowrap py-4 px-6 border-b-2 font-medium`}
               >
                 Messages
               </button>
@@ -971,22 +967,21 @@ const Rentals = () => {
                       // Check if this provider has unread messages
                       const providerChatId = createChatId(user._id, provider._id);
                       const hasUnread = unreadMessages[providerChatId] && unreadMessages[providerChatId] > 0;
-                      
+
                       return (
                         <button
                           key={provider._id}
                           onClick={() => startChat(provider)}
-                          className={`w-full p-3 rounded-lg text-left transition-colors relative ${
-                            currentChat?.recipient?._id === provider._id
+                          className={`w-full p-3 rounded-lg text-left transition-colors relative ${currentChat?.recipient?._id === provider._id
                               ? 'bg-blue-50 text-blue-700'
-                              : hasUnread 
-                                ? 'bg-yellow-50 hover:bg-yellow-100' 
+                              : hasUnread
+                                ? 'bg-yellow-50 hover:bg-yellow-100'
                                 : 'hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           <div className="font-medium">{provider.fullName}</div>
                           <div className="text-sm text-gray-500">{provider.email}</div>
-                          
+
                           {/* Unread indicator */}
                           {hasUnread && (
                             <span className="absolute top-3 right-3 h-3 w-3 bg-red-500 rounded-full animate-pulse"></span>
@@ -1002,9 +997,9 @@ const Rentals = () => {
               <div className="col-span-3 p-4">
                 {currentChat ? (
                   <div className="h-full chat-wrapper">
-                    <ChatWindow 
+                    <ChatWindow
                       key={currentChat.id}
-                      chatId={currentChat.id} 
+                      chatId={currentChat.id}
                       recipient={currentChat.recipient}
                       isProvider={false}
                     />

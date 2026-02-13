@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FaCar, FaGasPump, FaCog, FaUsers, FaPlus, FaUser, FaStar, FaStarHalf, FaRegStar } from 'react-icons/fa';
+import { API_BASE_URL } from '../utils/api';
 import { formatCurrency } from '../utils/formatCurrency';
 
 const CarCard = ({ car }) => {
@@ -12,7 +13,7 @@ const CarCard = ({ car }) => {
   useEffect(() => {
     const fetchRatings = async () => {
       try {
-        const response = await fetch(`http://localhost:3000/ratings/${car._id}`);
+        const response = await fetch(`${API_BASE_URL}/ratings/${car._id}`);
         if (response.ok) {
           const ratings = await response.json();
           if (ratings && ratings.length > 0) {
@@ -54,15 +55,14 @@ const CarCard = ({ car }) => {
       <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
         <div className="relative h-48">
           <img
-            src={car.images?.[0] ? `http://localhost:3002${car.images[0]}` : "placeholder-car-image.jpg"}
+            src={car.images?.[0] ? `${API_BASE_URL}${car.images[0]}` : "placeholder-car-image.jpg"}
             alt={car.name}
             className="w-full h-full object-cover"
           />
-          <span className={`absolute top-2 right-2 text-xs px-2 py-1 rounded-full ${
-            car.status === 'Available' ? 'bg-green-100 text-green-800' : 
-            car.status === 'Rented' ? 'bg-blue-100 text-blue-800' : 
-            'bg-gray-100 text-gray-800'
-          }`}>
+          <span className={`absolute top-2 right-2 text-xs px-2 py-1 rounded-full ${car.status === 'Available' ? 'bg-green-100 text-green-800' :
+              car.status === 'Rented' ? 'bg-blue-100 text-blue-800' :
+                'bg-gray-100 text-gray-800'
+            }`}>
             {car.status}
           </span>
         </div>
@@ -105,7 +105,7 @@ const CarCard = ({ car }) => {
               <span>{car.modelYear}</span>
             </div>
           </div>
-          
+
           {/* Features Section */}
           {displayedFeatures.length > 0 && (
             <div className="mb-3">

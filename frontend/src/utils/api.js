@@ -1,8 +1,11 @@
 import axios from 'axios';
 
+// API Base URL - centralized configuration
+export const API_BASE_URL = 'https://car-rental-api-gateway.onrender.com';
+
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: 'https://car-rental-api-gateway.onrender.com',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -41,9 +44,9 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401 && 
-        (error.response?.data?.message === 'Invalid token.' || 
-         error.response?.data?.message === 'Token expired')) {
+    if (error.response?.status === 401 &&
+      (error.response?.data?.message === 'Invalid token.' ||
+        error.response?.data?.message === 'Token expired')) {
       localStorage.removeItem('auth');
       window.location.href = '/login';
     }
