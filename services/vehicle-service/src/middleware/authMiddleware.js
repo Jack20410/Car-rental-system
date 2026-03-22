@@ -1,8 +1,11 @@
-const jwt = require('jsonwebtoken');
+/**
+ * Auth Middleware — Refactored (Phase 1: Clean Architecture)
+ * Uses IAuthService via DI container instead of importing jsonwebtoken directly.
+ */
 
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ message: 'No token provided' });
   }
@@ -10,7 +13,8 @@ const verifyToken = (req, res, next) => {
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const authService = req.container.resolve('authService');
+    const decoded = authService.verifyToken(token);
     req.user = decoded;
     next();
   } catch (error) {
@@ -25,7 +29,4 @@ const requireCarProvider = (req, res, next) => {
   next();
 };
 
-module.exports = {
-  verifyToken,
-  requireCarProvider
-}; 
+module.exports = { verifyToken, requireCarProvider };

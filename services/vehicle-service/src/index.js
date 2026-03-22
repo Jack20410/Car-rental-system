@@ -5,17 +5,22 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const vehicleRoutes = require('./routes/vehicleRoutes');
+const { scopePerRequest } = require('./middleware/containerMiddleware');
+const errorHandler = require('./middleware/errorMiddleware');
 
 const app = express();
 
 // Middleware
 app.use(cors({
-  origin: '*',  // Allow all origins for static files
+  origin: '*',
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true,
   optionsSuccessStatus: 204
 }));
 app.use(express.json());
+
+// Dependency Injection — attach DI container to every request
+app.use(scopePerRequest);
 
 // Define the possible uploads paths (for different container setups)
 const possiblePaths = [
@@ -104,11 +109,8 @@ app.use('/', vehicleRoutes);
 // MongoDB connection
 connectDB();
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
-});
+// Global error handling middleware
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3002;
 app.listen(PORT, () => {

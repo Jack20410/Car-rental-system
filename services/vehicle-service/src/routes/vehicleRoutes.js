@@ -9,7 +9,7 @@ const { createVehicle,
 const { verifyToken, requireCarProvider } = require('../middleware/authMiddleware');
 const { validateCreateVehicle } = require('../middleware/vehicleValidation');
 const upload = require('../config/multerConfig');
-const Vehicle = require('../models/vehicleModel');
+const { NotFoundError } = require('../errors/AppError');
 const fs = require('fs');
 const path = require('path');
 
@@ -47,41 +47,28 @@ router.patch('/vehicles/:id/status',
 router.delete('/vehicles/:id', verifyToken, requireCarProvider, deleteVehicle);
 
 // Delete vehicle image - requires car_provider role
-router.delete('/vehicles/:id/images', verifyToken, requireCarProvider, async (req, res) => {
+router.delete('/vehicles/:id/images', verifyToken, requireCarProvider, async (req, res, next) => {
   try {
+    const vehicleRepository = req.container.resolve('vehicleRepository');
     const { imagePath } = req.body;
     const vehicleId = req.params.id;
     
-    // Get the vehicle
-    const vehicle = await Vehicle.findById(vehicleId);
-    if (!vehicle) {
-      return res.status(404).json({ message: 'Vehicle not found' });
-    }
+    const vehicle = await vehicleRepository.findById(vehicleId);
+    if (!vehicle) throw new NotFoundError('Vehicle');
+    if (!vehicle.images.includes(imagePath)) throw new NotFoundError('Image');
 
-    // Check if image exists in vehicle's images
-    if (!vehicle.images.includes(imagePath)) {
-      return res.status(404).json({ message: 'Image not found' });
-    }
-
-    // Remove image from vehicle's images array
-    vehicle.images = vehicle.images.filter(img => img !== imagePath);
-    await vehicle.save();
+    await vehicleRepository.removeImage(vehicleId, imagePath);
 
     // Delete physical file
     const fullPath = path.join(__dirname, '../../../uploads/vehicles', path.basename(imagePath));
-    
     fs.unlink(fullPath, (err) => {
-      if (err) {
-        console.error('Error deleting file:', err);
-        // Don't fail the request if file deletion fails
-      }
+      if (err) console.error('Error deleting file:', err);
     });
 
     res.status(200).json({ message: 'Image deleted successfully' });
   } catch (error) {
-    console.error('Error deleting image:', error);
-    res.status(500).json({ message: 'Failed to delete image' });
+    next(error);
   }
 });
 
-module.exports = router; 
+module.exports = router;
