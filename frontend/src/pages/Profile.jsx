@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api, { endpoints } from '../utils/api';
+import { API_BASE_URL } from '../utils/api';
 
 const DEFAULT_AVATAR = `${API_BASE_URL}/uploads/avatars/user.png`;
 

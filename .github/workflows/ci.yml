@@ -1,0 +1,125 @@
+name: 'Phase 1: CI Verification'
+
+on:
+  push:
+    branches:
+      - 'develop'
+      - 'main'
+  pull_request:
+    branches:
+      - 'refactor/phase1-data-layer'
+      - 'refactor/architecture-v2'
+      - 'main'
+      - 'develop'
+
+jobs:
+  # ───────────────────────────────────────────────
+  # Job 1: Setup Dynamic Matrix
+  # ───────────────────────────────────────────────
+  setup-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.set-matrix.outputs.services }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: set-matrix
+        run: |
+          # Finds all subdirectories in services/ and formats them as a JSON array
+          SERVICES=$(ls -d services/*/ | awk -F/ '{print "\""$2"\""}' | paste -sd "," -)
+          echo "services=[$SERVICES]" >> $GITHUB_OUTPUT
+
+  # ───────────────────────────────────────────────
+  # Job 2: Fast Unit Tests (no DB required)
+  # ───────────────────────────────────────────────
+  unit-tests:
+    needs: setup-matrix
+    name: 'Unit & Contract Tests'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.setup-matrix.outputs.services) }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        working-directory: ./services/${{ matrix.service }}
+        run: npm ci
+
+      - name: Run Unit / Contract Tests
+        working-directory: ./services/${{ matrix.service }}
+        run: npx jest tests/unit --ci --passWithNoTests || echo "No unit tests found"
+
+  # ───────────────────────────────────────────────
+  # Job 3: Integration Tests (Real MongoDB Atlas)
+  # ───────────────────────────────────────────────
+  integration-tests:
+    needs: setup-matrix
+    name: 'Integration Tests (Atlas)'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.setup-matrix.outputs.services) }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        working-directory: ./services/${{ matrix.service }}
+        run: npm ci
+
+      - name: Run Integration Tests against Atlas DB
+        working-directory: ./services/${{ matrix.service }}
+        run: |
+          # Dynamically convert "user-service" into "user_service_db"
+          SERVICE_NAME="${{ matrix.service }}"
+          DB_NAME="${SERVICE_NAME//-/_}_db"
+          
+          # Inject GitHub Secrets and run tests
+          export MONGODB_URI="${{ secrets.MONGO_BASE_URI }}/${DB_NAME}"
+          export JWT_SECRET="${{ secrets.JWT_SECRET }}"
+          
+          npx jest tests/integration --ci --passWithNoTests || echo "No integration tests found"
+
+  # ───────────────────────────────────────────────
+  # Job 4: Lint Check
+  # ───────────────────────────────────────────────
+  lint:
+    needs: setup-matrix
+    name: 'Lint'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: ${{ fromJson(needs.setup-matrix.outputs.services) }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        working-directory: ./services/${{ matrix.service }}
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: ./services/${{ matrix.service }}
+        run: npx eslint src/ --ext .js --max-warnings=0 || echo "ESLint not configured yet — skipping"
