@@ -7,6 +7,7 @@ const userRoutes = require('./routes/user.routes');
 const avatarRoutes = require('./routes/avatarRoutes');
 const errorHandler = require('./middleware/errorMiddleware');
 const { uploadsPath } = require('./middleware/uploadMiddleware');
+const { scopePerRequest } = require('./middleware/containerMiddleware');
 
 const app = express();
 
@@ -17,6 +18,9 @@ connectDB();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Dependency Injection — attach DI container to every request
+app.use(scopePerRequest);
 
 // Serve static avatar files
 app.use('/uploads/avatars', express.static(uploadsPath, {
