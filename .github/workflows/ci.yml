@@ -51,7 +51,7 @@ jobs:
 
       - name: Install Dependencies
         working-directory: ./services/${{ matrix.service }}
-        run: npm ci
+        run: npm install
 
       - name: Run Unit / Contract Tests
         working-directory: ./services/${{ matrix.service }}
@@ -80,7 +80,7 @@ jobs:
 
       - name: Install Dependencies
         working-directory: ./services/${{ matrix.service }}
-        run: npm ci
+        run: npm install
 
       - name: Run Integration Tests against Atlas DB
         working-directory: ./services/${{ matrix.service }}
@@ -118,7 +118,7 @@ jobs:
 
       - name: Install Dependencies
         working-directory: ./services/${{ matrix.service }}
-        run: npm ci
+        run: npm install
 
       - name: Run ESLint
         working-directory: ./services/${{ matrix.service }}
