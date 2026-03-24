@@ -1,4 +1,9 @@
-const jwt = require('jsonwebtoken');
+/**
+ * Auth Middleware — Refactored (Phase 1: Clean Architecture)
+ *
+ * Token verification delegated to IAuthService via DI container.
+ * This middleware no longer imports jsonwebtoken directly.
+ */
 
 // Middleware to verify JWT token
 exports.verifyToken = (req, res, next) => {
@@ -14,7 +19,8 @@ exports.verifyToken = (req, res, next) => {
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const authService = req.container.resolve('authService');
+    const decoded = authService.verifyToken(token);
     req.user = decoded;
     next();
   } catch (error) {

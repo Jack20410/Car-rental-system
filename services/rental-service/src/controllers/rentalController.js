@@ -1,7 +1,14 @@
-const Rental = require('../models/rentalModel');
-const axios = require('axios');
+/**
+ * Rental Controller — Refactored (Phase 1: Clean Architecture)
+ *
+ * All database access goes through IRentalRepository (via DI).
+ * All cross-service calls go through IVehicleServiceClient (via DI).
+ * All activity logging goes through IActivityLogger (via DI).
+ *
+ * This controller ONLY handles HTTP request/response concerns.
+ */
 const { RENTAL_TYPES, HOURLY_RENTAL_OPTIONS } = require('../constants/rentalConstants');
-const { logRentalActivity } = require('../utils/activityLogger');
+const { ValidationError, NotFoundError, ForbiddenError } = require('../errors/AppError');
 
 // Helper function to calculate rental price for daily rentals
 const calculateDailyRentalPrice = (start, end, vehicle) => {
@@ -23,7 +30,7 @@ const calculateHourlyRentalPrice = (hourlyDuration, vehicle) => {
       priceMultiplier = HOURLY_RENTAL_OPTIONS.TWELVE_HOURS.priceMultiplier;
       break;
     default:
-      throw new Error('Invalid hourly duration');
+      throw new ValidationError('Invalid hourly duration');
   }
   return vehicle.rentalPricePerDay * priceMultiplier;
 };
@@ -36,29 +43,19 @@ const calculateHourlyEndDate = (startDate, hourlyDuration) => {
 };
 
 // Check vehicle availability for specified dates
-exports.checkAvailability = async (req, res) => {
+const checkAvailability = async (req, res, next) => {
   try {
+    const rentalRepo = req.container.resolve('rentalRepository');
     const { vehicleId, startDate, endDate } = req.query;
     
     if (!vehicleId || !startDate || !endDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'Vehicle ID, start date, and end date are required'
-      });
+      throw new ValidationError('Vehicle ID, start date, and end date are required');
     }
 
-    // Convert string dates to Date objects
     const start = new Date(startDate);
     const end = new Date(endDate);
 
-    // Sửa điều kiện overlap ở đây
-    const overlappingRentals = await Rental.find({
-      vehicleId,
-      status: { $nin: ['cancelled', 'rejected'] },
-      startDate: { $lt: end },
-      endDate: { $gt: start }
-    });
-
+    const overlappingRentals = await rentalRepo.findOverlappingRentals(vehicleId, start, end);
     const isAvailable = overlappingRentals.length === 0;
 
     return res.status(200).json({
@@ -69,65 +66,42 @@ exports.checkAvailability = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error checking availability:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while checking availability'
-    });
+    next(error);
   }
 };
 
 // Create a new rental
-exports.createRental = async (req, res) => {
+const createRental = async (req, res, next) => {
   try {
+    const rentalRepo = req.container.resolve('rentalRepository');
+    const vehicleService = req.container.resolve('vehicleServiceClient');
+    const activityLogger = req.container.resolve('activityLogger');
+
     const { vehicleId, startDate, endDate, rentalType, hourlyDuration } = req.body;
     const userId = req.user.userId;
 
-    // Convert start date to Date object
     const start = new Date(startDate);
     let end;
     let totalPrice;
 
     // Get vehicle details from vehicle service
-    let vehicleResponse;
-    try {
-      const vehicleUrl = `${process.env.VEHICLE_SERVICE_URL}/vehicles/${vehicleId}`;
-      vehicleResponse = await axios.get(
-        vehicleUrl,
-        { 
-          headers: { 
-            Authorization: req.headers.authorization 
-          }
-        }
-      );
-    } catch (error) {
-      console.error('Vehicle service error:', error);
-      return res.status(404).json({
-        success: false,
-        message: 'Vehicle not found or service unavailable'
-      });
+    const vehicle = await vehicleService.getVehicle(vehicleId, req.headers.authorization);
+
+    if (!vehicle) {
+      throw new NotFoundError('Vehicle');
     }
 
-    const vehicle = vehicleResponse.data.data;
-    
     // Check if vehicle is available
     if (vehicle.status !== 'Available') {
-      return res.status(400).json({
-        success: false,
-        message: 'This vehicle is not available for rent'
-      });
+      throw new ValidationError('This vehicle is not available for rent');
     }
 
     // Handle rental based on type
     if (rentalType === RENTAL_TYPES.HOURLY) {
-      // Calculate end date based on hourly duration
       end = calculateHourlyEndDate(start, hourlyDuration);
-      
-      // Calculate price for hourly rental
       totalPrice = calculateHourlyRentalPrice(hourlyDuration, vehicle);
     } else {
       end = new Date(endDate);
-      // Calculate price for daily rental
       totalPrice = calculateDailyRentalPrice(start, end, vehicle);
     }
 
@@ -135,14 +109,11 @@ exports.createRental = async (req, res) => {
     const car_providerId = vehicle.car_providerId;
 
     if (!car_providerId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Vehicle provider information is missing'
-      });
+      throw new ValidationError('Vehicle provider information is missing');
     }
 
     // Create rental record
-    const rental = new Rental({
+    const rental = await rentalRepo.create({
       userId,
       vehicleId,
       car_providerId,
@@ -157,10 +128,8 @@ exports.createRental = async (req, res) => {
       paymentHistory: [{ status: 'unpaid', changedAt: new Date() }]
     });
 
-    await rental.save();
-
     // Log rental creation activity
-    await logRentalActivity(
+    await activityLogger.logRentalActivity(
       userId,
       req.user.role,
       'CREATE_RENTAL_ORDER',
@@ -175,15 +144,7 @@ exports.createRental = async (req, res) => {
     );
 
     // Mark vehicle as unavailable
-    try {
-      await axios.patch(
-        `${process.env.VEHICLE_SERVICE_URL}/vehicles/${vehicleId}/status`,
-        { status: 'Rented' },
-        { headers: { Authorization: req.headers.authorization } }
-      );
-    } catch (error) {
-      console.error('Could not update vehicle status:', error.message);
-    }
+    await vehicleService.updateVehicleStatus(vehicleId, 'Rented', req.headers.authorization);
 
     return res.status(201).json({
       success: true,
@@ -191,26 +152,22 @@ exports.createRental = async (req, res) => {
       data: rental
     });
   } catch (error) {
-    console.error('Error creating rental:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while creating the rental'
-    });
+    next(error);
   }
 };
 
 // Get all rentals for a user
-exports.getUserRentals = async (req, res) => {
+const getUserRentals = async (req, res, next) => {
   try {
+    const rentalRepo = req.container.resolve('rentalRepository');
     const userId = req.user.userId;
     const { status, paymentStatus } = req.query;
     
-    // Build filter object
     const filter = { userId };
     if (status) filter.status = status;
     if (paymentStatus) filter.paymentStatus = paymentStatus;
     
-    const rentals = await Rental.find(filter).sort({ createdAt: -1 });
+    const rentals = await rentalRepo.findWithPagination(filter, { createdAt: -1 }, 0, 0);
     
     return res.status(200).json({
       success: true,
@@ -218,36 +175,27 @@ exports.getUserRentals = async (req, res) => {
       data: rentals
     });
   } catch (error) {
-    console.error('Error retrieving rentals:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while retrieving rentals'
-    });
+    next(error);
   }
 };
 
 // Get a specific rental by ID
-exports.getRentalById = async (req, res) => {
+const getRentalById = async (req, res, next) => {
   try {
+    const rentalRepo = req.container.resolve('rentalRepository');
     const { id } = req.params;
     const userId = req.user.userId;
     const userRole = req.user.role;
     
-    const rental = await Rental.findById(id);
+    const rental = await rentalRepo.findById(id);
     
     if (!rental) {
-      return res.status(404).json({
-        success: false,
-        message: 'Rental not found'
-      });
+      throw new NotFoundError('Rental');
     }
     
     // Check if the user is the owner of the rental or an admin
     if (rental.userId.toString() !== userId && userRole !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to view this rental'
-      });
+      throw new ForbiddenError('Not authorized to view this rental');
     }
     
     return res.status(200).json({
@@ -256,17 +204,17 @@ exports.getRentalById = async (req, res) => {
       data: rental
     });
   } catch (error) {
-    console.error('Error retrieving rental:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while retrieving the rental'
-    });
+    next(error);
   }
 };
 
 // Update rental status (cancel, approve, reject, complete)
-exports.updateRentalStatus = async (req, res) => {
+const updateRentalStatus = async (req, res, next) => {
   try {
+    const rentalRepo = req.container.resolve('rentalRepository');
+    const vehicleService = req.container.resolve('vehicleServiceClient');
+    const activityLogger = req.container.resolve('activityLogger');
+
     const { id } = req.params;
     const { status } = req.body;
     const userRole = req.user.role;
@@ -275,19 +223,13 @@ exports.updateRentalStatus = async (req, res) => {
     // Validate status
     const validStatuses = ['pending', 'cancelled', 'rejected', 'approved', 'started', 'completed'];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
-      });
+      throw new ValidationError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
     }
     
-    const rental = await Rental.findById(id);
+    const rental = await rentalRepo.findById(id);
     
     if (!rental) {
-      return res.status(404).json({
-        success: false,
-        message: 'Rental not found'
-      });
+      throw new NotFoundError('Rental');
     }
 
     // Define allowed transitions based on user role and conditions
@@ -297,8 +239,8 @@ exports.updateRentalStatus = async (req, res) => {
         approved: ['started']
       },
       car_provider: {
-        pending: ['cancelled', 'approved', 'rejected'], // car_provider can do what customer can
-        approved: ['started'],                         // and more
+        pending: ['cancelled', 'approved', 'rejected'],
+        approved: ['started'],
         started: ['completed']
       },
       admin: {
@@ -316,44 +258,33 @@ exports.updateRentalStatus = async (req, res) => {
 
     // Check if the status transition is allowed for this user role
     if (!allowedNextStatuses.includes(status)) {
-      return res.status(403).json({
-        success: false,
-        message: `You are not authorized to change status from ${rental.status} to ${status}`
-      });
+      throw new ForbiddenError(`You are not authorized to change status from ${rental.status} to ${status}`);
     }
 
     // Additional validation for customer and car_provider roles
     if (userRole === 'customer' || userRole === 'car_provider') {
-      // For customer: can only update their own rentals
-      // For car_provider: can update their own rentals OR rentals of their vehicles
       if (rental.userId.toString() !== userId && 
           (userRole === 'customer' || rental.car_providerId.toString() !== userId)) {
-        return res.status(403).json({
-          success: false,
-          message: userRole === 'customer' 
+        throw new ForbiddenError(
+          userRole === 'customer' 
             ? 'You can only update your own rentals'
             : 'You can only update rentals that you created or rentals for your vehicles'
-        });
+        );
       }
     }
 
     // Check payment status when transitioning from approved to started
     if (rental.status === 'approved' && status === 'started' && rental.paymentStatus !== 'paid') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot start rental until payment is completed'
-      });
+      throw new ValidationError('Cannot start rental until payment is completed');
     }
 
     // Only update if status is actually changing
     if (rental.status !== status) {
       rental.status = status;
-      // statusHistory will be automatically updated by the pre-save middleware
-      
       await rental.save();
       
       // Log rental status update activity
-      await logRentalActivity(
+      await activityLogger.logRentalActivity(
         req.user.userId,
         req.user.role,
         'UPDATE_RENTAL_ORDER',
@@ -368,15 +299,9 @@ exports.updateRentalStatus = async (req, res) => {
       
       // Update vehicle status based on rental status
       if (['cancelled', 'completed', 'rejected'].includes(status)) {
-        try {
-          await axios.patch(
-            `${process.env.VEHICLE_SERVICE_URL}/vehicles/${rental.vehicleId}/status`,
-            { status: 'Available' },
-            { headers: { Authorization: req.headers.authorization } }
-          );
-        } catch (error) {
-          console.error('Could not update vehicle status:', error.message);
-        }
+        await vehicleService.updateVehicleStatus(
+          rental.vehicleId, 'Available', req.headers.authorization
+        );
       }
     }
     
@@ -386,70 +311,53 @@ exports.updateRentalStatus = async (req, res) => {
       data: rental
     });
   } catch (error) {
-    console.error('Error updating rental status:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while updating the rental status'
-    });
+    next(error);
   }
 };
 
 // Update payment status
-exports.updatePaymentStatus = async (req, res) => {
+const updatePaymentStatus = async (req, res, next) => {
   try {
+    const rentalRepo = req.container.resolve('rentalRepository');
+    const activityLogger = req.container.resolve('activityLogger');
+
     const { id } = req.params;
     const { paymentStatus } = req.body;
     const userId = req.user.userId;
     
     // Validate payment status
     if (paymentStatus !== 'paid') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid payment status. Only "paid" status is allowed.'
-      });
+      throw new ValidationError('Invalid payment status. Only "paid" status is allowed.');
     }
     
-    const rental = await Rental.findById(id);
+    const rental = await rentalRepo.findById(id);
     
     if (!rental) {
-      return res.status(404).json({
-        success: false,
-        message: 'Rental not found'
-      });
+      throw new NotFoundError('Rental');
     }
     
     // Check if the user is the owner of the rental
     if (rental.userId.toString() !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to update this rental'
-      });
+      throw new ForbiddenError('Not authorized to update this rental');
     }
 
     // Check if rental is in a valid status for payment
     const validRentalStatuses = ['approved', 'started', 'completed'];
     if (!validRentalStatuses.includes(rental.status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot update payment status. Rental must be approved, started, or completed.'
-      });
+      throw new ValidationError('Cannot update payment status. Rental must be approved, started, or completed.');
     }
 
     // Check current payment status
     if (rental.paymentStatus !== 'unpaid') {
-      return res.status(400).json({
-        success: false,
-        message: 'Payment status can only be updated from unpaid to paid'
-      });
+      throw new ValidationError('Payment status can only be updated from unpaid to paid');
     }
     
-    // Update payment status only - let the pre-save middleware handle the history
+    // Update payment status only — let the pre-save middleware handle the history
     rental.paymentStatus = 'paid';
-
     await rental.save();
 
     // Log payment status update activity
-    await logRentalActivity(
+    await activityLogger.logRentalActivity(
       userId,
       req.user.role,
       'UPDATE_RENTAL_ORDER',
@@ -467,98 +375,15 @@ exports.updatePaymentStatus = async (req, res) => {
       data: rental
     });
   } catch (error) {
-    console.error('Error updating payment status:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while updating the payment status'
-    });
-  }
-};
-
-// Get all rentals
-exports.getAllRentals = async (req, res) => {
-  try {
-    const { status, paymentStatus, limit = 10, page = 1 } = req.query;
-    
-    // Build filter object
-    const filter = {};
-    if (status) filter.status = status;
-    if (paymentStatus) filter.paymentStatus = paymentStatus;
-    
-    // Calculate pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    const rentals = await Rental.find(filter)
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(skip);
-    
-    const total = await Rental.countDocuments(filter);
-    
-    return res.status(200).json({
-      success: true,
-      message: 'Rentals retrieved successfully',
-      data: rentals,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit))
-      }
-    });
-  } catch (error) {
-    console.error('Error retrieving all rentals:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while retrieving rentals'
-    });
-  }
-};
-
-// Get all rentals for a provider
-exports.getProviderRentals = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const { status, paymentStatus, limit = 10, page = 1 } = req.query;
-    
-    // Build filter object
-    const filter = { car_providerId: userId };
-    if (status) filter.status = status;
-    if (paymentStatus) filter.paymentStatus = paymentStatus;
-    
-    // Calculate pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    const rentals = await Rental.find(filter)
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(skip);
-    
-    const total = await Rental.countDocuments(filter);
-    
-    return res.status(200).json({
-      success: true,
-      message: 'Provider rentals retrieved successfully',
-      data: rentals,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit))
-      }
-    });
-  } catch (error) {
-    console.error('Error retrieving provider rentals:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while retrieving provider rentals'
-    });
+    next(error);
   }
 };
 
 // Get all rentals (public function)
-exports.getAllRentals = async (req, res) => {
+const getAllRentals = async (req, res, next) => {
   try {
+    const rentalRepo = req.container.resolve('rentalRepository');
+
     // Apply filters if provided in query params
     const filter = {};
     const { status, paymentStatus, userId, vehicleId } = req.query;
@@ -573,14 +398,8 @@ exports.getAllRentals = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     
-    // Get total count for pagination
-    const total = await Rental.countDocuments(filter);
-    
-    // Get rentals with pagination and sorting
-    const rentals = await Rental.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const total = await rentalRepo.count(filter);
+    const rentals = await rentalRepo.findWithPagination(filter, { createdAt: -1 }, skip, limit);
     
     return res.status(200).json({
       success: true,
@@ -596,33 +415,21 @@ exports.getAllRentals = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error retrieving all rentals:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while retrieving rentals'
-    });
+    next(error);
   }
 };
 
 // Get rentals for a car provider
-exports.getProviderRentals = async (req, res) => {
+const getProviderRentals = async (req, res, next) => {
   try {
-    const car_providerId = req.user.userId; // Get provider's ID from authenticated user
+    const rentalRepo = req.container.resolve('rentalRepository');
+
+    const car_providerId = req.user.userId;
     const { status, paymentStatus } = req.query;
-    
-    console.log('Fetching rentals for provider:', {
-      car_providerId,
-      userRole: req.user.role,
-      status,
-      paymentStatus
-    });
 
     // Verify user is a car provider
     if (req.user.role !== 'car_provider') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Only car providers can access their rentals.'
-      });
+      throw new ForbiddenError('Access denied. Only car providers can access their rentals.');
     }
 
     // Build filter object
@@ -630,23 +437,13 @@ exports.getProviderRentals = async (req, res) => {
     if (status) filter.status = status;
     if (paymentStatus) filter.paymentStatus = paymentStatus;
 
-    console.log('Applying filter:', filter);
-
     // Apply pagination
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // Get total count for pagination
-    const total = await Rental.countDocuments(filter);
-
-    // Get rentals without population first
-    const rentals = await Rental.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    console.log(`Found ${rentals.length} rentals for provider`);
+    const total = await rentalRepo.count(filter);
+    const rentals = await rentalRepo.findWithPagination(filter, { createdAt: -1 }, skip, limit);
 
     return res.status(200).json({
       success: true,
@@ -662,22 +459,17 @@ exports.getProviderRentals = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error retrieving provider rentals:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while retrieving provider rentals',
-      error: error.message
-    });
+    next(error);
   }
 };
 
 // Get all present/active rentals
-exports.getPresentRentals = async (req, res) => {
+const getPresentRentals = async (req, res, next) => {
   try {
-    // Fetch all rentals without status filtering
-    const rentals = await Rental.find().sort({ createdAt: -1 });
-    
-    const total = await Rental.countDocuments();
+    const rentalRepo = req.container.resolve('rentalRepository');
+
+    const rentals = await rentalRepo.findWithPagination({}, { createdAt: -1 }, 0, 0);
+    const total = await rentalRepo.count({});
     
     return res.status(200).json({
       success: true,
@@ -686,11 +478,18 @@ exports.getPresentRentals = async (req, res) => {
       total
     });
   } catch (error) {
-    console.error('Error retrieving rentals:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'An error occurred while retrieving rentals'
-    });
+    next(error);
   }
 };
 
+module.exports = {
+  checkAvailability,
+  createRental,
+  getUserRentals,
+  getRentalById,
+  updateRentalStatus,
+  updatePaymentStatus,
+  getAllRentals,
+  getProviderRentals,
+  getPresentRentals,
+};

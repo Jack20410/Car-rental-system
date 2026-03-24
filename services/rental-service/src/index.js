@@ -3,9 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const { createServer } = require('http');
 const WebSocket = require('ws');
-const axios = require('axios');
 const connectDB = require('./config/database');
 const rentalRoutes = require('./routes/rentalRoutes');
+const { scopePerRequest } = require('./middleware/containerMiddleware');
+const errorHandler = require('./middleware/errorMiddleware');
 
 const app = express();
 const httpServer = createServer(app);
@@ -58,16 +59,21 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Hàm xử lý tính toán giá
+// Hàm xử lý tính toán giá (WebSocket-only — uses DI container directly)
 async function handlePriceCalculation(ws, data) {
   try {
+    const container = require('./config/container');
+    const vehicleService = container.resolve('vehicleServiceClient');
+
     const { startDate, endDate, pickupTime, returnTime, vehicleId, rentalType, hourlyDuration } = data;
     
-    // Lấy thông tin vehicle
-    const vehicleResponse = await axios.get(
-      `${process.env.VEHICLE_SERVICE_URL}/vehicles/${vehicleId}`
-    );
-    const vehicle = vehicleResponse.data.data;
+    // Lấy thông tin vehicle via DI-resolved service
+    const vehicle = await vehicleService.getVehicle(vehicleId);
+    
+    if (!vehicle) {
+      throw new Error('Vehicle not found');
+    }
+
     let totalPrice = 0;
 
     if (rentalType === 'hourly') {
@@ -125,6 +131,9 @@ async function handlePriceCalculation(ws, data) {
 app.use(cors());
 app.use(express.json());
 
+// Dependency Injection — attach DI container to every request
+app.use(scopePerRequest);
+
 // Routes
 app.use('/rentals', rentalRoutes);
 
@@ -133,14 +142,8 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', service: 'rental-service' });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ 
-    success: false,
-    message: 'Something went wrong!' 
-  });
-});
+// Global error handling middleware (must be LAST)
+app.use(errorHandler);
 
 // Connect to MongoDB and start server
 connectDB()
