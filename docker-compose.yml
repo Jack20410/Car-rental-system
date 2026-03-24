@@ -5,7 +5,7 @@ services:
     ports:
       - "4000:4000"
     environment:
-      - VITE_API_URL=http://api-gateway:3000
+      - VITE_API_URL=http://localhost:3000
       - VITE_VEHICLE_SERVICE_URL=http://localhost:3002
       - VITE_RENTAL_SERVICE_URL=http://localhost:3003
       - VITE_USER_SERVICE_URL=http://localhost:3001
