@@ -2,8 +2,8 @@
  * UserEntity - A clean, framework-agnostic domain representation of a User.
  *
  * This entity is what the Application/Use-Case layer works with.
- * It is NOT a Mongoose document. Repositories are responsible for
- * converting Mongoose documents to/from this entity.
+ * It is NOT a Prisma model object. Repositories are responsible for
+ * converting Prisma records to/from this entity.
  */
 class UserEntity {
   /**

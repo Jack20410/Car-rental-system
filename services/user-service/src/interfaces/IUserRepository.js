@@ -1,7 +1,7 @@
 /**
  * @interface IUserRepository
  * Defines the contract for User data access operations.
- * Any concrete implementation (Mongo, Postgres, In-Memory) must fulfill this contract.
+ * Any concrete implementation (Prisma/Postgres, In-Memory, etc.) must fulfill this contract.
  */
 class IUserRepository {
   /**
@@ -44,7 +44,7 @@ class IUserRepository {
 
   /**
    * Find all users, optionally filtering by criteria.
-   * @param {Object} [filter={}] - Mongoose-style filter object.
+   * @param {Object} [filter={}] - Key-value filter object (e.g. { role: 'admin' }).
    * @param {string|Object} [projection] - Fields to include/exclude.
    * @returns {Promise<Array<Object>>}
    */

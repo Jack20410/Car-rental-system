@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const connectDB = require('./config/database');
+const { connectDB } = require('./config/database');
 const userRoutes = require('./routes/user.routes');
 const avatarRoutes = require('./routes/avatarRoutes');
 const errorHandler = require('./middleware/errorMiddleware');
@@ -11,7 +11,7 @@ const { scopePerRequest } = require('./middleware/containerMiddleware');
 
 const app = express();
 
-// Connect to MongoDB
+// Connect to PostgreSQL via Prisma
 connectDB();
 
 // Middleware

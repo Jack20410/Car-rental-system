@@ -1,9 +1,10 @@
-const { createContainer, asClass, InjectionMode } = require('awilix');
+const { createContainer, asClass, asValue, InjectionMode } = require('awilix');
 
 // --- Import Concrete Implementations ---
-const MongoUserRepository = require('../repositories/MongoUserRepository');
+const PrismaUserRepository = require('../repositories/PrismaUserRepository');
 const BcryptJwtAuthService = require('../services/BcryptJwtAuthService');
 const HttpActivityLogger = require('../services/HttpActivityLogger');
+const { prisma } = require('./database');
 
 /**
  * Application-level Dependency Injection Container.
@@ -17,8 +18,11 @@ const container = createContainer({
 });
 
 container.register({
+  // --- Prisma Client (injected into repository) ---
+  prisma: asValue(prisma),
+
   // --- Data Access Layer ---
-  userRepository: asClass(MongoUserRepository).singleton(),
+  userRepository: asClass(PrismaUserRepository).singleton(),
 
   // --- Infrastructure Services ---
   authService: asClass(BcryptJwtAuthService).singleton(),

@@ -1,4 +1,9 @@
 /**
+ * ⚠️  DEPRECATED — This test relies on MongoDB (MongoMemoryServer + Mongoose)
+ * which have been removed from the project as part of the PostgreSQL migration.
+ * This file is kept for reference only. It needs to be rewritten to use
+ * Prisma + PostgreSQL (or a test database) for integration testing.
+ *
  * BASELINE INTEGRATION TEST — User Authentication Flow
  *
  * This test MUST pass BEFORE and AFTER Phase 1 refactoring.

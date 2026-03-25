@@ -6,11 +6,11 @@ The **User Service** is a core microservice within the Car Rental System ecosyst
 ## 2. Tech Stack
 - **Runtime Environment:** Node.js
 - **Web Framework:** Express.js
-- **Database:** MongoDB (using Mongoose ODM)
+- **Database:** PostgreSQL (hosted on Supabase, using Prisma ORM)
 - **Dependency Injection:** Awilix (Implementing Clean Architecture principles)
 - **Authentication:** JSON Web Tokens (JWT) & bcryptjs
 - **File Uploads:** Multer (for handling user avatar images)
-- **Testing environment:** Jest & Supertest (along with mongodb-memory-server for isolated tests)
+- **Testing environment:** Jest & Supertest
 
 ## 3. Key Features / Business Logic
 - **User Authentication:** Secure registration and login using heavily hashed passwords (bcrypt) and JWT tokens.
@@ -19,13 +19,14 @@ The **User Service** is a core microservice within the Car Rental System ecosyst
 - **Admin Capabilities:** Administrators can radically retrieve complete user details, view users by role, and forcefully delete single or multiple user accounts in batches.
 - **Activity Logging:** Automatically logs critical user activities like registration and login workflows into an activity tracker for auditing purposes.
 - **Clean Architecture:** Implements a layered architecture (Controllers, Services, Repositories) facilitated by Awilix for smooth dependency inversion.
+- **Legacy ID Support:** Seamlessly handles lookups by both new PostgreSQL UUIDs and old MongoDB ObjectIds via the `legacyId` field.
 
 ## 4. Prerequisites & Environment Variables
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (v16 or higher recommended)
 - [Docker & Docker Compose](https://www.docker.com/) (Optional, for containerized running)
-- A running MongoDB instance (or MongoDB Atlas URI)
+- A PostgreSQL database (e.g., Supabase)
 
 ### Environment Variables (.env)
 Create a `.env` file in the root of the `user-service` directory. Use the following table as a `.env.example`:
@@ -33,7 +34,8 @@ Create a `.env` file in the root of the `user-service` directory. Use the follow
 | Variable | Description | Example Value |
 |----------|-------------|---------------|
 | `PORT` | The port on which the service will run | `3001` |
-| `MONGODB_URI` | The connection string for MongoDB | `mongodb://localhost:27017/user_service_db` |
+| `DATABASE_URL` | PostgreSQL connection string (pooled, for Prisma Client) | `postgresql://user:pass@host:6543/postgres?pgbouncer=true` |
+| `DIRECT_URL` | PostgreSQL direct connection (for Prisma Migrate/Push) | `postgresql://user:pass@host:5432/postgres` |
 | `NODE_ENV` | Environment mode (`development`, `production`, `test`) | `development` |
 | `JWT_SECRET` | Secret key used for signing JWT login tokens | `your_super_secret_jwt_key_here` |
 
@@ -44,9 +46,17 @@ Create a `.env` file in the root of the `user-service` directory. Use the follow
    ```bash
    npm install
    ```
-2. **Set up environment variables:**
+2. **Generate Prisma Client:**
+   ```bash
+   npx prisma generate
+   ```
+3. **Push schema to database (if first time):**
+   ```bash
+   npx prisma db push
+   ```
+4. **Set up environment variables:**
    Copy your `.env` file as described in the table above.
-3. **Start the development server:**
+5. **Start the development server:**
    ```bash
    npm run dev
    ```
@@ -82,13 +92,15 @@ Create a `.env` file in the root of the `user-service` directory. Use the follow
     "success": true,
     "message": "User registered successfully",
     "data": {
-      "_id": "60d0fe4f5311236168a109ca",
+      "id": "1c66332a-0c82-4634-8306-49dda33d13ce",
+      "_id": "1c66332a-0c82-4634-8306-49dda33d13ce",
       "name": "John Doe",
       "email": "john@example.com",
       "phoneNumber": "+1234567890",
       "role": "customer",
       "avatar": "/uploads/avatar/user.png",
-      "createdAt": "2024-03-24T10:00:00.000Z"
+      "createdAt": "2026-03-25T17:52:53.004Z",
+      "updatedAt": "2026-03-25T17:52:53.004Z"
     }
   }
   ```
@@ -109,7 +121,8 @@ Create a `.env` file in the root of the `user-service` directory. Use the follow
     "success": true,
     "message": "Login successful",
     "data": {
-      "_id": "60d0fe4f5311236168a109ca",
+      "id": "1c66332a-0c82-4634-8306-49dda33d13ce",
+      "_id": "1c66332a-0c82-4634-8306-49dda33d13ce",
       "name": "John Doe",
       "email": "john@example.com",
       "role": "customer"
@@ -120,14 +133,14 @@ Create a `.env` file in the root of the `user-service` directory. Use the follow
 
 #### 3. Get Public User Details
 * **Method & URL:** `GET /users/:id`
-* **Description:** Retrieves public-facing information about a user (highly useful for displaying car provider specific details without exposing PII).
+* **Description:** Retrieves public-facing information about a user. Supports both UUID and legacy MongoDB ObjectId lookups.
 * **Expected Response:** `200 OK`
   ```json
   {
     "success": true,
     "message": "User retrieved successfully",
     "data": {
-      "_id": "60d0fe4f5311236168a109ca",
+      "_id": "1c66332a-0c82-4634-8306-49dda33d13ce",
       "fullName": "Jane Provider",
       "avatar": "/uploads/avatar/user.png",
       "email": "jane@provider.com",
@@ -155,7 +168,7 @@ Create a `.env` file in the root of the `user-service` directory. Use the follow
 * **Request Payload:**
   ```json
   {
-    "userIds": ["60d0fe4f5311236168a109ca", "60d0fe4f5311236168a109cb"]
+    "userIds": ["1c66332a-0c82-4634-8306-49dda33d13ce", "a1b2c3d4-e5f6-7890-abcd-ef1234567890"]
   }
   ```
 * **Expected Response:** `200 OK`
@@ -193,15 +206,95 @@ curl -X GET http://localhost:3001/users/profile \
 
 ## 8. Database Schema
 
-The service faithfully relies on MongoDB to store active user data. Below is the Entity Relationship table mapping directly to the `User` Mongoose schema collection.
+The service uses **PostgreSQL** (hosted on Supabase) with **Prisma ORM** for data access. Below is the schema mapping for the `User` table:
 
 | Field | Type | Attributes | Description |
 |-------|------|------------|-------------|
-| `_id` | ObjectId | Primary Key | Auto-generated standard MongoDB identifier |
-| `name` | String | Required, Trimmed | The verified user's full functional name |
-| `email` | String | Required, Unique, Lowercase | The user's primary email address (solely used for standardized login) |
+| `id` | UUID | Primary Key, Auto-generated | PostgreSQL UUID v4 identifier |
+| `legacyId` | String | Unique, Nullable | Stores the old MongoDB `_id` for backward compatibility |
+| `name` | String | Required | The user's full name |
+| `email` | String | Required, Unique, Indexed | The user's primary email address (used for login) |
 | `password` | String | Required | Secure bcrypt hashed string |
-| `phoneNumber`| String | Required | Primary contact phone indicator |
-| `avatar` | String | Default String Map | Exact Path/URL pointing to the uploaded profile picture (`/uploads/avatar/user.png` standard default) |
-| `role` | String | Enum Set | Extracted roles: `admin`, `car_provider`, `customer`. Inherently defaults to `customer` |
-| `createdAt` | Date | Initialized Default | Chronological Timestamp tracking exact account creation logic |
+| `phoneNumber`| String | Required, Mapped to `phone_number` | Primary contact phone number |
+| `avatar` | String | Default: `/uploads/avatar/user.png` | Path/URL to the uploaded profile picture |
+| `role` | String | Default: `customer` | User roles: `admin`, `car_provider`, `customer` |
+| `createdAt` | DateTime | Auto-set on creation, Mapped to `created_at` | Timestamp tracking account creation |
+| `updatedAt` | DateTime | Auto-updated, Mapped to `updated_at` | Timestamp tracking last modification |
+
+---
+
+## 9. Migration Changelog: MongoDB → PostgreSQL
+
+> **Migration Date:** March 25, 2026
+> **Version:** `1.0.0` → `2.0.0`
+
+### Why We Migrated
+Moved from MongoDB (Mongoose) to PostgreSQL (Supabase) with Prisma ORM for stronger relational data integrity, better query performance, and unified infrastructure with Supabase's managed platform.
+
+### What Changed
+
+#### Files Created
+| File | Purpose |
+|------|---------|
+| `prisma/schema.prisma` | Prisma schema defining the `User` model for PostgreSQL |
+| `src/repositories/PrismaUserRepository.js` | Drop-in replacement for `MongoUserRepository` using Prisma Client |
+| `prisma.config.ts` *(if applicable)* | Prisma CLI configuration (for Prisma 7+ only) |
+
+#### Files Modified
+| File | Change |
+|------|--------|
+| `src/config/database.js` | `mongoose.connect()` → `prisma.$connect()` |
+| `src/config/container.js` | DI binding: `MongoUserRepository` → `PrismaUserRepository` |
+| `src/index.js` | Updated database import to Prisma module |
+| `src/entities/UserEntity.js` | Updated JSDoc references from Mongoose to Prisma |
+| `src/interfaces/IUserRepository.js` | Updated JSDoc to be database-agnostic |
+| `package.json` | Removed `mongoose`, `mongodb-memory-server`; added `@prisma/client`, `prisma` |
+| `.env` | Removed `MONGODB_URI`; added `DATABASE_URL`, `DIRECT_URL` |
+| `Dockerfile` | Added `prisma generate` step to Docker build |
+
+#### Files Deleted
+| File | Reason |
+|------|--------|
+| `src/models/user.model.js` | Old Mongoose schema — replaced by `prisma/schema.prisma` |
+| `src/repositories/MongoUserRepository.js` | Old Mongoose repository — replaced by `PrismaUserRepository.js` |
+
+#### Schema Mapping (Mongoose → Prisma)
+| Mongoose Field | Mongoose Type | Prisma Field | Prisma Type | Notes |
+|---------------|---------------|-------------|-------------|-------|
+| `_id` | `ObjectId` | `id` | `String @db.Uuid` | Auto-generated UUID v4 |
+| *(new)* | — | `legacyId` | `String?` | Stores old MongoDB `_id` for backward compat |
+| `name` | `String` | `name` | `String` | No change |
+| `email` | `String` | `email` | `String @unique` | No change |
+| `password` | `String` | `password` | `String` | No change |
+| `phoneNumber` | `String` | `phoneNumber` | `String` | Mapped to `phone_number` column |
+| `avatar` | `String` | `avatar` | `String` | Default: `/uploads/avatar/user.png` |
+| `role` | `String (enum)` | `role` | `String` | Default: `customer` |
+| `createdAt` | `Date` | `createdAt` | `DateTime` | `@default(now())` |
+| *(new)* | — | `updatedAt` | `DateTime` | `@updatedAt` (auto-managed by Prisma) |
+
+#### Key Architecture Decision: No Controller Changes Needed
+Thanks to the Clean Architecture (Repository Pattern + DI), the **controller layer required zero changes**. The migration was entirely contained within the data access layer — only the repository implementation was swapped.
+
+### ID Handling Strategy
+The `PrismaUserRepository` automatically detects the ID format:
+- **UUID format** (e.g. `1c66332a-0c82-4634-8306-49dda33d13ce`) → queries by `id`
+- **MongoDB ObjectId** (e.g. `68104c8526632ef737164552`) → queries by `legacyId`
+
+This ensures full backward compatibility with existing frontend clients and other microservices that may still reference old MongoDB IDs.
+
+### API Test Results (Post-Migration)
+
+All endpoints verified on **March 25, 2026** against the live Supabase PostgreSQL database:
+
+| # | Endpoint | Method | Status | Result |
+|---|----------|--------|--------|--------|
+| 1 | `/health` | GET | `200 OK` | ✅ Service healthy |
+| 2 | `/users/register` | POST | `201 Created` | ✅ User created with UUID |
+| 3 | `/users/login` | POST | `200 OK` | ✅ JWT token returned |
+| 4 | `/users/profile` | GET | `200 OK` | ✅ Authenticated profile |
+| 5 | `/users` | GET | `200 OK` | ✅ All users listed (15 migrated + 1 new) |
+| 6 | `/users/:uuid` | GET | `200 OK` | ✅ Lookup by new UUID |
+| 7 | `/users/:mongoId` | GET | `200 OK` | ✅ Lookup by legacy MongoDB ObjectId |
+| 8 | `/users/role/:role` | GET | `200 OK` | ✅ Filtered by role |
+| 9 | `/users/:id` | PATCH | `200 OK` | ✅ User updated successfully |
+| 10 | `/users/:id` | DELETE | `200 OK` | ✅ User deleted successfully |
