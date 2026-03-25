@@ -1,16 +1,10 @@
 /**
- * ⚠️  DEPRECATED — This test relies on MongoDB (MongoMemoryServer + Mongoose)
- * which have been removed from the project as part of the PostgreSQL migration.
- * This file is kept for reference only. It needs to be rewritten to use
- * Prisma + PostgreSQL (or a test database) for integration testing.
- *
  * BASELINE INTEGRATION TEST — User Authentication Flow
  *
- * This test MUST pass BEFORE and AFTER Phase 1 refactoring.
- * It verifies end-to-end behaviour against a real (in-memory) MongoDB.
+ * This test verifies end-to-end behaviour against PostgreSQL via Prisma.
+ * It ensures the authentication flow works as expected.
  */
-const { MongoMemoryServer } = require('mongodb-memory-server');
-const mongoose = require('mongoose');
+const { PrismaClient } = require('@prisma/client');
 const request = require('supertest');
 const express = require('express');
 
@@ -19,14 +13,20 @@ const userRoutes = require('../../src/routes/user.routes');
 const errorHandler = require('../../src/middleware/errorMiddleware');
 const { scopePerRequest } = require('../../src/middleware/containerMiddleware');
 
-let mongoServer;
+const prisma = new PrismaClient();
 let app;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
+  await prisma.$connect();
 
-  await mongoose.connect(uri);
+  // Clean up any left-over test users before starting tests
+  await prisma.user.deleteMany({
+    where: {
+      email: {
+        in: ['test@example.com', 'incomplete@example.com', 'ghost@example.com']
+      }
+    }
+  });
 
   // Set JWT_SECRET for tests
   process.env.JWT_SECRET = 'test_secret_key_for_integration';
@@ -39,15 +39,18 @@ beforeAll(async () => {
 }, 30000);
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+  await prisma.$disconnect();
 });
 
 afterEach(async () => {
-  const collections = mongoose.connection.collections;
-  for (const key in collections) {
-    await collections[key].deleteMany({});
-  }
+  // Clean up only the test users to avoid wiping the development database
+  await prisma.user.deleteMany({
+    where: {
+      email: {
+        in: ['test@example.com', 'incomplete@example.com', 'ghost@example.com']
+      }
+    }
+  });
 });
 
 // --- Test Data ---

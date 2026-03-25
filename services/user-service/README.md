@@ -251,6 +251,7 @@ Moved from MongoDB (Mongoose) to PostgreSQL (Supabase) with Prisma ORM for stron
 | `package.json` | Removed `mongoose`, `mongodb-memory-server`; added `@prisma/client`, `prisma` |
 | `.env` | Removed `MONGODB_URI`; added `DATABASE_URL`, `DIRECT_URL` |
 | `Dockerfile` | Added `prisma generate` step to Docker build |
+| `tests/integration/user.auth.baseline.test.js` | Rewritten to use `PrismaClient` against PostgreSQL instead of `MongoMemoryServer` |
 
 #### Files Deleted
 | File | Reason |
